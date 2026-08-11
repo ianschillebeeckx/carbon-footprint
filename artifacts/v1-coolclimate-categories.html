@@ -1,0 +1,959 @@
+<title>CoolClimate Inputs — Goods & Services</title>
+<style>
+  :root {
+    --ground: #F7F8F5;
+    --card: #FFFFFF;
+    --ink: #262B21;
+    --muted: #6C7465;
+    --leaf: #3E7C3A;
+    --chip: #E6EEE1;
+    --line: #D9DED2;
+    --warn: #A15C00;
+    --warnbg: #F6EDDD;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ground:#161A15; --card:#1E241D; --ink:#E4E8DD; --muted:#98A18F; --leaf:#7DB979; --chip:#263124; --line:#333B31; --warn:#D9A45B; --warnbg:#2E2718;
+            --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; }
+  }
+  :root[data-theme="dark"] { --ground:#161A15; --card:#1E241D; --ink:#E4E8DD; --muted:#98A18F; --leaf:#7DB979; --chip:#263124; --line:#333B31; --warn:#D9A45B; --warnbg:#2E2718;
+            --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; }
+  :root[data-theme="light"] { --ground:#F7F8F5; --card:#FFFFFF; --ink:#262B21; --muted:#6C7465; --leaf:#3E7C3A; --chip:#E6EEE1; --line:#D9DED2; --warn:#A15C00; --warnbg:#F6EDDD;
+            --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948; }
+
+  * { box-sizing: border-box; }
+  body { background: var(--ground); color: var(--ink); font-family: "Avenir Next", Seravek, system-ui, sans-serif; line-height: 1.45; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+
+  header.top { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 14px 20px 10px; border-bottom: 1px solid var(--line); }
+  header.top h1 { font-size: 1.05rem; font-weight: 600; margin: 0; }
+  header.top .window { color: var(--muted); font-size: 0.8rem; flex: 1; }
+  header.top button, label.filebtn { font: inherit; font-size: 0.82rem; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 7px; padding: 5px 12px; cursor: pointer; }
+  header.top label.filebtn { background: var(--leaf); color: #fff; border-color: transparent; }
+  header.top button:hover, label.filebtn:hover { filter: brightness(1.05); }
+
+  .panes { flex: 1; display: flex; min-height: 0; }
+  #left { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+  #right { flex: 0 0 330px; overflow-y: auto; padding: 16px 20px 40px; border-right: 1px solid var(--line); }
+  #chartpane { flex: 0 0 360px; overflow-y: auto; padding: 16px 18px 40px; position: relative; }
+  @media (max-width: 1150px) { .panes { flex-wrap: wrap; overflow-y: auto; } #left { flex: 1 1 100%; max-height: 55vh; border-right: none; } #right, #chartpane { flex: 1 1 300px; } }
+  @media (max-width: 800px) { .panes { flex-direction: column; } #left, #right, #chartpane { flex: none; max-width: none; border-right: none; } }
+  #chart-svg { width: 100%; height: auto; display: block; }
+  #chart-svg text { font-family: "Avenir Next", Seravek, system-ui, sans-serif; }
+  .legend { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+  .lrow { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; }
+  .lrow .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .lrow .lv { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+  #chart-tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--ground); font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; white-space: pre; opacity: 0; transition: opacity 0.1s; z-index: 5; }
+  @media (prefers-reduced-motion: reduce) { #chart-tip { transition: none; } }
+
+  .tabs { display: flex; gap: 4px; padding: 10px 16px 0; }
+  .tabs button { font: inherit; font-size: 0.85rem; border: 1px solid var(--line); border-bottom: none; background: var(--ground); color: var(--muted); border-radius: 8px 8px 0 0; padding: 6px 14px; cursor: pointer; }
+  .tabs button.active { background: var(--card); color: var(--ink); font-weight: 600; }
+  .tabbody { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--card); border-top: 1px solid var(--line); }
+
+  .toolbar { display: flex; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .toolbar input[type=search] { font: inherit; font-size: 0.85rem; padding: 5px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--ground); color: var(--ink); flex: 1; min-width: 120px; }
+  .toolbar select { font: inherit; font-size: 0.82rem; border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; background: var(--ground); color: var(--ink); }
+  .toolbar .count { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+  .toolbar .fieldfilter { background: var(--chip); color: var(--ink); font-size: 0.78rem; border-radius: 999px; padding: 3px 10px; cursor: pointer; border: none; }
+
+  #txnlist, #rules { flex: 1; overflow-y: auto; padding: 6px 10px 30px; }
+  .trow { display: grid; grid-template-columns: 5.2em minmax(0,1fr) auto minmax(150px, 190px); gap: 10px; align-items: center; padding: 4px 8px; border-radius: 6px; font-size: 0.82rem; }
+  .trow:hover { background: var(--chip); }
+  .trow.unmapped { background: var(--warnbg); }
+  .trow .d { color: var(--muted); font-family: var(--mono); font-size: 0.75rem; }
+  .trow .m { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .trow .m small { color: var(--muted); }
+  .trow .a { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .trow select { font: inherit; font-size: 0.75rem; width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; background: var(--ground); color: var(--ink); }
+  .trow.overridden select { border-color: var(--leaf); }
+
+  .dropzone { margin: 30px auto; max-width: 420px; border: 2px dashed var(--line); border-radius: 12px; padding: 40px 24px; text-align: center; color: var(--muted); font-size: 0.9rem; }
+  .dropzone.drag { border-color: var(--leaf); background: var(--chip); }
+  .dropzone b { color: var(--ink); }
+
+  h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; margin: 20px 0 6px; }
+  #impact { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--ground); }
+  #impact .stat { flex: 1 1 180px; position: relative; padding-right: 30px; }
+  #impact .sub { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+  .info { width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--line); background: var(--ground); color: var(--muted); font-size: 0.68rem; line-height: 1; cursor: help; padding: 0; flex: none; }
+  .info:hover, .info:focus-visible { background: var(--chip); color: var(--ink); }
+  #impact .info { position: absolute; top: 7px; right: 8px; }
+  .frow .info { width: 15px; height: 15px; font-size: 0.62rem; align-self: center; }
+  .frow > span:first-child { flex: 1; }
+  .frow .kgd { color: var(--muted); font-size: 0.68rem; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #info-pop { position: fixed; max-width: 270px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 0.76rem; line-height: 1.45; box-shadow: 0 4px 16px rgba(0,0,0,0.18); z-index: 60; display: none; }
+  .stats { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stat { flex: 1 1 110px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+  .stat .k { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .stat .v { font-family: var(--mono); font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+  .stat .v small { font-size: 0.7rem; color: var(--muted); }
+
+  .frow { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 6px 10px; border-radius: 7px; background: var(--card); border: 1px solid var(--line); margin-bottom: 4px; cursor: pointer; font-size: 0.87rem; }
+  .frow:hover { background: var(--chip); }
+  .frow.active { outline: 2px solid var(--leaf); }
+  .frow .amt { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .frow .amt small { color: var(--muted); font-weight: 400; }
+  .hint { color: var(--muted); font-size: 0.75rem; margin: 6px 0; }
+
+  .prefill { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 22px; font-size: 0.85rem; }
+  .prefill a { color: var(--leaf); }
+  button.copy { font: inherit; font-size: 0.82rem; background: var(--leaf); color: #fff; border: none; border-radius: 7px; padding: 6px 13px; cursor: pointer; margin-top: 8px; }
+  button.copy:hover { filter: brightness(1.08); }
+
+  /* rules editor */
+  .rulegroup { margin: 14px 6px 22px; }
+  .rulegroup h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 0 0 8px; }
+  .rrow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(160px, 200px) auto; gap: 8px; align-items: start; padding: 5px 8px; border-radius: 6px; font-size: 0.83rem; }
+  .rrow:nth-child(odd) { background: var(--ground); }
+  .rrow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-top: 4px; }
+  .rrow .tot { color: var(--muted); font-family: var(--mono); font-size: 0.75rem; text-align: right; padding-top: 5px; white-space: nowrap; }
+  .rrow select, .rrow input[type=text] { font: inherit; font-size: 0.78rem; border: 1px solid var(--line); border-radius: 6px; padding: 3px 5px; background: var(--card); color: var(--ink); width: 100%; }
+  .rrow .del { font: inherit; background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px; }
+  .rrow .del:hover { color: var(--warn); }
+  .splitedit { grid-column: 1 / -1; margin: 2px 0 6px 12px; padding-left: 10px; border-left: 2px solid var(--line); }
+  .sprow { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+  .sprow select { width: 220px; }
+  .sprow input[type=number] { font-family: var(--mono); font-size: 0.78rem; width: 62px; border: 1px solid var(--line); border-radius: 6px; padding: 3px 5px; background: var(--card); color: var(--ink); }
+  .sprow button { font: inherit; background: none; border: none; color: var(--muted); cursor: pointer; }
+  .spsum { font-size: 0.75rem; color: var(--muted); }
+  .spsum.bad { color: var(--warn); font-weight: 600; }
+  .addbtn { font: inherit; font-size: 0.78rem; background: var(--chip); border: 1px solid var(--line); color: var(--ink); border-radius: 6px; padding: 4px 10px; cursor: pointer; margin-top: 4px; }
+
+  :focus-visible { outline: 2px solid var(--leaf); outline-offset: 1px; }
+</style>
+
+<header class="top">
+  <h1>CoolClimate Goods &amp; Services</h1>
+  <span class="window" id="window">No data — upload a Monarch CSV export</span>
+  <label class="filebtn" for="csvfile">Upload CSV</label>
+  <input id="csvfile" type="file" accept=".csv,text/csv" hidden>
+  <button id="clearbtn" title="Remove transaction data and per-transaction choices from this browser">Clear data</button>
+</header>
+
+<div id="impact">
+  <div class="stat"><div class="k">Shopping footprint</div><div class="v" id="imp-tons">0 <small>t CO₂e/yr</small></div>
+    <button class="info" aria-label="About this number" data-tip="Your Goods &amp; Services spending multiplied by CoolClimate's carbon intensity for each category (kg CO₂e per dollar, measured from their calculator model), annualized from the uploaded window.">?</button></div>
+  <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">$0 <small>/yr</small></div><div class="sub" id="imp-damage-pct"></div>
+    <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: each tonne of CO₂e causes roughly $240 of discounted future damages — storms, floods, wildfire, crop loss, and other climate harms, mostly borne by other people.">?</button></div>
+  <div class="stat"><div class="k">To offset · $600/t</div><div class="v" id="imp-offset">$0 <small>/yr</small></div><div class="sub" id="imp-offset-pct"></div>
+    <button class="info" aria-label="About this number" data-tip="What permanently removing this much carbon would cost via Charm Industrial (agricultural waste converted to bio-oil and injected into geologic storage, ~$600/tonne). The percentage is the effective surcharge on your goods &amp; services spending if every purchase paid for its own removal.">?</button></div>
+  <div class="stat"><div class="k">Excess deaths · 50 yrs</div><div class="v" id="imp-deaths">0</div><div class="sub">Bressler mortality cost, horizon 2100</div>
+    <button class="info" aria-label="About this number" data-tip="Excess global deaths these emissions would cause if sustained for 50 years, counting deaths through 2100. Closed-form fit calibrated to Bressler (2021, Nature Communications): 2.26×10⁻⁴ deaths per tonne of CO₂. A micromort is a one-in-a-million chance of death.">?</button></div>
+</div>
+
+<div class="panes">
+  <div id="left">
+    <div class="tabs">
+      <button id="tab-txns" class="active">Transactions</button>
+      <button id="tab-rules">Rules</button>
+    </div>
+    <div class="tabbody">
+      <div class="toolbar" id="txn-toolbar">
+        <input type="search" id="search" placeholder="Search merchant or category…">
+        <select id="filter">
+          <option value="all">All</option>
+          <option value="unmapped">⚠ Unmapped</option>
+          <option value="ignored">Ignored</option>
+          <option value="overridden">Changed by me</option>
+        </select>
+        <button class="fieldfilter" id="fieldfilter" hidden></button>
+        <span class="count" id="count"></span>
+      </div>
+      <div id="txnlist"></div>
+      <div id="rules" hidden></div>
+    </div>
+  </div>
+
+  <div id="right">
+    <div class="stats">
+      <div class="stat"><div class="k">Goods</div><div class="v" id="st-goods">$0</div></div>
+      <div class="stat"><div class="k">Services</div><div class="v" id="st-services">$0</div></div>
+      <div class="stat"><div class="k">Total</div><div class="v" id="st-total">$0</div></div>
+    </div>
+    <div id="fieldlist"></div>
+    <p class="hint">All values are $/month averages over the uploaded window. Click a field to see its transactions; click the number to copy it.</p>
+    <div class="prefill">
+      <b>Prefill the calculator</b>
+      <p style="margin:6px 0">Open the <a href="https://coolclimate-calculator-ui.firebaseapp.com/en-US/shopping" target="_blank" rel="noopener">CoolClimate calculator</a> → F12 → Console → paste → Enter. Fields fill in and switch to Advanced.</p>
+      <button class="copy" id="copy-script">Copy prefill script</button>
+      <textarea id="script-out" hidden readonly rows="4" style="width:100%;margin-top:8px;font-family:var(--mono);font-size:0.7rem;border:1px solid var(--line);border-radius:7px;background:var(--ground);color:var(--ink);padding:6px" aria-label="Prefill script"></textarea>
+    </div>
+    <p class="hint" style="margin-top:18px">Your CSV is parsed and stored only in this browser — nothing is uploaded anywhere. Assignments follow the Rules tab; a dropdown on any transaction overrides its rule.</p>
+  </div>
+
+  <div id="chartpane">
+    <h2 style="margin-top:0">Emissions by month (kg CO₂e) — goods | services</h2>
+    <div id="chart-host"></div>
+    <div class="legend" id="chart-legend"></div>
+    <div id="chart-tip"></div>
+    <p class="hint" style="margin-top:12px">Computed with CoolClimate's own kg/$ intensities per category (measured from their calculator API; linear in spending, identical across locations/income). Each month shows a Goods bar (left) and a Services bar (right); the top three categories of each get their own color, the rest fold into a remainder.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) {}
+  ta.remove();
+  return ok;
+}
+
+const FIELDS = {
+  goods_furniture_appliances: ["Goods", "Furniture & Appliances"],
+  goods_clothing: ["Goods", "Clothing"],
+  goods_entertainment: ["Goods", "Entertainment"],
+  goods_paper_office_reading: ["Goods", "Paper, Office, & Reading"],
+  goods_personal_care_cleaning: ["Goods", "Personal Care & Cleaning"],
+  goods_auto_parts: ["Goods", "Auto Parts"],
+  goods_medical: ["Goods", "Medical"],
+  services_health_care: ["Services", "Health Care"],
+  services_education: ["Services", "Education"],
+  services_information_communication: ["Services", "Information & Communication"],
+  services_vehicle_service: ["Services", "Vehicle Service"],
+  services_personal_business_finance: ["Services", "Personal Business & Finance"],
+  services_household_maintenance_repair: ["Services", "Household Maintenance & Repair"],
+  services_organizations_charity: ["Services", "Organizations & Charity"],
+  services_other: ["Services", "Other services"],
+};
+// CoolClimate's own category definitions (calculator help text)
+const FIELD_DESC = {
+  goods_furniture_appliances: "Includes furniture, clocks, lighting, decorative items, carpets, flooring, window coverings, major household appliances, small electric household appliances, dishes, flatware, non-electric cookware, tableware, tools, hardware, supplies, and outdoor equipment.",
+  goods_clothing: "Includes new and used clothing, shoes, luggage, jewelry, and clothing materials.",
+  goods_entertainment: "Includes televisions, video and audio equipment, photographic equipment and supplies, computers and other information processing equipment, sporting goods, guns and ammunition, motorcycles, bicycles and accessories, boats, aircraft and other recreational vehicles, musical instruments, games, toys and hobbies, pets and pet products, and plants.",
+  goods_paper_office_reading: "Includes paper products, newspapers, magazines, books, stationery, and office and school supplies.",
+  goods_personal_care_cleaning: "Includes household cleaning products, household paper products, linens, sewing items, personal care products, cosmetics, and small electric appliances for personal care.",
+  goods_auto_parts: "Includes motor vehicle tires, accessories, and parts.",
+  goods_medical: "Includes medical equipment, eyeglasses, pharmaceutical products, and other medical products.",
+  services_health_care: "Includes physician services, dental services, medical laboratories, outpatient care facilities, hospitals, nursing services, nursing homes, and paramedical services.",
+  services_education: "Includes elementary and secondary schools, higher education, private education, and other education and research services.",
+  services_information_communication: "Includes telephone services and charges, postal service, and Internet access.",
+  services_vehicle_service: "Includes motor vehicle maintenance and repair services, auto leasing, parking fees, and tolls.",
+  services_personal_business_finance: "Includes financial services, banks, financial fees and charges, equity services, mutual fund charges, portfolio management and investment services, pension services, insurance services, accounting services, labor organization fees, professional associations, and legal services.",
+  services_household_maintenance_repair: "Includes domestic services, moving and storage, repair of household appliances, and other household services.",
+  services_organizations_charity: "Includes contributions and dues to religious, charitable, political, and other membership organizations.",
+  services_other: "Includes hotels and motels, funeral and burial services, hairdressing salons, miscellaneous personal care services, laundry and dry-cleaning, child care, individual and family services, vocational rehabilitation, and emergency relief services.",
+};
+
+const CALC_KEYS = {
+  goods_furniture_appliances: "input_footprint_shopping_goods_furnitureappliances",
+  goods_clothing: "input_footprint_shopping_goods_clothing",
+  goods_entertainment: "input_footprint_shopping_goods_other_entertainment",
+  goods_paper_office_reading: "input_footprint_shopping_goods_other_office",
+  goods_personal_care_cleaning: "input_footprint_shopping_goods_other_personalcare",
+  goods_auto_parts: "input_footprint_shopping_goods_other_autoparts",
+  goods_medical: "input_footprint_shopping_goods_other_medical",
+  services_health_care: "input_footprint_shopping_services_healthcare",
+  services_education: "input_footprint_shopping_services_education",
+  services_information_communication: "input_footprint_shopping_services_communications",
+  services_vehicle_service: "input_footprint_shopping_services_vehicleservices",
+  services_personal_business_finance: "input_footprint_shopping_services_finance",
+  services_household_maintenance_repair: "input_footprint_shopping_services_household",
+  services_organizations_charity: "input_footprint_shopping_services_charity",
+  services_other: "input_footprint_shopping_services_miscservices",
+};
+
+// Assignment shapes: {t:"field", f} | {t:"ignore"} | {t:"split", w:{field:weight}} | {t:"unmapped"}
+const DEFAULT_RULES = {
+  categories: {
+    "Clothing": {t:"field", f:"goods_clothing"},
+    "Furniture & Housewares": {t:"field", f:"goods_furniture_appliances"},
+    "Electronics": {t:"field", f:"goods_entertainment"},
+    "Entertainment & Recreation": {t:"field", f:"goods_entertainment"},
+    "Woodworking": {t:"field", f:"goods_entertainment"},
+    "Hobby and Craft": {t:"field", f:"goods_entertainment"},
+    "Fun Money": {t:"field", f:"goods_entertainment"},
+    "Gifts": {t:"field", f:"goods_entertainment"},
+    "Garden": {t:"field", f:"goods_entertainment"},
+    "Personal": {t:"field", f:"goods_personal_care_cleaning"},
+    "Household Stuff (Paper towels,etc)": {t:"field", f:"goods_personal_care_cleaning"},
+    "Shopping": {t:"split", w:{goods_clothing:20, goods_entertainment:30, goods_personal_care_cleaning:20, goods_paper_office_reading:10, goods_furniture_appliances:20}},
+    "Medical": {t:"field", f:"services_health_care"},
+    "Dentist": {t:"field", f:"services_health_care"},
+    "Fitness": {t:"field", f:"services_other"},
+    "Haircut": {t:"field", f:"services_other"},
+    "Sailing": {t:"split", w:{services_other:80, goods_entertainment:20}},
+    "Miscellaneous": {t:"field", f:"services_other"},
+    "Uncategorized": {t:"field", f:"services_other"},
+    "Child Activities": {t:"field", f:"services_other"},
+    "Child Activity": {t:"field", f:"services_other"},
+    "Internet & Cable": {t:"field", f:"services_information_communication"},
+    "Phone": {t:"field", f:"services_information_communication"},
+    "Streaming": {t:"field", f:"services_information_communication"},
+    "Auto Maintenance": {t:"field", f:"services_vehicle_service"},
+    "Parking & Tolls": {t:"field", f:"services_vehicle_service"},
+    "Auto Registration and Taxes": {t:"field", f:"services_vehicle_service"},
+    "Auto Insurance": {t:"field", f:"services_personal_business_finance"},
+    "Home Insurance": {t:"field", f:"services_personal_business_finance"},
+    "life insurance": {t:"field", f:"services_personal_business_finance"},
+    "Financial & Legal Services": {t:"field", f:"services_personal_business_finance"},
+    "Financial Fees": {t:"field", f:"services_personal_business_finance"},
+    "Home Improvement": {t:"field", f:"services_household_maintenance_repair"},
+    "House Cleaning": {t:"field", f:"services_household_maintenance_repair"},
+    "Charity": {t:"field", f:"services_organizations_charity"},
+    "Travel & Vacation": {t:"split", w:{services_other:30}},  // hotels; the other 70% is ignored (flights/transport)
+    "Groceries": {t:"ignore"}, "Farmers Market": {t:"ignore"}, "Restaurants": {t:"ignore"},
+    "Alcohol & Bars": {t:"ignore"}, "Coffee Shops": {t:"ignore"}, "Gas": {t:"ignore"},
+    "Car Electricity": {t:"ignore"}, "Public Transit": {t:"ignore"}, "Taxi & Ride Shares": {t:"ignore"},
+    "Mortgage": {t:"ignore"}, "HELOC": {t:"ignore"}, "Gas & Electric": {t:"ignore"},
+    "Water": {t:"ignore"}, "Garbage": {t:"ignore"}, "Taxes": {t:"ignore"},
+    "Cash & ATM": {t:"ignore"}, "Check": {t:"ignore"}, "Credit Card Payment": {t:"ignore"},
+    "Transfer": {t:"ignore"}, "Carbon Removal": {t:"ignore"}, "Child Care": {t:"ignore"},
+    "CareDX Reimburseable": {t:"ignore"}, "Paychecks": {t:"ignore"}, "Bonus": {t:"ignore"},
+    "Other Income": {t:"ignore"}, "Interest": {t:"ignore"}, "Tax Refund": {t:"ignore"},
+    "CA Benefits": {t:"ignore"}, "Credit Card Rewards": {t:"ignore"},
+  },
+  merchants: [
+    {match: "Amazon", cat: "Shopping", assign: {t:"split", w:{goods_entertainment:30, goods_clothing:20, goods_personal_care_cleaning:20, goods_furniture_appliances:20, goods_paper_office_reading:10}}},
+    {match: "Home Depot", cat: "", assign: {t:"field", f:"goods_furniture_appliances"}},
+    {match: "Ace Hardware", cat: "", assign: {t:"field", f:"goods_furniture_appliances"}},
+    {match: "Electrical Hardware", cat: "", assign: {t:"field", f:"goods_furniture_appliances"}},
+    {match: "IKEA", cat: "", assign: {t:"field", f:"goods_furniture_appliances"}},
+    {match: "CVS", cat: "", assign: {t:"field", f:"goods_medical"}},
+    {match: "Walgreens", cat: "", assign: {t:"field", f:"goods_medical"}},
+    {match: "Airlines", cat: "", assign: {t:"ignore"}},
+    {match: "Airways", cat: "", assign: {t:"ignore"}},
+    {match: "San Francisco Municipal Transportation Agency", cat: "", assign: {t:"ignore"}},
+  ],
+};
+
+// ---------- state ----------
+let txns = [];            // {date, merchant, category, amount}
+let meta = null;          // {start, end, months}
+let rules = null;
+let overrides = {};       // key -> {t:"field",f}|{t:"ignore"}
+let ui = {tab: "txns", search: "", filter: "all", field: null};
+
+const store = {
+  load() {
+    try {
+      const d = JSON.parse(localStorage.getItem("cf_data") || "null");
+      if (d) { txns = d.txns; meta = d.meta; }
+      rules = JSON.parse(localStorage.getItem("cf_rules") || "null") || structuredClone(DEFAULT_RULES);
+      overrides = JSON.parse(localStorage.getItem("cf_overrides") || "{}");
+    } catch (e) { rules = structuredClone(DEFAULT_RULES); }
+  },
+  saveData() { localStorage.setItem("cf_data", JSON.stringify({txns, meta})); },
+  saveRules() { localStorage.setItem("cf_rules", JSON.stringify(rules)); },
+  saveOverrides() { localStorage.setItem("cf_overrides", JSON.stringify(overrides)); },
+};
+
+const txnKey = t => `${t.date}|${t.merchant}|${t.amount}`;
+
+// ---------- CSV ----------
+function parseCSV(text) {
+  const rows = [];
+  let row = [], cell = "", inq = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inq) {
+      if (c === '"') { if (text[i+1] === '"') { cell += '"'; i++; } else inq = false; }
+      else cell += c;
+    } else if (c === '"') inq = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i+1] === "\n") i++;
+      row.push(cell); cell = "";
+      if (row.length > 1 || row[0] !== "") rows.push(row);
+      row = [];
+    } else cell += c;
+  }
+  if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+
+function importCSV(text) {
+  const rows = parseCSV(text.replace(/^\uFEFF/, ""));
+  const header = rows.shift() || [];
+  const col = name => header.indexOf(name);
+  if (col("Date") < 0 || col("Category") < 0 || col("Amount") < 0) {
+    alert("This doesn't look like a Monarch transactions CSV (need Date, Category, Amount columns).");
+    return;
+  }
+  const [di, mi, ci, ai] = [col("Date"), col("Merchant"), col("Category"), col("Amount")];
+  txns = rows.filter(r => r[di]).map(r => ({
+    date: r[di],
+    merchant: mi >= 0 ? (r[mi] || "") : "",
+    category: r[ci] || "Uncategorized",
+    amount: parseFloat(String(r[ai]).replace(/[$,]/g, "")) || 0,
+  })).sort((a, b) => b.date.localeCompare(a.date));
+  const dates = txns.map(t => t.date).sort();
+  const days = (new Date(dates[dates.length-1]) - new Date(dates[0])) / 864e5 + 1;
+  meta = {start: dates[0], end: dates[dates.length-1], months: Math.max(1, Math.round(days / 30.44))};
+  store.saveData();
+  renderAll();
+}
+
+// ---------- assignment ----------
+function ruleFor(t) {
+  const m = t.merchant.toLowerCase();
+  for (const r of rules.merchants) {
+    if (r.match && m.includes(r.match.toLowerCase()) && (!r.cat || r.cat === t.category)) return r.assign;
+  }
+  return rules.categories[t.category] || {t: "unmapped"};
+}
+const assignFor = t => overrides[txnKey(t)] || ruleFor(t);
+
+function contributions(t) {
+  // returns {field: dollars} for one transaction (spend = -amount)
+  const a = assignFor(t), spend = -t.amount, out = {};
+  if (a.t === "field") out[a.f] = spend;
+  else if (a.t === "split") {
+    const entries = Object.entries(a.w).filter(([f, w]) => FIELDS[f] && w > 0);
+    const total = entries.reduce((s, [, w]) => s + w, 0);
+    const base = total > 100 ? total : 100;  // weights are %; under 100 leaves the remainder unassigned
+    for (const [f, w] of entries) out[f] = spend * w / base;
+  }
+  return out;
+}
+
+function compute() {
+  const totals = Object.fromEntries(Object.keys(FIELDS).map(k => [k, 0]));
+  for (const t of txns) for (const [f, v] of Object.entries(contributions(t))) totals[f] += v;
+  const months = meta ? meta.months : 1;
+  return Object.fromEntries(Object.entries(totals).map(([k, v]) => [k, v / months]));
+}
+
+// ---------- assignment labels & selects ----------
+function assignLabel(a) {
+  if (a.t === "field") return FIELDS[a.f][1];
+  if (a.t === "ignore") return "Ignored";
+  if (a.t === "split") return "Split: " + Object.entries(a.w).filter(([f,w]) => FIELDS[f] && w>0).map(([f, w]) => `${w}% ${FIELDS[f][1]}`).join(", ");
+  return "⚠ Unmapped";
+}
+
+function fieldOptions(selected) {
+  let out = "";
+  for (const section of ["Goods", "Services"]) {
+    out += `<optgroup label="${section}">`;
+    for (const [k, [sec, label]] of Object.entries(FIELDS)) {
+      if (sec === section) out += `<option value="${k}" ${selected === k ? "selected" : ""}>${label}</option>`;
+    }
+    out += "</optgroup>";
+  }
+  return out;
+}
+
+// ---------- transactions pane ----------
+function renderTxns() {
+  const list = $("txnlist");
+  const scroll = list.scrollTop;
+  list.innerHTML = "";
+  if (!txns.length) {
+    list.innerHTML = `<div class="dropzone" id="dropzone"><b>Drop a Monarch CSV export here</b><br>or use the Upload CSV button.<br><br>Monarch → Transactions → Download CSV.<br>Parsed locally; nothing leaves this page.</div>`;
+    wireDropzone($("dropzone"));
+    $("count").textContent = "";
+    return;
+  }
+  const q = ui.search.toLowerCase();
+  const frag = document.createDocumentFragment();
+  let shown = 0;
+  txns.forEach((t, i) => {
+    const a = assignFor(t);
+    const over = !!overrides[txnKey(t)];
+    if (q && !(t.merchant.toLowerCase().includes(q) || t.category.toLowerCase().includes(q))) return;
+    if (ui.filter === "unmapped" && a.t !== "unmapped") return;
+    if (ui.filter === "ignored" && a.t !== "ignore") return;
+    if (ui.filter === "overridden" && !over) return;
+    if (ui.field && !(a.t === "field" && a.f === ui.field) && !(a.t === "split" && a.w[ui.field] > 0)) return;
+    shown++;
+    if (shown > 800) return;  // keep the DOM sane; search to narrow
+    const row = document.createElement("div");
+    row.className = "trow" + (a.t === "unmapped" ? " unmapped" : "") + (over ? " overridden" : "");
+    const auto = ruleFor(t);
+    row.innerHTML =
+      `<span class="d">${esc(t.date)}</span>` +
+      `<span class="m" title="${esc(t.merchant)}">${esc(t.merchant) || "(no merchant)"} <small>· ${esc(t.category)}</small></span>` +
+      `<span class="a">${t.amount < 0 ? "$" + fmt(-t.amount) : "−$" + fmt(t.amount)}</span>` +
+      `<select aria-label="CoolClimate assignment">` +
+        `<option value="__auto" ${!over ? "selected" : ""}>Auto → ${assignLabel(auto)}</option>` +
+        fieldOptions(over && a.t === "field" ? a.f : null) +
+        `<option value="__ignore" ${over && a.t === "ignore" ? "selected" : ""}>Ignore</option>` +
+      `</select>`;
+    row.querySelector("select").onchange = e => {
+      const v = e.target.value, k = txnKey(t);
+      if (v === "__auto") delete overrides[k];
+      else if (v === "__ignore") overrides[k] = {t: "ignore"};
+      else overrides[k] = {t: "field", f: v};
+      store.saveOverrides();
+      renderAll();
+    };
+    frag.appendChild(row);
+  });
+  list.appendChild(frag);
+  list.scrollTop = scroll;
+  $("count").textContent = shown > 800 ? `${shown} matches (showing 800)` : `${shown} of ${txns.length}`;
+}
+
+function wireDropzone(dz) {
+  dz.ondragover = e => { e.preventDefault(); dz.classList.add("drag"); };
+  dz.ondragleave = () => dz.classList.remove("drag");
+  dz.ondrop = e => {
+    e.preventDefault(); e.stopPropagation(); dz.classList.remove("drag");
+    const f = e.dataTransfer.files[0];
+    if (f) f.text().then(importCSV);
+  };
+}
+
+// ---------- rules pane ----------
+function splitEditor(assign, onChange) {
+  const wrap = document.createElement("div");
+  wrap.className = "splitedit";
+  const draw = () => {
+    wrap.innerHTML = "";
+    for (const [f, w] of Object.entries(assign.w)) {
+      const row = document.createElement("div");
+      row.className = "sprow";
+      row.innerHTML = `<select>${fieldOptions(f)}</select><input type="number" min="0" max="100" step="5" value="${w}"><span class="spsum">%</span><button title="Remove">✕</button>`;
+      const [sel, num, , del] = row.children;
+      sel.onchange = () => { const nf = sel.value; if (nf !== f && !(nf in assign.w)) { assign.w[nf] = assign.w[f]; delete assign.w[f]; onChange(); draw(); } else draw(); };
+      num.onchange = () => { assign.w[f] = Math.max(0, parseFloat(num.value) || 0); onChange(); sum(); };
+      del.onclick = () => { delete assign.w[f]; onChange(); draw(); };
+      wrap.appendChild(row);
+    }
+    const foot = document.createElement("div");
+    foot.className = "sprow";
+    foot.innerHTML = `<button class="addbtn">+ field</button><span class="spsum" id="spsum"></span>`;
+    foot.querySelector("button").onclick = () => {
+      const unused = Object.keys(FIELDS).find(f => !(f in assign.w));
+      if (unused) { assign.w[unused] = 0; onChange(); draw(); }
+    };
+    wrap.appendChild(foot);
+    sum();
+  };
+  const sum = () => {
+    const s = Object.values(assign.w).reduce((a, b) => a + b, 0);
+    const el = wrap.querySelector("#spsum");
+    if (el) { el.textContent = `Σ ${s}%` + (s < 100 ? ` — remaining ${100 - s}% ignored` : s > 100 ? " — will be normalized" : ""); el.className = "spsum" + (s > 100 ? " bad" : ""); }
+  };
+  draw();
+  return wrap;
+}
+
+function assignSelect(assign, opts, onSet) {
+  const sel = document.createElement("select");
+  sel.innerHTML =
+    (opts.unmapped ? `<option value="__unmapped" ${assign.t === "unmapped" ? "selected" : ""}>⚠ Unmapped</option>` : "") +
+    fieldOptions(assign.t === "field" ? assign.f : null) +
+    `<option value="__ignore" ${assign.t === "ignore" ? "selected" : ""}>Ignore</option>` +
+    `<option value="__split" ${assign.t === "split" ? "selected" : ""}>Split…</option>`;
+  sel.onchange = () => {
+    const v = sel.value;
+    if (v === "__ignore") onSet({t: "ignore"});
+    else if (v === "__unmapped") onSet({t: "unmapped"});
+    else if (v === "__split") onSet({t: "split", w: assign.t === "field" ? {[assign.f]: 100} : {goods_entertainment: 100}});
+    else onSet({t: "field", f: v});
+  };
+  return sel;
+}
+
+function renderRules() {
+  const host = $("rules");
+  host.innerHTML = "";
+
+  // --- category rules ---
+  const cats = {};
+  for (const t of txns) {
+    const c = cats[t.category] || (cats[t.category] = {n: 0, total: 0});
+    c.n++; c.total += -t.amount;
+  }
+  for (const name of Object.keys(rules.categories)) if (!(name in cats)) cats[name] = null; // rules without data
+  const cgroup = document.createElement("div");
+  cgroup.className = "rulegroup";
+  cgroup.innerHTML = "<h3>Category rules</h3>";
+  const catNames = Object.keys(cats).sort((a, b) => (cats[b]?.total ?? -1) - (cats[a]?.total ?? -1));
+  for (const name of catNames) {
+    const assign = rules.categories[name] || {t: "unmapped"};
+    const row = document.createElement("div");
+    row.className = "rrow";
+    const info = cats[name] ? `$${fmt(cats[name].total)} · ${cats[name].n}` : "no txns";
+    row.innerHTML = `<span class="nm" title="${esc(name)}">${esc(name)}</span><span class="tot">${info}</span>`;
+    const sel = assignSelect(assign, {unmapped: true}, a => { rules.categories[name] = a; store.saveRules(); renderAll(); });
+    row.appendChild(sel);
+    row.appendChild(document.createElement("span"));
+    cgroup.appendChild(row);
+    if (assign.t === "split") {
+      const ed = splitEditor(assign, () => { store.saveRules(); renderRight(); renderChart(); renderTxnsSoft(); });
+      cgroup.appendChild(ed);
+    }
+  }
+  host.appendChild(cgroup);
+
+  // --- merchant rules ---
+  const mgroup = document.createElement("div");
+  mgroup.className = "rulegroup";
+  mgroup.innerHTML = "<h3>Merchant rules (win over category rules — control how generic vendors like Amazon spread)</h3>";
+  rules.merchants.forEach((r, idx) => {
+    const row = document.createElement("div");
+    row.className = "rrow";
+    row.innerHTML = `<input type="text" value="${esc(r.match)}" placeholder="merchant contains…" aria-label="Merchant match">` +
+      `<input type="text" value="${esc(r.cat || "")}" placeholder="any category" style="width:110px" aria-label="Only when category is" title="Optional: apply only when the Monarch category matches exactly">`;
+    const [mi, ci] = row.children;
+    mi.onchange = () => { r.match = mi.value; store.saveRules(); renderAll(); };
+    ci.onchange = () => { r.cat = ci.value; store.saveRules(); renderAll(); };
+    const sel = assignSelect(r.assign, {}, a => { r.assign = a; store.saveRules(); renderAll(); });
+    row.appendChild(sel);
+    const del = document.createElement("button");
+    del.className = "del"; del.textContent = "✕"; del.title = "Delete rule";
+    del.onclick = () => { rules.merchants.splice(idx, 1); store.saveRules(); renderAll(); };
+    row.appendChild(del);
+    mgroup.appendChild(row);
+    if (r.assign.t === "split") {
+      mgroup.appendChild(splitEditor(r.assign, () => { store.saveRules(); renderRight(); renderChart(); renderTxnsSoft(); }));
+    }
+  });
+  const add = document.createElement("button");
+  add.className = "addbtn";
+  add.textContent = "+ Add merchant rule";
+  add.onclick = () => { rules.merchants.push({match: "", cat: "", assign: {t: "ignore"}}); store.saveRules(); renderRules(); };
+  mgroup.appendChild(add);
+  const reset = document.createElement("button");
+  reset.className = "addbtn";
+  reset.style.marginLeft = "8px";
+  reset.textContent = "Reset all rules to defaults";
+  reset.onclick = () => { if (confirm("Replace all category, merchant, and split rules with the defaults?")) { rules = structuredClone(DEFAULT_RULES); store.saveRules(); renderAll(); } };
+  mgroup.appendChild(reset);
+  host.appendChild(mgroup);
+}
+
+// ---------- right pane ----------
+function renderRight() {
+  const avg = compute();
+  let goods = 0, services = 0;
+  for (const [k, [sec]] of Object.entries(FIELDS)) (sec === "Goods" ? (goods += avg[k]) : (services += avg[k]));
+  $("st-goods").innerHTML = `$${Math.round(goods).toLocaleString()} <small>/mo</small>`;
+  $("st-services").innerHTML = `$${Math.round(services).toLocaleString()} <small>/mo</small>`;
+  $("st-total").innerHTML = `$${Math.round(goods + services).toLocaleString()} <small>/mo</small>`;
+
+  const host = $("fieldlist");
+  host.innerHTML = "";
+  let section = null;
+  for (const [k, [sec, label]] of Object.entries(FIELDS)) {
+    if (sec !== section) {
+      section = sec;
+      const h = document.createElement("h2");
+      h.textContent = `${sec} ($/month)`;
+      host.appendChild(h);
+    }
+    const row = document.createElement("div");
+    row.className = "frow" + (ui.field === k ? " active" : "");
+    row.innerHTML = `<span>${label}</span>` +
+      `<span class="kgd" title="CoolClimate carbon intensity">${FACTORS[k].toFixed(2)} kg/$</span>` +
+      `<span class="amt" title="Click number to copy">${fmt(avg[k])}<small> $/mo</small></span>` +
+      `<button class="info" aria-label="What counts as ${esc(label)}" data-tip="${esc(FIELD_DESC[k])}">?</button>`;
+    row.onclick = e => {
+      if (e.target.closest(".info")) return;
+      ui.field = ui.field === k ? null : k;
+      ui.filter = "all";
+      $("filter").value = "all";
+      setTab("txns");
+      renderRight();
+      renderTxns();
+      updateFieldFilterChip();
+    };
+    row.querySelector(".amt").onclick = async e => {
+      e.stopPropagation();
+      const ok = await copyText(String(Math.round(avg[k])));
+      row.style.outline = ok ? "2px solid var(--leaf)" : "2px solid var(--warn)";
+      setTimeout(() => { row.style.outline = ""; renderRight(); }, 500);
+    };
+    host.appendChild(row);
+  }
+}
+
+function updateFieldFilterChip() {
+  const chip = $("fieldfilter");
+  if (ui.field) {
+    chip.hidden = false;
+    chip.textContent = `field: ${FIELDS[ui.field][1]} ✕`;
+  } else chip.hidden = true;
+}
+
+// ---------- emissions chart ----------
+// kg CO2e per dollar, measured from CoolClimate's compute_footprint API
+// (finite differences; verified linear and location/income-invariant)
+const FACTORS = {
+  goods_furniture_appliances: 0.5101,
+  goods_clothing: 0.5197,
+  goods_entertainment: 0.5241,
+  goods_paper_office_reading: 0.324,
+  goods_personal_care_cleaning: 0.6103,
+  goods_auto_parts: 0.6652,
+  goods_medical: 0.3616,
+  services_health_care: 0.237,
+  services_education: 0.2546,
+  services_information_communication: 0.1471,
+  services_vehicle_service: 0.3561,
+  services_personal_business_finance: 0.1409,
+  services_household_maintenance_repair: 0.7206,
+  services_organizations_charity: 0.3402,
+  services_other: 0.3205,
+};
+const GOODS_COLORS = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)"];
+const SERVICES_COLORS = ["var(--s5)","var(--s6)","var(--s7)","var(--s8)"];
+
+function monthlyEmissions() {
+  // {month: {field: kg}}, plus per-field kg totals
+  const byMonth = {}, byField = {};
+  for (const t of txns) {
+    const m = t.date.slice(0, 7);
+    for (const [f, dollars] of Object.entries(contributions(t))) {
+      const kg = dollars * FACTORS[f];
+      (byMonth[m] = byMonth[m] || {})[f] = (byMonth[m][f] || 0) + kg;
+      byField[f] = (byField[f] || 0) + kg;
+    }
+  }
+  return {byMonth, byField};
+}
+
+// Impact summary. Damages: $240/tCO2e/yr; offsets: $600/tCO2e.
+// Mortality: closed-form fit to Joos IRF x Boucher-Reddy thermal response x
+// convex damage, calibrated to Bressler (2021) MCC = 2.26e-4 deaths/tCO2.
+// D(X) = M0*X - a*(X-1)*X*(2X-1)/6 micromorts/tonne over X sustained years.
+const DAMAGE_PER_TON = 240, OFFSET_PER_TON = 600;
+const MORT_M0 = 226.0, MORT_A = 0.04028, MORT_YEARS = 50;  // horizon 2100
+
+function renderImpact(tonsYr, annualSpend) {
+  $("imp-tons").innerHTML = `${tonsYr.toFixed(1)} <small>t CO₂e/yr</small>`;
+  const damage = tonsYr * DAMAGE_PER_TON;
+  $("imp-damage").innerHTML = `$${Math.round(damage).toLocaleString()} <small>/yr</small>`;
+  $("imp-damage-pct").textContent = annualSpend > 0
+    ? `${(damage / annualSpend * 100).toFixed(1)}% of your goods+services spending`
+    : "";
+  const offset = tonsYr * OFFSET_PER_TON;
+  $("imp-offset").innerHTML = `$${Math.round(offset).toLocaleString()} <small>/yr</small>`;
+  $("imp-offset-pct").textContent = annualSpend > 0
+    ? `+${(offset / annualSpend * 100).toFixed(1)}% on your goods+services spending`
+    : "";
+  const X = MORT_YEARS;
+  const micromorts = tonsYr * (MORT_M0 * X - MORT_A * (X - 1) * X * (2 * X - 1) / 6);
+  const deaths = micromorts / 1e6;
+  $("imp-deaths").innerHTML = `${deaths.toFixed(2)} <small>(${Math.round(micromorts).toLocaleString()} micromorts)</small>`;
+}
+
+function renderChart() {
+  const host = $("chart-host"), legend = $("chart-legend");
+  host.innerHTML = ""; legend.innerHTML = "";
+  if (!txns.length || !meta) {
+    renderImpact(0, 0);
+    host.innerHTML = '<p class="hint">Upload a CSV to see monthly emissions.</p>';
+    return;
+  }
+  const {byMonth, byField} = monthlyEmissions();
+  const totalKg = Object.values(byField).reduce((a, b) => a + b, 0);
+  const tonsYr = totalKg / meta.months * 12 / 1000;
+  const avgSpend = compute();
+  const annualSpend = Object.values(avgSpend).reduce((a, b) => a + b, 0) * 12;
+  renderImpact(tonsYr, annualSpend);
+
+  // per section: top 3 fields by kg + a remainder bucket, largest first (bottom of stack)
+  const groupSeries = (section, colors) => {
+    const ranked = Object.entries(byField)
+      .filter(([f, v]) => v > 0 && FIELDS[f][0] === section)
+      .sort((a, b) => b[1] - a[1]);
+    const series = ranked.slice(0, 3).map(([f], i) => ({key: f, label: FIELDS[f][1], color: colors[i], group: section}));
+    const rest = ranked.slice(3).map(([f]) => f);
+    if (rest.length) series.push({key: "__rest_" + section, label: `Remaining ${section.toLowerCase()}`, color: colors[3], group: section, members: rest});
+    return series;
+  };
+  const goodsSeries = groupSeries("Goods", GOODS_COLORS);
+  const servicesSeries = groupSeries("Services", SERVICES_COLORS);
+  const kgOf = (m, s) => s.members
+    ? s.members.reduce((a, f) => a + (byMonth[m]?.[f] || 0), 0)
+    : (byMonth[m]?.[s.key] || 0);
+  const groupTotal = (m, series) => series.reduce((a, s) => a + kgOf(m, s), 0);
+
+  const months = Object.keys(byMonth).sort();
+  const W = 360, H = 250, ML = 42, MR = 6, MT = 16, MB = 22;
+  const iw = W - ML - MR, ih = H - MT - MB;
+  const maxBar = Math.max(...months.flatMap(m => [groupTotal(m, goodsSeries), groupTotal(m, servicesSeries)]));
+  const step = [50,100,200,250,500,1000,2000,2500,5000].find(s => s * 4 >= maxBar) || 10000;
+  const yMax = Math.ceil(maxBar / step) * step;
+  const y = v => MT + ih * (1 - v / yMax);
+  const band = iw / months.length;
+  const bw = Math.min((band - 10) / 2 - 2, 26);  // two bars per month band
+
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.id = "chart-svg";
+  const el = (tag, attrs, parent) => {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    (parent || svg).appendChild(n);
+    return n;
+  };
+
+  for (let v = 0; v <= yMax; v += step) {  // grid + y labels
+    el("line", {x1: ML, x2: W - MR, y1: y(v), y2: y(v), stroke: "var(--line)", "stroke-width": v === 0 ? 1.2 : 0.6});
+    if (v > 0) el("text", {x: ML - 5, y: y(v) + 3, "text-anchor": "end", "font-size": 8, fill: "var(--muted)"}).textContent = v.toLocaleString();
+  }
+
+  const tip = $("chart-tip");
+  const drawStack = (m, series, x) => {
+    const total = groupTotal(m, series);
+    let acc = 0;
+    const segs = series.map(s => ({s, kg: kgOf(m, s)})).filter(o => o.kg > 0);
+    segs.forEach((o, si) => {
+      const y1 = y(acc + o.kg), y0 = y(acc);
+      const h = Math.max(y0 - y1, 0);
+      const isTop = si === segs.length - 1;
+      let node;
+      if (isTop && h > 4) {  // rounded cap on the data end only
+        const r = Math.min(3, h);
+        node = el("path", {d: `M${x},${y0} L${x},${y1 + r} Q${x},${y1} ${x + r},${y1} L${x + bw - r},${y1} Q${x + bw},${y1} ${x + bw},${y1 + r} L${x + bw},${y0} Z`, fill: o.s.color});
+      } else {
+        node = el("rect", {x, y: y1, width: bw, height: h, fill: o.s.color});
+      }
+      node.setAttribute("stroke", "var(--card)");
+      node.setAttribute("stroke-width", "1");
+      node.addEventListener("mousemove", ev => {
+        const r = $("chartpane").getBoundingClientRect();
+        tip.textContent = `${m} · ${o.s.group}: ${o.s.label}\n${Math.round(o.kg).toLocaleString()} kg of ${Math.round(total).toLocaleString()} kg`;
+        tip.style.left = Math.min(ev.clientX - r.left + 12, r.width - 160) + "px";
+        tip.style.top = (ev.clientY - r.top + 14) + "px";
+        tip.style.opacity = 1;
+      });
+      node.addEventListener("mouseleave", () => tip.style.opacity = 0);
+      acc += o.kg;
+    });
+    if (total > 0) el("text", {x: x + bw / 2, y: y(total) - 4, "text-anchor": "middle", "font-size": 7, fill: "var(--muted)"}).textContent = Math.round(total).toLocaleString();
+  };
+
+  months.forEach((m, mi) => {
+    const cx = ML + band * mi + band / 2;
+    drawStack(m, goodsSeries, cx - bw - 2);
+    drawStack(m, servicesSeries, cx + 2);
+    const [yy, mm] = m.split("-");
+    const name = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+mm - 1];
+    el("text", {x: cx, y: H - 8, "text-anchor": "middle", "font-size": 8, fill: "var(--muted)"}).textContent =
+      (mm === "01" || mi === 0) ? `${name} ’${yy.slice(2)}` : name;
+  });
+  host.appendChild(svg);
+
+  for (const [heading, series] of [["Goods (left bar)", goodsSeries], ["Services (right bar)", servicesSeries]]) {
+    const h = document.createElement("div");
+    h.style.cssText = "font-size:0.66rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:6px";
+    h.textContent = heading;
+    legend.appendChild(h);
+    for (const s of series) {
+      const kg = months.reduce((a, m) => a + kgOf(m, s), 0);
+      const row = document.createElement("div");
+      row.className = "lrow";
+      row.innerHTML = `<span class="sw" style="background:${s.color}"></span><span>${esc(s.label)}</span>` +
+        `<span class="lv">${(kg / meta.months * 12 / 1000).toFixed(2)} t/yr</span>`;
+      legend.appendChild(row);
+    }
+  }
+}
+
+// ---------- glue ----------
+function renderTxnsSoft() { if (ui.tab === "txns") renderTxns(); }
+function renderAll() {
+  $("window").textContent = meta
+    ? `${meta.start} → ${meta.end} · ${meta.months} months · ${txns.length} transactions`
+    : "No data — upload a Monarch CSV export";
+  renderRight();
+  renderChart();
+  if (ui.tab === "txns") renderTxns(); else renderRules();
+}
+
+function setTab(tab) {
+  ui.tab = tab;
+  $("tab-txns").className = tab === "txns" ? "active" : "";
+  $("tab-rules").className = tab === "rules" ? "active" : "";
+  $("txnlist").hidden = tab !== "txns";
+  $("txn-toolbar").style.display = tab === "txns" ? "" : "none";
+  $("rules").hidden = tab !== "rules";
+  if (tab === "txns") renderTxns(); else renderRules();
+}
+
+$("tab-txns").onclick = () => setTab("txns");
+$("tab-rules").onclick = () => setTab("rules");
+$("search").oninput = e => { ui.search = e.target.value; renderTxns(); };
+$("filter").onchange = e => { ui.filter = e.target.value; renderTxns(); };
+$("fieldfilter").onclick = () => { ui.field = null; updateFieldFilterChip(); renderTxns(); renderRight(); };
+$("csvfile").onchange = e => { const f = e.target.files[0]; if (f) f.text().then(importCSV); e.target.value = ""; };
+$("clearbtn").onclick = () => {
+  if (confirm("Remove the uploaded transactions and your per-transaction choices from this browser? (Rules are kept.)")) {
+    txns = []; meta = null; overrides = {};
+    localStorage.removeItem("cf_data"); localStorage.removeItem("cf_overrides");
+    renderAll();
+  }
+};
+document.body.addEventListener("dragover", e => e.preventDefault());
+document.body.addEventListener("drop", e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f && /csv/i.test(f.name + f.type)) f.text().then(importCSV);
+});
+
+$("copy-script").onclick = async e => {
+  const avg = compute();
+  const vals = {input_footprint_shopping_goods_type: 1, input_footprint_shopping_goods_other_type: 1, input_footprint_shopping_services_type: 1};
+  for (const [field, key] of Object.entries(CALC_KEYS)) vals[key] = Math.round(avg[field]);
+  const script = `(()=>{if(!/coolclimate/.test(location.host))return alert("Run this on the CoolClimate calculator tab");` +
+    `const v=${JSON.stringify(vals)};` +
+    `const d=JSON.parse(localStorage.getItem("redux")||"null");` +
+    `if(d&&d.user_footprint){d.user_footprint.inputs=Object.assign({},d.user_footprint.inputs,v);localStorage.setItem("redux",JSON.stringify(d))}` +
+    `else{localStorage.setItem("user_footprint",JSON.stringify(Object.assign(JSON.parse(localStorage.getItem("user_footprint")||"{}"),v)))}` +
+    `location.reload()})()`;
+  const ok = await copyText(script);
+  const out = $("script-out");
+  if (ok) {
+    out.hidden = true;
+    e.target.textContent = "Copied!";
+  } else {
+    // clipboard blocked in this sandbox — show the script for manual copy
+    out.hidden = false;
+    out.value = script;
+    out.focus(); out.select();
+    e.target.textContent = "Press ⌘C / Ctrl-C to copy";
+  }
+  setTimeout(() => e.target.textContent = "Copy prefill script", 2000);
+};
+
+// info bubbles (?) — delegated so dynamically re-rendered buttons work too
+{
+  const pop = document.createElement("div");
+  pop.id = "info-pop";
+  document.body.appendChild(pop);
+  let pinned = null;
+  const show = btn => {
+    pop.textContent = btn.dataset.tip;
+    pop.style.display = "block";
+    const r = btn.getBoundingClientRect();
+    const w = Math.min(270, window.innerWidth - 20);
+    pop.style.left = Math.max(10, Math.min(r.left - w + r.width + 8, window.innerWidth - w - 10)) + "px";
+    const below = r.bottom + 6;
+    pop.style.top = below + "px";
+    const ph = pop.getBoundingClientRect().height;   // flip above if clipped
+    if (below + ph > window.innerHeight - 8) pop.style.top = Math.max(8, r.top - ph - 6) + "px";
+  };
+  const hide = () => { pop.style.display = "none"; pinned = null; };
+  document.addEventListener("mouseover", e => { const b = e.target.closest(".info"); if (b && !pinned) show(b); });
+  document.addEventListener("mouseout", e => { if (e.target.closest(".info") && !pinned) hide(); });
+  document.addEventListener("focusin", e => { const b = e.target.closest(".info"); if (b) { pinned = null; show(b); } });
+  document.addEventListener("focusout", e => { if (e.target.closest(".info")) hide(); });
+  document.addEventListener("click", e => {   // tap support: click pins, click again unpins
+    const b = e.target.closest(".info");
+    if (b) { if (pinned === b) hide(); else { pinned = b; show(b); } }
+    else hide();
+  });
+}
+
+store.load();
+renderAll();
+</script>

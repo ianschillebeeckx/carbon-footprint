@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Carbon v2 — bottom-up NAICS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --ground:#F7F8F5; --card:#FFFFFF; --ink:#262B21; --muted:#6C7465; --leaf:#3E7C3A;
+    --chip:#E6EEE1; --line:#D9DED2; --warn:#A15C00; --warnbg:#F6EDDD;
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ground:#161A15; --card:#1E241D; --ink:#E4E8DD; --muted:#98A18F; --leaf:#7DB979; --chip:#263124; --line:#333B31; --warn:#D9A45B; --warnbg:#2E2718;
+            --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; }
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--ground); color: var(--ink); font-family: "Avenir Next", Seravek, system-ui, sans-serif; line-height: 1.45; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+  header.top { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 12px 20px 8px; border-bottom: 1px solid var(--line); }
+  header.top h1 { font-size: 1.02rem; font-weight: 600; margin: 0; }
+  header.top .window { color: var(--muted); font-size: 0.8rem; flex: 1; }
+  header.top label.filebtn { font: inherit; font-size: 0.82rem; background: var(--leaf); color: #fff; border-radius: 7px; padding: 5px 12px; cursor: pointer; }
+  header.top .resetbtn { font: inherit; font-size: 0.78rem; background: none; border: 1px solid var(--line); color: var(--warn); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+  header.top .resetbtn:hover { border-color: var(--warn); background: var(--warnbg); }
+  #upload-msg { font-size: 0.78rem; color: var(--muted); }
+
+  #impact { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 20px; border-bottom: 1px solid var(--line); }
+  .stat { flex: 1 1 150px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; }
+  .stat .k { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .stat .v { font-family: var(--mono); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+  .stat .v small { font-size: 0.68rem; color: var(--muted); }
+  .stat .sub { font-size: 0.66rem; color: var(--muted); }
+
+  .panes { flex: 1; display: flex; min-height: 0; }
+  /* visual order: categories | chart | transactions (flex `order`, DOM unchanged) */
+  #right { order: 1; flex: 0 0 360px; overflow-y: auto; padding: 14px 18px 40px; border-right: 1px solid var(--line); }
+  #chartpane { order: 2; flex: 0 0 360px; overflow-y: auto; padding: 16px 18px 40px; position: relative; border-right: 1px solid var(--line); }
+  #left { order: 3; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: var(--card); }
+  #chart-svg { width: 100%; height: auto; display: block; }
+  #chart-svg text { font-family: "Avenir Next", Seravek, system-ui, sans-serif; }
+  .legend { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+  .lrow { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; }
+  .lrow .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .lrow .lv { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+  #chart-tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--ground); font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; white-space: pre; opacity: 0; transition: opacity 0.1s; z-index: 5; }
+  @media (prefers-reduced-motion: reduce) { #chart-tip { transition: none; } }
+  @media (max-width: 1150px) { .panes { flex-wrap: wrap; overflow-y: auto; } #right, #chartpane { flex: 1 1 300px; } #left { flex: 1 1 100%; max-height: 55vh; border-top: 1px solid var(--line); } }
+  @media (max-width: 900px) { .panes { flex-direction: column; overflow-y: auto; } #right, #chartpane { flex: none; border-right: none; } #left { max-height: 55vh; } }
+
+  .toolbar { display: flex; gap: 8px; align-items: center; padding: 9px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .toolbar input[type=search] { font: inherit; font-size: 0.85rem; padding: 5px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--ground); color: var(--ink); flex: 1; min-width: 110px; }
+  .toolbar select { font: inherit; font-size: 0.8rem; border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; background: var(--ground); color: var(--ink); max-width: 200px; }
+  .toolbar .count { color: var(--muted); font-size: 0.76rem; white-space: nowrap; margin-left: auto; }
+  .toolbar .legend { color: var(--muted); font-size: 0.7rem; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+  .toolbar .legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--warnbg); border: 1px solid var(--warn); }
+
+  #txnlist { flex: 1; overflow-y: auto; padding: 6px 10px 30px; }
+  .trow { display: grid; grid-template-columns: 5em minmax(0,1fr) 4.6em 5.5em 120px minmax(150px, 200px); gap: 8px; align-items: center; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; }
+  .trow:hover { background: var(--chip); }
+  .trow.lowconf { background: var(--warnbg); }
+  .trow .d { color: var(--muted); font-family: var(--mono); font-size: 0.72rem; }
+  .trow .m { overflow: hidden; }
+  .trow .m .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trow .m small { color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.7rem; }
+  .trow .kgd { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); text-align: right; white-space: nowrap; }
+  .trow .a { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .trow select { font: inherit; font-size: 0.72rem; width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; background: var(--ground); color: var(--ink); }
+  .trow.corrected select { border-color: var(--leaf); }
+
+  .tabs { display: flex; gap: 4px; padding: 8px 14px 0; border-bottom: 1px solid var(--line); }
+  .tabs button { font: inherit; font-size: 0.84rem; border: 1px solid var(--line); border-bottom: none; background: var(--ground); color: var(--muted); border-radius: 8px 8px 0 0; padding: 5px 13px; cursor: pointer; }
+  .tabs button.active { background: var(--card); color: var(--ink); font-weight: 600; }
+  #merchlist { flex: 1; overflow-y: auto; padding: 6px 10px 30px; }
+  .mrow { display: grid; grid-template-columns: minmax(0,1fr) 7.5em 5em 120px minmax(160px, 210px) 26px; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; }
+  .mrow:hover { background: var(--chip); }
+  .mrow.lowconf { background: var(--warnbg); }
+  .mrow.corrected select { border-color: var(--leaf); }
+  .mrow .m { overflow: hidden; }
+  .mrow .m .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+  .mrow .m small { color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.7rem; }
+  .mrow .tot { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .mrow .tot small { color: var(--muted); }
+  .mrow .kgd { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); text-align: right; white-space: nowrap; }
+  .mrow select { font: inherit; font-size: 0.72rem; width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; background: var(--ground); color: var(--ink); }
+  .splitedit { margin: 2px 8px 8px 20px; padding: 8px 10px; border-left: 2px solid var(--leaf); background: var(--ground); border-radius: 0 8px 8px 0; }
+  .sprow { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; font-size: 0.76rem; }
+  .sprow select { max-width: 320px; font: inherit; font-size: 0.72rem; border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; background: var(--card); color: var(--ink); }
+  .sprow input { font-family: var(--mono); font-size: 0.74rem; width: 58px; border: 1px solid var(--line); border-radius: 6px; padding: 3px 5px; background: var(--card); color: var(--ink); }
+  .sprow button { font: inherit; font-size: 0.72rem; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+  .sprow .spsave { background: var(--leaf); color: #fff; border-color: transparent; }
+  .sprow .spsum { color: var(--muted); margin-left: auto; }
+  .bsugg { position: absolute; top: 100%; left: 2.4em; z-index: 6; min-width: 300px; max-width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.12); overflow: hidden; }
+  .bsi { padding: 5px 9px; font-size: 0.74rem; cursor: pointer; }
+  .bsi:hover { background: var(--chip); }
+  .bsi small { display: block; color: var(--muted); font-family: var(--mono); font-size: 0.66rem; }
+  .allcats { cursor: pointer; color: var(--leaf); }
+  .allcats input { vertical-align: -2px; margin: 0 2px 0 0; accent-color: var(--leaf); }
+  .okbtn { font: inherit; font-size: 0.78rem; border: 1px solid var(--leaf); background: var(--card); color: var(--leaf); border-radius: 6px; padding: 2px 0; cursor: pointer; width: 24px; }
+  .okbtn:hover { background: var(--leaf); color: #fff; }
+  h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; margin: 16px 0 6px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  h2 .htot { font-family: var(--mono); font-variant-numeric: tabular-nums; text-transform: none; letter-spacing: 0; color: var(--ink); }
+  .frow { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 6px 10px; border-radius: 7px; background: var(--card); border: 1px solid var(--line); margin-bottom: 4px; cursor: pointer; font-size: 0.84rem; }
+  .frow:hover { background: var(--chip); }
+  .frow.active { outline: 2px solid var(--leaf); }
+  .frow > span:first-child { flex: 1; }
+  .frow .kgd { color: var(--muted); font-size: 0.68rem; font-family: var(--mono); white-space: nowrap; }
+  .frow .amt { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .frow .amt small { color: var(--muted); font-weight: 400; }
+  .hint { color: var(--muted); font-size: 0.74rem; margin: 6px 0; }
+  .prefill { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 20px; font-size: 0.84rem; }
+  .prefill a { color: var(--leaf); }
+  button.copy { font: inherit; font-size: 0.8rem; background: var(--leaf); color: #fff; border: none; border-radius: 7px; padding: 6px 13px; cursor: pointer; margin-top: 8px; }
+  :focus-visible { outline: 2px solid var(--leaf); outline-offset: 1px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Carbon v2 — per-transaction NAICS</h1>
+  <span class="window" id="window"></span>
+  <span id="upload-msg"></span>
+  <button id="reset" class="resetbtn" title="Delete all transactions and every merchant rule">Reset all</button>
+  <label class="filebtn" for="csvfile">Upload CSV</label>
+  <input id="csvfile" type="file" accept=".csv,text/csv" hidden>
+</header>
+
+<div id="impact">
+  <div class="stat"><div class="k">G&amp;S footprint</div><div class="v" id="imp-tons">–</div></div>
+  <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div></div>
+  <div class="stat"><div class="k">To offset · $600/t (Charm)</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div></div>
+  <div class="stat"><div class="k">Excess deaths · 50 yrs</div><div class="v" id="imp-deaths">–</div><div class="sub">Bressler mortality cost, horizon 2100</div></div>
+</div>
+
+<div class="panes">
+  <div id="left">
+    <div class="tabs">
+      <button id="tab-txns" class="active">Transactions</button>
+      <button id="tab-merch">Merchant rules</button>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Search merchant / NAICS…">
+      <select id="catfilter"><option value="" id="catall">All transactions</option><option value="__nonexcluded">All categories — non-excluded</option></select>
+      <select id="srcfilter">
+        <option value="">All sources</option>
+        <option value="__low">⚠ Low confidence (to review)</option>
+        <option value="llm">LLM-assigned</option>
+        <option value="vector">Vector-only (less reliable)</option>
+        <option value="rule">Rule (non-purchase)</option>
+        <option value="manual">Corrected by me</option>
+        <option value="confirmed">Confirmed by me</option>
+      </select>
+      <span class="legend"><i></i> to review (vector-only, conf &lt;0.7, or flagged)</span>
+      <span class="count" id="count"></span>
+    </div>
+    <div id="txnlist"></div>
+    <div id="merchlist" hidden></div>
+  </div>
+
+  <div id="right">
+    <div id="catlist"></div>
+    <p class="hint">$/mo is nominal spend, refunds netted out. kg is computed on spend deflated to 2022 USD (CPI), times each transaction's NAICS factor (bottom-up USEEIO, purchaser price with margins), so the shown kg/$ blends in the deflator. Click a category to filter. Corrections apply to all transactions of the same merchant and persist server-side.</p>
+  </div>
+
+  <div id="chartpane">
+    <h2 style="margin-top:0">Emissions by month (kg CO₂e) — goods | services</h2>
+    <div id="chart-host"></div>
+    <div class="legend" id="chart-legend"></div>
+    <div id="chart-tip"></div>
+    <p class="hint" style="margin-top:12px">Computed bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Each month shows a Goods bar (left) and a Services bar (right); the top three categories of each get their own color, the rest fold into a remainder.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+const DATA = /*__V2DATA__*/null;
+const NAICS_OPTIONS = /*__NAICS_OPTIONS__*/null;  // [{code,title,category}] curated consumer subset
+const CAT_DEFAULTS = /*__CAT_DEFAULTS__*/null;      // category -> representative NAICS
+const BASKET_OPTIONS = /*__BASKET_OPTIONS__*/null;  // commodities for the basket editor
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+const fmt = n => n.toLocaleString("en-US", {maximumFractionDigits: 0});
+
+const CAT_ORDER = Object.keys(DATA?.categories || {});
+const isLow = t => t.unmapped || (t.source !== "manual" && t.source !== "confirmed" &&
+  (t.source === "vector" || (t.source === "llm" && t.confidence != null && t.confidence < 0.7) || t.margin_warn));
+const basketDesc = t => t.basket ? t.basket.map(p => `${Math.round(p.weight*100)}% ${p.title}`).join(", ") : "";
+const factorTip = t => {
+  if (t.factor == null) return t.unmapped ? "No EPA factor for this code — assign an industry" : "";
+  let s;
+  if (t.factor_production != null && t.factor_margins != null)
+    s = `${t.factor.toFixed(2)} kg/$ total = ${t.factor_production.toFixed(2)} production + ${t.factor_margins.toFixed(2)} retail/wholesale/transport margins`;
+  else s = `${t.factor.toFixed(2)} kg/$ (supply chain incl. margins)`;
+  if (t.factor_note) s += ` · ${t.factor_note}`;
+  if (t.margin_warn) s += " · ⚠ zero-margin row for a goods category — likely the store was mapped, not the product";
+  if (t.deflator && t.deflator !== 1) s += ` · per 2022 USD: spend ×${t.deflator} before multiplying`;
+  if (t.useeio) s += ` · USEEIO ${t.useeio}`;
+  return s;
+};
+const catMatches = t => !ui.cat ? true
+  : ui.cat === "__nonexcluded" ? (t.mix ? t.mix.some(p => p.category !== "excluded") : t.category !== "excluded")
+  : (t.category === ui.cat || (t.mix && t.mix.some(p => p.category === ui.cat)));
+const ui = { search: "", cat: "", src: "" };
+
+function stats() {
+  const months = DATA.meta.months;
+  const per = {};   // cat -> {dollars, kg}
+  for (const c of CAT_ORDER) per[c] = { dollars: 0, kg: 0 };
+  for (const t of DATA.transactions) {
+    if (t.naics == null && !t.mix) continue;        // money movement: out of every total
+    const spend = -t.amount;                        // refunds net out as negative
+    const spend22 = spend * (t.deflator || 1);      // factors are per 2022 USD
+    if (t.mix) {
+      for (const p of t.mix) {
+        per[p.category].dollars += spend * p.weight;
+        per[p.category].kg += spend22 * p.weight * p.factor;
+      }
+    } else {
+      per[t.category].dollars += spend;
+      if (t.factor != null) per[t.category].kg += spend22 * t.factor;
+    }
+  }
+  let totalKg = 0, totalDollars = 0;
+  for (const c of CAT_ORDER) {
+    if (c === "excluded") continue;
+    totalKg += per[c].kg; totalDollars += per[c].dollars;
+  }
+  return { per, months, totalKg, totalDollars };
+}
+
+function renderImpact() {
+  const { per, months, totalKg, totalDollars } = stats();
+  const tons = totalKg / months * 12 / 1000;
+  const annualSpend = totalDollars / months * 12;
+  $("imp-tons").innerHTML = `${tons.toFixed(1)} <small>t CO₂e/yr</small>`;
+  const damage = tons * 240, offset = tons * 600;
+  $("imp-damage").innerHTML = `$${fmt(damage)} <small>/yr</small>`;
+  $("imp-damage-pct").textContent = annualSpend ? `${(damage/annualSpend*100).toFixed(1)}% of G&S spending` : "";
+  $("imp-offset").innerHTML = `$${fmt(offset)} <small>/yr</small>`;
+  $("imp-offset-pct").textContent = annualSpend ? `+${(offset/annualSpend*100).toFixed(1)}% on G&S spending` : "";
+  const X = 50, mm = tons * (226.0 * X - 0.04028 * (X-1)*X*(2*X-1)/6);
+  $("imp-deaths").innerHTML = `${(mm/1e6).toFixed(2)} <small>(${fmt(mm)} micromorts)</small>`;
+}
+
+function renderCats() {
+  const { per, months } = stats();
+  const host = $("catlist");
+  host.innerHTML = "";
+  const secTotal = {};
+  for (const c of CAT_ORDER) {
+    const sec = DATA.categories[c].section;
+    secTotal[sec] = (secTotal[sec] || 0) + per[c].dollars;
+  }
+  let section = null;
+  for (const c of CAT_ORDER) {
+    const info = DATA.categories[c];
+    if (info.section !== section) {
+      section = info.section;
+      const h = document.createElement("h2");
+      if (section === "Excluded") h.textContent = "Out of scope";
+      else h.innerHTML = `<span>${esc(section)}</span><span class="htot">${(secTotal[section] / months).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})} $/mo</span>`;
+      host.appendChild(h);
+    }
+    const d = per[c].dollars / months, kg = per[c].kg / months;
+    const row = document.createElement("div");
+    row.className = "frow" + (ui.cat === c ? " active" : "");
+    row.innerHTML = `<span>${esc(info.label)}</span>` +
+      (c !== "excluded" && d > 0 ? `<span class="kgd">${(kg/d).toFixed(2)} kg/$ · ${(kg*12/1000).toFixed(2)} t/yr</span>` : "") +
+      `<span class="amt">${d.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}<small> $/mo</small></span>`;
+    row.onclick = () => { ui.cat = ui.cat === c ? "" : c; $("catfilter").value = ui.cat; renderCats(); renderLeft(); };
+    host.appendChild(row);
+  }
+}
+
+function catSelect(t) {
+  let html = `<select class="catsel" aria-label="Category assignment">`;
+  if (t.mix) html += `<option value="" selected>Split</option>`;
+  for (const c of CAT_ORDER) {
+    const label = c === "excluded" ? "Excluded / non-purchase" : DATA.categories[c].label;
+    html += `<option value="${c}" ${!t.mix && t.category === c ? "selected" : ""}>${esc(label)}</option>`;
+  }
+  html += `</select>`;
+  return html;
+}
+
+function wireCatSelect(row, merchant, hint) {
+  row.querySelector(".catsel").onchange = e => {
+    const c = e.target.value;
+    if (!c) return;
+    postCorrection(merchant, hint, c === "excluded" ? null : CAT_DEFAULTS[c], null, false, allCatsChecked(row));
+  };
+}
+
+function naicsSelect(t) {
+  const groups = {};
+  for (const o of NAICS_OPTIONS) (groups[o.category] = groups[o.category] || []).push(o);
+  let html = `<select aria-label="NAICS assignment">`;
+  html += `<option value="">${t.mix ? `Split across ${t.mix.length} industries` : t.naics ? esc(`${t.naics} · ${t.naics_title}`) : "Non-purchase"}</option>`;
+  for (const c of CAT_ORDER) {
+    if (!groups[c]) continue;
+    html += `<optgroup label="${esc(DATA.categories[c].label)}">`;
+    for (const o of groups[c]) html += `<option value="${o.code}">${esc(o.title)}${o.basket ? " · 🧺 store basket" : ""}</option>`;
+    html += `</optgroup>`;
+  }
+  html += `<option value="__nonpurchase">Non-purchase / ignore</option>`;
+  html += `<option value="__split">Split across industries…</option></select>`;
+  return html;
+}
+
+function renderTxns() {
+  const list = $("txnlist");
+  const scroll = list.scrollTop;
+  list.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  const q = ui.search.toLowerCase();
+  let shown = 0;
+  DATA.transactions.forEach((t, idx) => {
+    if (q && !(`${t.merchant} ${t.naics_title} ${t.category_hint}`.toLowerCase().includes(q))) return;
+    if (!catMatches(t)) return;
+    if (ui.src === "__low" ? !isLow(t) : (ui.src && t.source !== ui.src)) return;
+    shown++;
+    if (shown > 600) return;
+    const low = isLow(t);
+    const row = document.createElement("div");
+    row.className = "trow" + (low ? " lowconf" : "") + (t.source === "manual" || t.source === "confirmed" ? " corrected" : "");
+    row.innerHTML =
+      `<span class="d">${esc(t.date || "")}</span>` +
+      `<span class="m"><span class="name" title="${esc(t.merchant_raw)}">${esc(t.merchant)}</span>` +
+        `<small title="${esc(basketDesc(t))}">${esc(t.naics_title)}${t.basket ? " · 🧺" : ""}${t.category_hint ? " · " + esc(t.category_hint) : ""}${t.confidence != null && t.source === "llm" ? ` · conf ${t.confidence.toFixed(2)}` : t.source === "vector" ? " · vector" : ""}</small></span>` +
+      `<span class="kgd" title="${esc(factorTip(t))}">${t.factor != null ? t.factor.toFixed(2) + " kg/$" : "–"}</span>` +
+      `<span class="a">${t.amount < 0 ? "$" + fmt(-t.amount) : "−$" + fmt(t.amount)}</span>` +
+      catSelect(t) + naicsSelect(t);
+    wireCatSelect(row, t.merchant, t.category_hint);
+    row.querySelector("select:not(.catsel)").onchange = e => {
+      const v = e.target.value;
+      if (!v) return;
+      if (v === "__split") { ui.search = t.merchant; $("search").value = t.merchant; setTab("merch"); return; }
+      postCorrection(t.merchant, t.category_hint, v === "__nonpurchase" ? null : v);
+    };
+    frag.appendChild(row);
+  });
+  list.appendChild(frag);
+  list.scrollTop = scroll;
+  $("count").textContent = shown > 600 ? `${shown} matches (showing 600)` : `${shown} of ${DATA.transactions.length}`;
+}
+
+const allCatsChecked = row => !!row.querySelector(".allcats input:checked");
+
+async function postCorrection(merchant, hint, naics, mix, confirm, allCats, basket) {
+  const res = await fetch("/api/v2/correct", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({merchant, category_hint: hint, naics, mix, basket,
+                          all_categories: !!allCats, confirm: !!confirm}),
+  });
+  if (!res.ok) { alert("Correction failed"); return false; }
+  const upd = await res.json();
+  for (const tx of DATA.transactions) {
+    if (tx.merchant !== merchant) continue;
+    if (allCats ? (upd.locked_hints || []).includes(tx.category_hint) : tx.category_hint !== hint) continue;
+    Object.assign(tx, upd.assignment, {source: confirm ? "confirmed" : "manual", confidence: 1});
+  }
+  renderAll();
+  return true;
+}
+
+function merchantAgg() {
+  const map = new Map();
+  for (const t of DATA.transactions) {
+    const key = `${t.merchant}|${t.category_hint}`;
+    let m = map.get(key);
+    if (!m) {
+      m = {merchant: t.merchant, category_hint: t.category_hint, count: 0, total: 0, sample: t};
+      map.set(key, m);
+    }
+    m.count++;
+    m.total += -t.amount;  // refunds net out
+    m.sample = t;  // all share the same assignment
+  }
+  return [...map.values()].sort((a, b) => b.total - a.total);
+}
+
+function renderMerchants() {
+  const list = $("merchlist");
+  const scroll = list.scrollTop;
+  list.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  const q = ui.search.toLowerCase();
+  let shown = 0;
+  const rows = merchantAgg();
+  const hintCount = new Map();   // merchant -> number of distinct category hints
+  for (const m of rows) hintCount.set(m.merchant, (hintCount.get(m.merchant) || 0) + 1);
+  for (const m of rows) {
+    const t = m.sample;
+    if (q && !(`${m.merchant} ${t.naics_title} ${m.category_hint}`.toLowerCase().includes(q))) continue;
+    if (!catMatches(t)) continue;
+    if (ui.src === "__low" ? !isLow(t) : (ui.src && t.source !== ui.src)) continue;
+    shown++;
+    const low = isLow(t);
+    const row = document.createElement("div");
+    row.className = "mrow" + (low ? " lowconf" : "") + (t.source === "manual" || t.source === "confirmed" ? " corrected" : "");
+    const srcLabel = (t.source === "llm" ? `LLM · conf ${t.confidence?.toFixed(2)}`
+      : t.source === "vector" ? "vector match" : t.source === "manual" ? "corrected by you"
+      : t.source === "confirmed" ? "confirmed by you" : "rule") + (t.scope === "merchant" ? " (merchant-wide)" : "");
+    const nHints = hintCount.get(m.merchant);
+    const allcats = nHints > 1
+      ? ` · <label class="allcats" title="Apply corrections from this row to ${esc(m.merchant)} in all ${nHints} of its categories (category-specific rules you set stay pinned)"><input type="checkbox"${t.scope === "merchant" ? " checked" : ""}> all cats</label>`
+      : "";
+    row.innerHTML =
+      `<span class="m"><span class="name">${esc(m.merchant)}</span>` +
+        `<small title="${esc(basketDesc(t))}">${esc(t.naics_title)}${t.basket ? " · 🧺 basket" : ""}${m.category_hint ? " · " + esc(m.category_hint) : ""} · ${srcLabel}${allcats}</small></span>` +
+      `<span class="tot">$${fmt(m.total)}<small> · ${m.count}</small></span>` +
+      `<span class="kgd" title="${esc(factorTip(t))}">${t.factor != null ? t.factor.toFixed(2) + " kg/$" : "–"}</span>` +
+      catSelect(t) + naicsSelect(t) +
+      (low ? `<button class="okbtn" title="Confirm this assignment is correct">✓</button>` : `<span></span>`);
+    if (t.mix) {
+      row.title = "Click to edit this split";
+      row.style.cursor = "pointer";
+      row.onclick = e => { if (e.target.closest("select,button,input,label")) return; openSplitEditor(row, m, t); };
+    } else if (t.basket) {
+      row.title = "Click to edit the commodity basket (manufacturing vs retail margin)";
+      row.style.cursor = "pointer";
+      row.onclick = e => { if (e.target.closest("select,button,input,label")) return; openBasketEditor(row, m, t); };
+    }
+    wireCatSelect(row, m.merchant, m.category_hint);
+    row.querySelector("select:not(.catsel)").onchange = e => {
+      const v = e.target.value;
+      if (!v) return;
+      if (v === "__split") { openSplitEditor(row, m, t); e.target.value = ""; return; }
+      postCorrection(m.merchant, m.category_hint, v === "__nonpurchase" ? null : v, null, false, allCatsChecked(row));
+    };
+    const ok = row.querySelector(".okbtn");
+    if (ok) ok.onclick = e => {
+      e.stopPropagation();
+      const mixPct = t.mix ? t.mix.map(p => ({naics: p.naics, weight: Math.round(p.weight * 100)})) : null;
+      postCorrection(m.merchant, m.category_hint, t.mix ? null : t.naics, mixPct, true, allCatsChecked(row));
+    };
+    frag.appendChild(row);
+  }
+  list.appendChild(frag);
+  list.scrollTop = scroll;
+  $("count").textContent = `${shown} merchants`;
+}
+
+function openSplitEditor(row, m, t) {
+  document.querySelector(".splitedit")?.remove();
+  const ed = document.createElement("div");
+  ed.className = "splitedit";
+  const parts = t.mix ? t.mix.map(p => ({naics: p.naics, weight: Math.round(p.weight * 100)}))
+                      : [{naics: t.naics || NAICS_OPTIONS[0].code, weight: 100}];
+  const groups = {};
+  for (const o of NAICS_OPTIONS) (groups[o.category] = groups[o.category] || []).push(o);
+  const optionsHtml = sel => CAT_ORDER.filter(c => groups[c]).map(c =>
+    `<optgroup label="${esc(DATA.categories[c].label)}">` +
+    groups[c].map(o => `<option value="${o.code}" ${o.code === sel ? "selected" : ""}>${esc(o.title)}${o.basket ? " · 🧺 store basket" : ""}</option>`).join("") +
+    `</optgroup>`).join("");
+  const draw = () => {
+    ed.innerHTML = parts.map((p, i) =>
+      `<div class="sprow"><select data-i="${i}">${optionsHtml(p.naics)}</select>` +
+      `<input type="number" min="1" max="100" step="5" value="${p.weight}" data-i="${i}">` +
+      `<span>%</span><button class="spdel" data-i="${i}" title="Remove">✕</button></div>`).join("") +
+      `<div class="sprow"><button class="spadd">+ industry</button>` +
+      `<span class="spsum"></span>` +
+      `<button class="spsave">Save split</button><button class="spcancel">Cancel</button></div>`;
+    ed.querySelectorAll("select").forEach(s => s.onchange = () => { parts[+s.dataset.i].naics = s.value; });
+    ed.querySelectorAll("input").forEach(n => n.onchange = () => { parts[+n.dataset.i].weight = Math.max(1, +n.value || 1); sum(); });
+    ed.querySelectorAll(".spdel").forEach(b => b.onclick = () => { parts.splice(+b.dataset.i, 1); if (!parts.length) parts.push({naics: NAICS_OPTIONS[0].code, weight: 100}); draw(); });
+    ed.querySelector(".spadd").onclick = () => { parts.push({naics: NAICS_OPTIONS[0].code, weight: 10}); draw(); };
+    ed.querySelector(".spcancel").onclick = () => ed.remove();
+    ed.querySelector(".spsave").onclick = async () => {
+      if (await postCorrection(m.merchant, m.category_hint, null, parts, false, allCatsChecked(row))) ed.remove();
+    };
+    sum();
+  };
+  const sum = () => {
+    const s = parts.reduce((a, p) => a + p.weight, 0);
+    const el = ed.querySelector(".spsum");
+    el.textContent = `Σ ${s}%` + (s !== 100 ? " (will be normalized)" : "");
+  };
+  draw();
+  row.after(ed);
+}
+
+function openBasketEditor(row, m, t) {
+  document.querySelector(".splitedit")?.remove();
+  const ed = document.createElement("div");
+  ed.className = "splitedit";
+  const OPT = Object.fromEntries(BASKET_OPTIONS.map(o => [o.code, o]));
+  const groups = {};
+  for (const o of BASKET_OPTIONS) (groups[o.category] = groups[o.category] || []).push(o);
+  const parts = t.basket.filter(p => p.naics !== t.naics)
+    .map(p => ({naics: p.naics, weight: Math.round(p.weight * 100)}));
+  if (!parts.length) parts.push({naics: BASKET_OPTIONS[0].code, weight: 100});
+  const optionsHtml = sel =>
+    CAT_ORDER.filter(c => groups[c]).map(c => {
+      const glabel = c === "excluded" ? "Raw / intermediate commodities" : DATA.categories[c].label;
+      return `<optgroup label="${esc(glabel)}">` +
+        groups[c].map(o => `<option value="${o.code}" ${o.code === sel ? "selected" : ""}>${esc(o.title)} — ${o.factor_production.toFixed(2)} kg/$ mfg</option>`).join("") +
+        `</optgroup>`;
+    }).join("");
+  const blend = () => {
+    const tw = parts.reduce((a, p) => a + p.weight, 0) || 1;
+    let prod = 0, marg = 0;
+    for (const p of parts) {
+      const o = OPT[p.naics];
+      if (!o) continue;
+      prod += o.factor_production * p.weight / tw;
+      marg += o.factor_margins * p.weight / tw;
+    }
+    return {prod, marg, tw};
+  };
+  ed.innerHTML =
+    `<div class="sprow" style="color:var(--muted)">Manufacturing mix for a dollar at ${esc(m.merchant)} (weights sum to 100%). Category stays ${esc(DATA.categories[t.category]?.label || t.category)}.</div>` +
+    `<div class="brows"></div>` +
+    `<div class="sprow" style="position:relative"><span style="color:var(--muted)">Add:</span>` +
+      `<input type="search" class="bfind" placeholder="Search ${BASKET_OPTIONS.length} commodities to add (soap, lumber, 3256…)" style="flex:1;max-width:340px" autocomplete="off">` +
+      `<div class="bsugg" hidden></div></div>` +
+    `<div class="sprow bmargins" style="color:var(--muted)"></div>` +
+    `<div class="sprow"><span class="spsum"></span>` +
+    `<button class="spsave">Save basket</button><button class="spcancel">Cancel</button></div>`;
+  const sums = () => {
+    const b = blend();
+    ed.querySelector(".bmargins").innerHTML =
+      `+ Retail, wholesale &amp; transport margins: <b>&nbsp;${b.marg.toFixed(2)} kg/$</b>&nbsp; (always included, from EPA margin factors of the chosen commodities)`;
+    ed.querySelector(".spsum").textContent =
+      `Σ ${b.tw}%${b.tw !== 100 ? " (normalized)" : ""} · blended ${(b.prod + b.marg).toFixed(2)} kg/$ = ${b.prod.toFixed(2)} mfg + ${b.marg.toFixed(2)} margins`;
+  };
+  const renderRows = () => {
+    ed.querySelector(".brows").innerHTML = parts.map((p, i) =>
+      `<div class="sprow"><select data-i="${i}">${optionsHtml(p.naics)}</select>` +
+      `<input type="number" min="1" max="100" step="5" value="${p.weight}" data-i="${i}">` +
+      `<span>%</span><button class="spdel" data-i="${i}" title="Remove">✕</button></div>`).join("");
+    ed.querySelectorAll(".brows select").forEach(sel => sel.onchange = () => { parts[+sel.dataset.i].naics = sel.value; sums(); });
+    ed.querySelectorAll(".brows input").forEach(n => n.onchange = () => { parts[+n.dataset.i].weight = Math.max(1, +n.value || 1); sums(); });
+    ed.querySelectorAll(".spdel").forEach(btn => btn.onclick = () => { parts.splice(+btn.dataset.i, 1); if (!parts.length) parts.push({naics: BASKET_OPTIONS[0].code, weight: 100}); renderRows(); sums(); });
+  };
+  const inp = ed.querySelector(".bfind"), sugg = ed.querySelector(".bsugg");
+  const addPart = code => {
+    parts.push({naics: code, weight: 10});
+    inp.value = ""; sugg.hidden = true;
+    renderRows(); sums();
+  };
+  const renderSugg = () => {
+    const ql = inp.value.trim().toLowerCase();
+    if (!ql) { sugg.hidden = true; sugg.innerHTML = ""; return; }
+    const hits = BASKET_OPTIONS.filter(o => `${o.code} ${o.title}`.toLowerCase().includes(ql)).slice(0, 10);
+    sugg.innerHTML = hits.length
+      ? hits.map(o => `<div class="bsi" data-code="${o.code}">${esc(o.title)} <small>${o.code} · ${o.factor_production.toFixed(2)} kg/$ mfg + ${o.factor_margins.toFixed(2)} margins</small></div>`).join("")
+      : `<div class="bsi" style="cursor:default;color:var(--muted)">no matching commodity</div>`;
+    sugg.hidden = false;
+    sugg.querySelectorAll(".bsi[data-code]").forEach(el => el.onclick = () => addPart(el.dataset.code));
+  };
+  inp.oninput = renderSugg;
+  inp.onkeydown = e => {
+    if (e.key === "Enter") { const first = sugg.querySelector(".bsi[data-code]"); if (first) addPart(first.dataset.code); }
+    if (e.key === "Escape") { sugg.hidden = true; }
+  };
+  ed.querySelector(".spcancel").onclick = () => ed.remove();
+  ed.querySelector(".spsave").onclick = async () => {
+    const basket = parts.map(p => ({naics: p.naics, weight: p.weight}));
+    if (await postCorrection(m.merchant, m.category_hint, t.naics, null, false, allCatsChecked(row), basket)) ed.remove();
+  };
+  renderRows(); sums();
+  row.after(ed);
+}
+
+function setTab(tab) {
+  ui.tab = tab;
+  $("catall").textContent = tab === "merch" ? "All merchants" : "All transactions";
+  $("tab-txns").className = tab === "txns" ? "active" : "";
+  $("tab-merch").className = tab === "merch" ? "active" : "";
+  $("txnlist").hidden = tab !== "txns";
+  $("merchlist").hidden = tab !== "merch";
+  renderLeft();
+}
+$("tab-txns").onclick = () => setTab("txns");
+$("tab-merch").onclick = () => setTab("merch");
+
+function renderLeft() {
+  if ((ui.tab || "txns") === "txns") renderTxns(); else renderMerchants();
+}
+
+$("search").oninput = e => { ui.search = e.target.value; renderLeft(); };
+$("srcfilter").onchange = e => { ui.src = e.target.value; renderLeft(); };
+const cf = $("catfilter");
+for (const c of CAT_ORDER) {
+  const o = document.createElement("option");
+  o.value = c; o.textContent = DATA?.categories[c].label;
+  cf.appendChild(o);
+}
+cf.onchange = e => { ui.cat = e.target.value; renderCats(); renderLeft(); };
+
+$("reset").onclick = async () => {
+  if (!confirm("Delete ALL transactions and EVERY merchant rule — including your manual corrections and confirmations? This cannot be undone.")) return;
+  const res = await fetch("/api/v2/reset", {method: "POST"});
+  if (res.ok) location.reload();
+  else alert("Reset failed");
+};
+
+$("csvfile").onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  $("upload-msg").textContent = "Classifying (vector + LLM) — can take a minute or two…";
+  const res = await fetch("/api/v2/upload", {method: "POST", headers: {"Content-Type": "text/csv"}, body: await f.text()});
+  if (res.ok) location.reload();
+  else { const d = await res.json().catch(() => ({})); $("upload-msg").textContent = "Failed: " + (d.error || res.status); }
+  e.target.value = "";
+};
+
+// ---------- emissions chart (ported from v1) ----------
+const GOODS_COLORS = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)"];
+const SERVICES_COLORS = ["var(--s5)","var(--s6)","var(--s7)","var(--s8)"];
+
+function monthlyEmissions() {
+  // {month: {category: kg}} + per-category totals, from per-transaction
+  // NAICS factors (2022-USD-deflated spend; refunds net out).
+  const byMonth = {}, byCat = {};
+  for (const t of DATA.transactions) {
+    if ((t.naics == null && !t.mix) || !t.date) continue;
+    const m = t.date.slice(0, 7);
+    const spend22 = -t.amount * (t.deflator || 1);
+    const add = (cat, kg) => {
+      if (cat === "excluded" || !kg) return;
+      (byMonth[m] = byMonth[m] || {})[cat] = (byMonth[m][cat] || 0) + kg;
+      byCat[cat] = (byCat[cat] || 0) + kg;
+    };
+    if (t.mix) for (const p of t.mix) add(p.category, spend22 * p.weight * p.factor);
+    else if (t.factor != null) add(t.category, spend22 * t.factor);
+  }
+  return {byMonth, byCat};
+}
+
+function renderChart() {
+  const host = $("chart-host"), legend = $("chart-legend");
+  host.innerHTML = ""; legend.innerHTML = "";
+  const {byMonth, byCat} = monthlyEmissions();
+  const months = Object.keys(byMonth).sort();
+  if (!months.length) {
+    host.innerHTML = '<p class="hint">Upload a CSV to see monthly emissions.</p>';
+    return;
+  }
+
+  // per section: top 3 categories by kg + a remainder bucket
+  const groupSeries = (section, colors) => {
+    const ranked = Object.entries(byCat)
+      .filter(([c, v]) => v > 0 && DATA.categories[c]?.section === section)
+      .sort((a, b) => b[1] - a[1]);
+    const series = ranked.slice(0, 3).map(([c], i) => ({key: c, label: DATA.categories[c].label, color: colors[i], group: section}));
+    const rest = ranked.slice(3).map(([c]) => c);
+    if (rest.length) series.push({key: "__rest_" + section, label: `Remaining ${section.toLowerCase()}`, color: colors[3], group: section, members: rest});
+    return series;
+  };
+  const goodsSeries = groupSeries("Goods", GOODS_COLORS);
+  const servicesSeries = groupSeries("Services", SERVICES_COLORS);
+  const kgOf = (m, s) => Math.max(0, s.members
+    ? s.members.reduce((a, c) => a + (byMonth[m]?.[c] || 0), 0)
+    : (byMonth[m]?.[s.key] || 0));
+  const groupTotal = (m, series) => series.reduce((a, s) => a + kgOf(m, s), 0);
+
+  const W = 360, H = 250, ML = 42, MR = 6, MT = 16, MB = 22;
+  const iw = W - ML - MR, ih = H - MT - MB;
+  const maxBar = Math.max(...months.flatMap(m => [groupTotal(m, goodsSeries), groupTotal(m, servicesSeries)]));
+  const step = [50,100,200,250,500,1000,2000,2500,5000].find(s => s * 4 >= maxBar) || 10000;
+  const yMax = Math.ceil(maxBar / step) * step || step;
+  const y = v => MT + ih * (1 - v / yMax);
+  const band = iw / months.length;
+  const bw = Math.min((band - 10) / 2 - 2, 26);  // two bars per month band
+
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.id = "chart-svg";
+  const el = (tag, attrs, parent) => {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    (parent || svg).appendChild(n);
+    return n;
+  };
+
+  for (let v = 0; v <= yMax; v += step) {  // grid + y labels
+    el("line", {x1: ML, x2: W - MR, y1: y(v), y2: y(v), stroke: "var(--line)", "stroke-width": v === 0 ? 1.2 : 0.6});
+    if (v > 0) el("text", {x: ML - 5, y: y(v) + 3, "text-anchor": "end", "font-size": 8, fill: "var(--muted)"}).textContent = v.toLocaleString();
+  }
+
+  const tip = $("chart-tip");
+  const drawStack = (m, series, x) => {
+    const total = groupTotal(m, series);
+    let acc = 0;
+    const segs = series.map(s => ({s, kg: kgOf(m, s)})).filter(o => o.kg > 0);
+    segs.forEach((o, si) => {
+      const y1 = y(acc + o.kg), y0 = y(acc);
+      const h = Math.max(y0 - y1, 0);
+      const isTop = si === segs.length - 1;
+      let node;
+      if (isTop && h > 4) {  // rounded cap on the data end only
+        const r = Math.min(3, h);
+        node = el("path", {d: `M${x},${y0} L${x},${y1 + r} Q${x},${y1} ${x + r},${y1} L${x + bw - r},${y1} Q${x + bw},${y1} ${x + bw},${y1 + r} L${x + bw},${y0} Z`, fill: o.s.color});
+      } else {
+        node = el("rect", {x, y: y1, width: bw, height: h, fill: o.s.color});
+      }
+      node.setAttribute("stroke", "var(--card)");
+      node.setAttribute("stroke-width", "1");
+      node.addEventListener("mousemove", ev => {
+        const r = $("chartpane").getBoundingClientRect();
+        tip.textContent = `${m} · ${o.s.group}: ${o.s.label}\n${Math.round(o.kg).toLocaleString()} kg of ${Math.round(total).toLocaleString()} kg`;
+        tip.style.left = Math.min(ev.clientX - r.left + 12, r.width - 160) + "px";
+        tip.style.top = (ev.clientY - r.top + 14) + "px";
+        tip.style.opacity = 1;
+      });
+      node.addEventListener("mouseleave", () => tip.style.opacity = 0);
+      acc += o.kg;
+    });
+    if (total > 0) el("text", {x: x + bw / 2, y: y(total) - 4, "text-anchor": "middle", "font-size": 7, fill: "var(--muted)"}).textContent = Math.round(total).toLocaleString();
+  };
+
+  months.forEach((m, mi) => {
+    const cx = ML + band * mi + band / 2;
+    drawStack(m, goodsSeries, cx - bw - 2);
+    drawStack(m, servicesSeries, cx + 2);
+    const [yy, mm] = m.split("-");
+    const name = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+mm - 1];
+    el("text", {x: cx, y: H - 8, "text-anchor": "middle", "font-size": 8, fill: "var(--muted)"}).textContent =
+      (mm === "01" || mi === 0) ? `${name} ’${yy.slice(2)}` : name;
+  });
+  host.appendChild(svg);
+
+  for (const [heading, series] of [["Goods (left bar)", goodsSeries], ["Services (right bar)", servicesSeries]]) {
+    const h = document.createElement("div");
+    h.style.cssText = "font-size:0.66rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:6px";
+    h.textContent = heading;
+    legend.appendChild(h);
+    for (const s of series) {
+      const kg = months.reduce((a, m) => a + kgOf(m, s), 0);
+      const row = document.createElement("div");
+      row.className = "lrow";
+      row.innerHTML = `<span class="sw" style="background:${s.color}"></span><span>${esc(s.label)}</span>` +
+        `<span class="lv">${(kg / DATA.meta.months * 12 / 1000).toFixed(2)} t/yr</span>`;
+      legend.appendChild(row);
+    }
+  }
+}
+
+function renderAll() { renderImpact(); renderCats(); renderChart(); renderLeft(); }
+if (DATA) {
+  $("window").textContent = `${DATA.meta.start || "?"} → ${DATA.meta.end || "?"} · ${DATA.meta.months} months · ${DATA.meta.count} transactions`;
+  renderAll();
+} else {
+  $("window").textContent = "No data — upload a transactions CSV (needs Merchant + Amount columns; Category helps)";
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CoolClimate — Goods &amp; Services from Monarch</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: -apple-system, system-ui, sans-serif; height: 100vh; display: flex; background: #f4f4f2; color: #222; }
+  #calc { flex: 1 1 58%; border: none; height: 100vh; background: #fff; }
+  #panel { flex: 0 0 42%; max-width: 560px; overflow-y: auto; padding: 20px 24px; border-left: 1px solid #ddd; }
+  h1 { font-size: 1.05rem; margin-bottom: 2px; }
+  .window { color: #777; font-size: 0.8rem; margin-bottom: 12px; }
+  h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #555; margin: 18px 0 6px; }
+  .row { display: flex; align-items: baseline; justify-content: space-between; padding: 7px 10px; border-radius: 6px; cursor: pointer; background: #ececea; margin-bottom: 3px; }
+  .row:hover { background: #dde8dd; }
+  .txlist { margin: -1px 0 6px; padding: 4px 10px 6px 22px; font-size: 0.8rem; background: #f7f7f5; border-radius: 0 0 6px 6px; }
+  .txn { display: grid; grid-template-columns: 5.5em 1fr auto; gap: 8px; padding: 2px 0; }
+  .txn .txdate { color: #888; font-variant-numeric: tabular-nums; }
+  .txn .txmerchant { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .txn .txamt { font-variant-numeric: tabular-nums; text-align: right; }
+  .txn.more { color: #888; }
+  .row .label { font-size: 0.9rem; }
+  .row .value { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .row .unit { color: #888; font-size: 0.75rem; font-weight: 400; margin-left: 4px; }
+  .row.copied { background: #c9e4c9; }
+  .hint { color: #888; font-size: 0.75rem; margin: 8px 0 0; }
+  details { margin-top: 18px; font-size: 0.85rem; }
+  summary { cursor: pointer; color: #555; }
+  details table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  details td { padding: 3px 6px; border-bottom: 1px solid #e5e5e3; }
+  details td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .warn { color: #a15c00; }
+  #connect { border: 1px solid #d5d5d2; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; background: #fff; }
+  #connect button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid #4a8a48; background: #4aaa48; color: #fff; cursor: pointer; }
+  #connect button:disabled { opacity: 0.5; cursor: default; }
+  #login-form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  #login-form input { font: inherit; padding: 7px 9px; border: 1px solid #ccc; border-radius: 6px; }
+  #conn-msg { font-size: 0.8rem; margin-top: 8px; color: #555; }
+  #conn-msg.error { color: #b00020; }
+  .note { color: #777; font-size: 0.85rem; padding: 12px 0; }
+  #prefill { border: 1px solid #d5d5d2; border-radius: 8px; padding: 10px 14px; margin-bottom: 6px; background: #fff; font-size: 0.9rem; }
+  #prefill a#bookmarklet { padding: 2px 8px; background: #4aaa48; color: #fff; border-radius: 5px; text-decoration: none; cursor: grab; }
+  #dropzone { border: 2px dashed #bbb; border-radius: 8px; padding: 16px; text-align: center; font-size: 0.9rem; }
+  #dropzone.drag { border-color: #4aaa48; background: #eef6ee; }
+  .linkish { color: #2a7a2a; text-decoration: underline; cursor: pointer; }
+  #api-login { margin-top: 10px; font-size: 0.85rem; }
+  #api-login button { margin-top: 8px; }
+  #login-form details { margin: 4px 0 0; }
+  #login-form details input { width: 100%; margin-top: 6px; }
+  code { font-size: 0.75rem; background: #ececea; padding: 1px 4px; border-radius: 4px; word-break: break-all; }
+</style>
+</head>
+<body>
+<iframe id="calc" src="https://coolclimate-calculator-ui.firebaseapp.com/?utm_medium=iframe&utm_campaign=carboncalculator" title="CoolClimate calculator"></iframe>
+<div id="panel">
+  <h1>Goods &amp; Services from Monarch</h1>
+  <div class="window" id="window"></div>
+
+  <div id="connect" hidden>
+    <div id="dropzone">
+      <b>Drop a Monarch CSV export here</b> or <label for="csv-file" class="linkish">choose a file</label>
+      <input id="csv-file" type="file" accept=".csv,text/csv" hidden>
+      <div class="hint">Monarch &rarr; Transactions &rarr; Download CSV. Nothing leaves this machine.</div>
+    </div>
+    <details id="api-login">
+      <summary>…or fetch via the Monarch API (login required)</summary>
+      <button id="refresh-btn">Fetch latest from Monarch</button>
+    <form id="login-form" hidden>
+      <input id="email" type="email" placeholder="Monarch email" autocomplete="username" required>
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" required>
+      <input id="mfa" type="text" placeholder="MFA code" inputmode="numeric" autocomplete="one-time-code" hidden>
+      <button type="submit" id="login-btn">Log in &amp; fetch</button>
+      <details>
+        <summary>Sign in to Monarch with Google?</summary>
+        <p class="hint">Set a password in Monarch (<a href="https://app.monarch.com/settings/security"
+        target="_blank">Settings &rarr; Security</a>) and log in with it here — your Google sign-in keeps
+        working alongside. (Monarch's web app uses cookie sessions, so there's no API token you can copy
+        from the browser; the field below only accepts a token obtained via the API's own login.)</p>
+        <input id="token" type="password" placeholder="API token (advanced, optional)" autocomplete="off">
+      </details>
+    </form>
+    </details>
+    <div id="conn-msg"></div>
+  </div>
+
+  <div id="prefill" hidden>
+    <b>Prefill the calculator</b>
+    <p class="hint">Drag <a id="bookmarklet" href="#">CF&nbsp;Prefill</a> to your bookmarks bar (once). Then open
+    <a href="https://coolclimate-calculator-ui.firebaseapp.com/en-US/shopping" target="_blank">the calculator in its own tab</a>,
+    click the bookmark, and the Shopping values fill in from this tool (Chrome may ask to allow
+    "local network access" — allow it). Reload this page afterwards and the embedded calculator
+    picks them up too (same browser storage).</p>
+    <p class="hint">No bookmarks bar handy? <a id="copy-script" href="#">Copy a prefill script</a> and paste it
+    into that tab's DevTools console instead.</p>
+  </div>
+
+  <div id="sections"></div>
+  <p class="hint" id="copy-hint" hidden>Click a category to see its transactions; click the number to copy it. Enter these under Shopping &rarr; Advanced in the calculator.</p>
+  <details id="unmapped-box" hidden><summary></summary><table id="unmapped"></table></details>
+  <details id="excluded-box" hidden><summary id="excluded-sum"></summary><table id="excluded"></table></details>
+</div>
+<script>
+const DATA = /*__VALUES__*/null;
+const SERVED = /*__SERVED__*/false;
+
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+function render() {
+  if (!DATA) {
+    $("window").innerHTML = '<span class="note">No data yet — fetch from Monarch to fill this panel.</span>';
+    return;
+  }
+  $("window").textContent = `${DATA.window.start} → ${DATA.window.end} (${DATA.window.months} months)`;
+  $("copy-hint").hidden = false;
+
+  const sectionsEl = $("sections");
+  let currentSection = null, sectionEl = null;
+  for (const [key, f] of Object.entries(DATA.fields)) {
+    if (f.section !== currentSection) {
+      currentSection = f.section;
+      const h = document.createElement("h2");
+      h.textContent = `${f.section} ($/month)`;
+      sectionsEl.appendChild(h);
+      sectionEl = document.createElement("div");
+      sectionsEl.appendChild(sectionEl);
+    }
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<span class="label">▸ ${f.label}</span>` +
+      `<span class="value" title="click to copy">${fmt(f.monthly_avg)}<span class="unit">$/mo</span></span>`;
+
+    const txlist = document.createElement("div");
+    txlist.className = "txlist";
+    txlist.hidden = true;
+    if (f.txn_count) {
+      for (const t of f.top_transactions) {
+        const line = document.createElement("div");
+        line.className = "txn";
+        line.innerHTML = `<span class="txdate">${t.date}</span>` +
+          `<span class="txmerchant">${t.merchant}<span class="unit"> · ${t.category}</span></span>` +
+          `<span class="txamt">$${fmt(t.amount)}</span>`;
+        txlist.appendChild(line);
+      }
+      if (f.more_count > 0) {
+        const line = document.createElement("div");
+        line.className = "txn more";
+        line.innerHTML = `<span></span><span>+ ${f.more_count} more</span><span class="txamt">$${fmt(f.more_total)}</span>`;
+        txlist.appendChild(line);
+      }
+    } else {
+      txlist.innerHTML = '<div class="txn"><span></span><span>no transactions</span><span></span></div>';
+    }
+
+    row.querySelector(".label").parentElement.onclick = () => {
+      txlist.hidden = !txlist.hidden;
+      row.querySelector(".label").textContent = `${txlist.hidden ? "▸" : "▾"} ${f.label}`;
+    };
+    row.querySelector(".value").onclick = e => {
+      e.stopPropagation();
+      const v = String(Math.round(f.monthly_avg));
+      (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject())
+        .catch(() => {
+          const ta = document.createElement("textarea");
+          ta.value = v; document.body.appendChild(ta); ta.select();
+          document.execCommand("copy"); ta.remove();
+        });
+      row.classList.add("copied");
+      setTimeout(() => row.classList.remove("copied"), 700);
+    };
+    sectionEl.appendChild(row);
+    sectionEl.appendChild(txlist);
+  }
+
+  const unmappedEntries = Object.entries(DATA.unmapped);
+  if (unmappedEntries.length) {
+    $("unmapped-box").hidden = false;
+    $("unmapped-box").querySelector("summary").innerHTML =
+      `<span class="warn">⚠ ${unmappedEntries.length} unmapped categories — add to config/mapping.yaml</span>`;
+    for (const [cat, u] of unmappedEntries) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${cat} <span class="unit">(${u.count} txns)</span></td><td>$${fmt(u.total)}</td>`;
+      $("unmapped").appendChild(tr);
+    }
+  }
+
+  $("excluded-box").hidden = false;
+  const exclTotal = Object.values(DATA.excluded).reduce((a, b) => a + b, 0);
+  $("excluded-sum").textContent = `Excluded from Goods & Services: $${fmt(exclTotal)} total`;
+  for (const [cat, v] of Object.entries(DATA.excluded)) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${cat}</td><td>$${fmt(v)}</td>`;
+    $("excluded").appendChild(tr);
+  }
+}
+
+async function api(path, body) {
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body || {}),
+    });
+    return {status: res.status, data: await res.json().catch(() => ({}))};
+  } catch (err) {
+    return {status: 0, data: {error: `can't reach the local server (${err.message}) — is cf serve running? Try a hard refresh.`}};
+  }
+}
+
+window.onerror = (m) => msg(`Page error: ${m}`, true);
+
+function msg(text, isError) {
+  $("conn-msg").textContent = text;
+  $("conn-msg").className = isError ? "error" : "";
+}
+
+function setupConnect() {
+  $("connect").hidden = false;
+
+  async function uploadCSV(file) {
+    msg(`Importing ${file.name}…`);
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: {"Content-Type": "text/csv"},
+        body: await file.text(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        msg(`Imported ${data.count} transactions — reloading…`);
+        location.reload();
+      } else {
+        msg(`Import failed: ${data.error || res.status}`, true);
+      }
+    } catch (err) {
+      msg(`Import failed: ${err.message}`, true);
+    }
+  }
+
+  const dz = $("dropzone");
+  dz.ondragover = e => { e.preventDefault(); dz.classList.add("drag"); };
+  dz.ondragleave = () => dz.classList.remove("drag");
+  dz.ondrop = e => {
+    e.preventDefault();
+    dz.classList.remove("drag");
+    if (e.dataTransfer.files[0]) uploadCSV(e.dataTransfer.files[0]);
+  };
+  $("csv-file").onchange = () => {
+    if ($("csv-file").files[0]) uploadCSV($("csv-file").files[0]);
+  };
+
+  async function refresh() {
+    $("refresh-btn").disabled = true;
+    msg("Fetching transactions from Monarch… (can take ~30s)");
+    const {status, data} = await api("/api/refresh");
+    if (status === 200) {
+      msg("Done — reloading…");
+      location.reload();
+    } else if (status === 401) {
+      msg("Not logged in — enter your Monarch credentials. They go only to the local process on this machine.", false);
+      $("login-form").hidden = false;
+      $("refresh-btn").hidden = true;
+    } else {
+      msg(`Fetch failed: ${data.error || status}`, true);
+      $("refresh-btn").disabled = false;
+    }
+  }
+
+  $("refresh-btn").onclick = refresh;
+
+  const token = $("token");
+  token.oninput = () => {
+    $("email").required = $("password").required = !token.value;
+  };
+
+  $("login-form").onsubmit = async e => {
+    e.preventDefault();
+    $("login-btn").disabled = true;
+    msg("Logging in…");
+    const body = token.value
+      ? {token: token.value}
+      : {email: $("email").value, password: $("password").value};
+    if (!body.token && !$("mfa").hidden && $("mfa").value) body.mfa_code = $("mfa").value;
+    const {data} = await api("/api/login", body);
+    $("login-btn").disabled = false;
+    if (data.ok) {
+      $("login-form").hidden = true;
+      await refresh();
+    } else if (data.mfa_required) {
+      $("mfa").hidden = false;
+      $("mfa").focus();
+      msg("Enter the 6-digit code Monarch just emailed you (or your authenticator app code).");
+    } else {
+      msg(`Login failed: ${data.error || "check email/password"}`, true);
+    }
+  };
+}
+
+const CALC_KEYS = {
+  goods_furniture_appliances: "input_footprint_shopping_goods_furnitureappliances",
+  goods_clothing: "input_footprint_shopping_goods_clothing",
+  goods_entertainment: "input_footprint_shopping_goods_other_entertainment",
+  goods_paper_office_reading: "input_footprint_shopping_goods_other_office",
+  goods_personal_care_cleaning: "input_footprint_shopping_goods_other_personalcare",
+  goods_auto_parts: "input_footprint_shopping_goods_other_autoparts",
+  goods_medical: "input_footprint_shopping_goods_other_medical",
+  services_health_care: "input_footprint_shopping_services_healthcare",
+  services_education: "input_footprint_shopping_services_education",
+  services_information_communication: "input_footprint_shopping_services_communications",
+  services_vehicle_service: "input_footprint_shopping_services_vehicleservices",
+  services_personal_business_finance: "input_footprint_shopping_services_finance",
+  services_household_maintenance_repair: "input_footprint_shopping_services_household",
+  services_organizations_charity: "input_footprint_shopping_services_charity",
+  services_other: "input_footprint_shopping_services_miscservices",
+};
+
+// Merges `vals` into the calculator's persisted state and reloads. Runs ON
+// the calculator's origin (via bookmarklet or pasted into its console).
+function applyScript(valsExpr) {
+  return `(async()=>{if(!/coolclimate/.test(location.host))return alert("Run this on the CoolClimate calculator tab");` +
+    `try{const v=${valsExpr};` +
+    `const d=JSON.parse(localStorage.getItem("redux")||"null");` +
+    `if(d&&d.user_footprint){d.user_footprint.inputs=Object.assign({},d.user_footprint.inputs,v);localStorage.setItem("redux",JSON.stringify(d))}` +
+    `else{localStorage.setItem("user_footprint",JSON.stringify(Object.assign(JSON.parse(localStorage.getItem("user_footprint")||"{}"),v)))}` +
+    `location.reload()}catch(e){alert("Prefill failed: "+e.message)}})()`;
+}
+
+function setupPrefill() {
+  if (!DATA) return;
+  $("prefill").hidden = false;
+
+  if (SERVED) {
+    const fetchExpr = `await fetch("${location.origin}/api/values").then(r=>r.json()).then(j=>j.inputs)`;
+    $("bookmarklet").href = "javascript:" + encodeURIComponent(applyScript(fetchExpr));
+  } else {
+    $("bookmarklet").parentElement.hidden = true;
+  }
+
+  $("copy-script").onclick = e => {
+    e.preventDefault();
+    const vals = {input_footprint_shopping_goods_type: 1, input_footprint_shopping_goods_other_type: 1, input_footprint_shopping_services_type: 1};
+    for (const [field, key] of Object.entries(CALC_KEYS)) vals[key] = Math.round(DATA.fields[field].monthly_avg);
+    navigator.clipboard.writeText(applyScript(JSON.stringify(vals)));
+    $("copy-script").textContent = "Copied!";
+    setTimeout(() => $("copy-script").textContent = "Copy a prefill script", 1200);
+  };
+}
+
+render();
+setupPrefill();
+if (SERVED) setupConnect();
+</script>
+</body>
+</html>

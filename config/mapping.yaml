@@ -1,0 +1,123 @@
+# Monarch category -> CoolClimate Goods & Services field mapping.
+#
+# Values can be:
+#   - a single field key (see src/cf/fields.py for the full list)
+#   - "exclude" (not part of Goods & Services: food, travel, housing,
+#     transfers, income... you enter those calculator sections yourself)
+#   - a dict of {field: weight} to split one category across fields
+#
+# Categories that appear in your data but not here land in the "unmapped"
+# report so you can add them.
+
+categories:
+  # ---- Goods ----
+  Clothing: goods_clothing
+  Furniture & Housewares: goods_furniture_appliances
+  Electronics: goods_entertainment          # CoolClimate counts AV/electronics under Entertainment goods
+  Entertainment & Recreation: goods_entertainment
+  Woodworking: goods_entertainment          # hobby supplies
+  Hobby and Craft: goods_entertainment
+  Fun Money: goods_entertainment
+  Gifts: goods_entertainment                # physical gifts; move to charity if mostly donations
+  Personal: goods_personal_care_cleaning
+  Household Stuff (Paper towels,etc): goods_personal_care_cleaning
+  # Generic shopping is a grab-bag; merchant overrides below catch the big ones.
+  Shopping:
+    goods_clothing: 0.20
+    goods_entertainment: 0.30
+    goods_personal_care_cleaning: 0.20
+    goods_paper_office_reading: 0.10
+    goods_furniture_appliances: 0.20
+
+  # ---- Services ----
+  Medical: services_health_care
+  Dentist: services_health_care
+  Fitness: services_other
+  Haircut: services_other
+  Sailing:                                  # club fees are services; gear/boat stuff is Entertainment goods
+    services_other: 0.8
+    goods_entertainment: 0.2
+  Miscellaneous: services_other
+  Uncategorized: services_other
+  Child Activities: services_other           # child/family services live under Other services
+  Child Activity: services_other
+  Internet & Cable: services_information_communication
+  Phone: services_information_communication
+  Streaming: services_information_communication
+  Auto Maintenance: services_vehicle_service
+  Parking & Tolls: services_vehicle_service  # CoolClimate vehicle services includes parking/tolls
+  Auto Registration and Taxes: services_vehicle_service
+  Auto Insurance: services_personal_business_finance
+  Home Insurance: services_personal_business_finance
+  life insurance: services_personal_business_finance
+  Financial & Legal Services: services_personal_business_finance
+  Financial Fees: services_personal_business_finance
+  Home Improvement: services_household_maintenance_repair  # contractors/installs; hardware stores overridden to goods below
+  House Cleaning: services_household_maintenance_repair
+  Garden: goods_entertainment               # CoolClimate puts plants under Entertainment goods
+  Charity: services_organizations_charity
+
+  # ---- Not Goods & Services (entered elsewhere in the calculator) ----
+  Groceries: exclude
+  Farmers Market: exclude
+  Restaurants: exclude
+  Alcohol & Bars: exclude
+  Coffee Shops: exclude
+  Gas: exclude
+  Car Electricity: exclude                  # EV charging -> travel section
+  Public Transit: exclude
+  Taxi & Ride Shares: exclude
+  Travel & Vacation:                        # hotels count as Other services; flights/transport excluded (travel section)
+    services_other: 0.3
+    exclude: 0.7
+  Mortgage: exclude
+  HELOC: exclude
+  Gas & Electric: exclude
+  Water: exclude
+  Garbage: exclude
+  Taxes: exclude
+  Cash & ATM: exclude
+  Check: exclude                            # payee unknown; recategorize in Monarch if significant
+  Credit Card Payment: exclude
+  Transfer: exclude
+  Carbon Removal: exclude                   # offsets, not consumption; revisit in phase 2
+  Child Care: exclude                       # day care; not CoolClimate "Education"
+  CareDX Reimburseable: exclude             # work-reimbursed
+  # income categories (CSV has no income/transfer flag, so list them here)
+  Paychecks: exclude
+  Bonus: exclude
+  Other Income: exclude
+  Interest: exclude
+  Tax Refund: exclude
+  CA Benefits: exclude
+  Credit Card Rewards: exclude
+
+# Substring match (case-insensitive) against the merchant name; first match
+# wins and overrides the category mapping. Add `category:` to restrict an
+# override to transactions with that exact Monarch category.
+merchant_overrides:
+  # flights are budgeted elsewhere; keep them out of every field
+  - match: Airlines
+    field: exclude
+  - match: Airways
+    field: exclude
+  # parking tickets, not parking services
+  - match: San Francisco Municipal Transportation Agency
+    field: exclude
+  # hardware/tool retailers sell goods ("tools, hardware, supplies" ->
+  # Furniture & Appliances), even when categorized Home Improvement
+  - match: Home Depot
+    field: goods_furniture_appliances
+  - match: Ace Hardware
+    field: goods_furniture_appliances
+  - match: Electrical Hardware
+    field: goods_furniture_appliances
+  - match: Amazon
+    category: Home Improvement
+    field: goods_furniture_appliances
+  - match: IKEA
+    field: goods_furniture_appliances
+  - match: CVS
+    field: goods_medical
+  - match: Walgreens
+    field: goods_medical
