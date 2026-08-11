@@ -26,7 +26,11 @@
   #upload-msg { font-size: 0.78rem; color: var(--muted); }
 
   #impact { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 20px; border-bottom: 1px solid var(--line); }
-  .stat { flex: 1 1 150px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; }
+  .stat { flex: 1 1 150px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; position: relative; }
+  .info { width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--line); background: var(--ground); color: var(--muted); font-size: 0.68rem; line-height: 1; cursor: help; padding: 0; flex: none; }
+  .info:hover, .info:focus-visible { background: var(--chip); color: var(--ink); }
+  #impact .info { position: absolute; top: 7px; right: 8px; }
+  #info-pop { position: fixed; max-width: 270px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 0.76rem; line-height: 1.45; box-shadow: 0 4px 16px rgba(0,0,0,0.18); z-index: 60; display: none; }
   .stat .k { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
   .stat .v { font-family: var(--mono); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
   .stat .v small { font-size: 0.68rem; color: var(--muted); }
@@ -125,10 +129,14 @@
 </header>
 
 <div id="impact">
-  <div class="stat"><div class="k">G&amp;S footprint</div><div class="v" id="imp-tons">–</div></div>
-  <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div></div>
-  <div class="stat"><div class="k">To offset · $600/t (Charm)</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div></div>
-  <div class="stat"><div class="k">Excess deaths · 50 yrs</div><div class="v" id="imp-deaths">–</div><div class="sub">Bressler mortality cost, horizon 2100</div></div>
+  <div class="stat"><div class="k">G&amp;S footprint</div><div class="v" id="imp-tons">–</div>
+    <button class="info" aria-label="About this number" data-tip="Each transaction's spending (CPI-deflated to 2022 dollars) times the EPA/USEEIO supply-chain carbon intensity of its assigned NAICS industry (kg CO₂e per dollar, retail/wholesale/transport margins included), summed bottom-up across Goods &amp; Services and annualized from the uploaded window.">?</button></div>
+  <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
+    <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: each tonne of CO₂e causes roughly $240 of discounted future damages — storms, floods, wildfire, crop loss, and other climate harms, mostly borne by other people.">?</button></div>
+  <div class="stat"><div class="k">To offset · $600/t (Charm)</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
+    <button class="info" aria-label="About this number" data-tip="What permanently removing this much carbon would cost via Charm Industrial (agricultural waste converted to bio-oil and injected into geologic storage, ~$600/tonne). The percentage is the effective surcharge on your goods &amp; services spending if every purchase paid for its own removal.">?</button></div>
+  <div class="stat"><div class="k">Excess deaths · 50 yrs</div><div class="v" id="imp-deaths">–</div><div class="sub">Bressler mortality cost, horizon 2100</div>
+    <button class="info" aria-label="About this number" data-tip="Excess global deaths these emissions would cause if sustained for 50 years, counting deaths through 2100. Closed-form fit calibrated to Bressler (2021, Nature Communications): 2.26×10⁻⁴ deaths per tonne of CO₂. A micromort is a one-in-a-million chance of death.">?</button></div>
 </div>
 
 <div class="panes">
@@ -737,6 +745,35 @@ function renderChart() {
       legend.appendChild(row);
     }
   }
+}
+
+// info bubbles (?) — delegated so dynamically re-rendered buttons work too
+{
+  const pop = document.createElement("div");
+  pop.id = "info-pop";
+  document.body.appendChild(pop);
+  let pinned = null;
+  const show = btn => {
+    pop.textContent = btn.dataset.tip;
+    pop.style.display = "block";
+    const r = btn.getBoundingClientRect();
+    const w = Math.min(270, window.innerWidth - 20);
+    pop.style.left = Math.max(10, Math.min(r.left - w + r.width + 8, window.innerWidth - w - 10)) + "px";
+    const below = r.bottom + 6;
+    pop.style.top = below + "px";
+    const ph = pop.getBoundingClientRect().height;   // flip above if clipped
+    if (below + ph > window.innerHeight - 8) pop.style.top = Math.max(8, r.top - ph - 6) + "px";
+  };
+  const hide = () => { pop.style.display = "none"; pinned = null; };
+  document.addEventListener("mouseover", e => { const b = e.target.closest(".info"); if (b && !pinned) show(b); });
+  document.addEventListener("mouseout", e => { if (e.target.closest(".info") && !pinned) hide(); });
+  document.addEventListener("focusin", e => { const b = e.target.closest(".info"); if (b) { pinned = null; show(b); } });
+  document.addEventListener("focusout", e => { if (e.target.closest(".info")) hide(); });
+  document.addEventListener("click", e => {   // tap support: click pins, click again unpins
+    const b = e.target.closest(".info");
+    if (b) { if (pinned === b) hide(); else { pinned = b; show(b); } }
+    else hide();
+  });
 }
 
 function renderAll() { renderImpact(); renderCats(); renderChart(); renderLeft(); }
