@@ -1,0 +1,21 @@
+{
+ "location": "94127",
+ "income": "200k+",
+ "factors_kg_per_dollar": {
+  "Furniture & Appliances": 0.5101,
+  "Clothing": 0.5197,
+  "Entertainment": 0.5241,
+  "Paper, Office, & Reading": 0.324,
+  "Personal Care & Cleaning": 0.6103,
+  "Auto Parts": 0.6652,
+  "Medical (goods)": 0.3616,
+  "Health Care": 0.237,
+  "Education": 0.2546,
+  "Information & Communication": 0.1471,
+  "Vehicle Service": 0.3561,
+  "Personal Business & Finance": 0.1409,
+  "Household Maintenance & Repair": 0.7206,
+  "Organizations & Charity": 0.3402,
+  "Other services": 0.3205
+ }
+}

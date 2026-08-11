@@ -5,6 +5,8 @@ __pycache__/
 # the EPA factors CSV is public data the pipeline needs, so keep it.
 data/*
 !data/naics2022_with_2017_emission_factors_1.csv
+!data/coolclimate_factors.json
+!data/coolclimate_travel_factors.json
 site/index.html
 .mm/
 .mm_session*

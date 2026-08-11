@@ -36,6 +36,29 @@
   .stat .v small { font-size: 0.68rem; color: var(--muted); }
   .stat .sub { font-size: 0.66rem; color: var(--muted); }
 
+  .maintabs { display: flex; gap: 4px; padding: 8px 20px 0; border-bottom: 1px solid var(--line); background: var(--ground); }
+  .maintabs button { font: inherit; font-size: 0.88rem; border: 1px solid var(--line); border-bottom: none; background: var(--ground); color: var(--muted); border-radius: 9px 9px 0 0; padding: 6px 16px; cursor: pointer; }
+  .maintabs button.active { background: var(--card); color: var(--ink); font-weight: 600; }
+  .mainpane { flex: 1; overflow-y: auto; padding: 18px 24px 60px; background: var(--card); }
+  .mainpane[hidden], .panes[hidden] { display: none; }
+  .tcol { max-width: 720px; display: flex; flex-direction: column; gap: 14px; }
+  .tcard { background: var(--ground); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; position: relative; }
+  .tcard h3 { margin: 0 0 8px; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .tcard h3 .tkg { margin-left: auto; font-family: var(--mono); font-size: 0.78rem; text-transform: none; letter-spacing: 0; color: var(--ink); }
+  .tvrow { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; font-size: 0.82rem; }
+  .tvrow label { color: var(--muted); font-size: 0.76rem; }
+  .tvrow input[type=number] { font-family: var(--mono); font-size: 0.8rem; width: 90px; border: 1px solid var(--line); border-radius: 7px; padding: 5px 7px; background: var(--card); color: var(--ink); }
+  .tvrow select { font: inherit; font-size: 0.78rem; border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; background: var(--card); color: var(--ink); }
+  .tvrow .rowkg { margin-left: auto; font-family: var(--mono); font-size: 0.74rem; color: var(--muted); white-space: nowrap; }
+  .tvrow button.del { font: inherit; font-size: 0.72rem; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+  .tadd { font: inherit; font-size: 0.76rem; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+  .tmode { display: flex; gap: 2px; margin-bottom: 8px; }
+  .tmode button { font: inherit; font-size: 0.72rem; border: 1px solid var(--line); background: var(--card); color: var(--muted); padding: 3px 10px; cursor: pointer; }
+  .tmode button:first-child { border-radius: 7px 0 0 7px; }
+  .tmode button:last-child { border-radius: 0 7px 7px 0; }
+  .tmode button.active { background: var(--chip); color: var(--ink); font-weight: 600; }
+  .tsum { font-size: 0.95rem; }
+  .tsum b { font-family: var(--mono); }
   .panes { flex: 1; display: flex; min-height: 0; }
   /* visual order: categories | chart | transactions (flex `order`, DOM unchanged) */
   #right { order: 1; flex: 0 0 360px; overflow-y: auto; padding: 14px 18px 40px; border-right: 1px solid var(--line); }
@@ -129,14 +152,60 @@
 </header>
 
 <div id="impact">
-  <div class="stat"><div class="k">G&amp;S footprint</div><div class="v" id="imp-tons">–</div>
-    <button class="info" aria-label="About this number" data-tip="Each transaction's spending (CPI-deflated to 2022 dollars) times the EPA/USEEIO supply-chain carbon intensity of its assigned NAICS industry (kg CO₂e per dollar, retail/wholesale/transport margins included), summed bottom-up across Goods &amp; Services and annualized from the uploaded window.">?</button></div>
+  <div class="stat"><div class="k">Footprint</div><div class="v" id="imp-tons">–</div><div class="sub" id="imp-split"></div>
+    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (your vehicle/transit/air inputs at CoolClimate's own factors). Home and Food coming next.">?</button></div>
   <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
     <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: each tonne of CO₂e causes roughly $240 of discounted future damages — storms, floods, wildfire, crop loss, and other climate harms, mostly borne by other people.">?</button></div>
   <div class="stat"><div class="k">To offset · $600/t (Charm)</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
     <button class="info" aria-label="About this number" data-tip="What permanently removing this much carbon would cost via Charm Industrial (agricultural waste converted to bio-oil and injected into geologic storage, ~$600/tonne). The percentage is the effective surcharge on your goods &amp; services spending if every purchase paid for its own removal.">?</button></div>
   <div class="stat"><div class="k">Excess deaths · 50 yrs</div><div class="v" id="imp-deaths">–</div><div class="sub">Bressler mortality cost, horizon 2100</div>
     <button class="info" aria-label="About this number" data-tip="Excess global deaths these emissions would cause if sustained for 50 years, counting deaths through 2100. Closed-form fit calibrated to Bressler (2021, Nature Communications): 2.26×10⁻⁴ deaths per tonne of CO₂. A micromort is a one-in-a-million chance of death.">?</button></div>
+</div>
+
+<div class="maintabs">
+  <button id="mtab-travel">Travel</button>
+  <button id="mtab-home">Home</button>
+  <button id="mtab-food">Food</button>
+  <button id="mtab-gs" class="active">Goods &amp; Services</button>
+</div>
+
+<div id="pane-travel" class="mainpane" hidden>
+  <div class="tcol">
+    <div class="tcard" id="tc-vehicles">
+      <h3>Vehicles
+        <button class="info" aria-label="About vehicle emissions" data-tip="CoolClimate's vehicle model, measured from their calculator API: gasoline 8.87 kg CO₂e/gallon tailpipe + 2.31 upstream (diesel 11.30 + 2.36); fuel burn = miles ÷ MPG. Vehicle manufacturing adds 0.056 kg/mile regardless of fuel. Their model counts electric vehicles' fuel as zero (grid electricity is not added anywhere) — duplicated as-is.">?</button>
+        <span class="tkg" id="kg-vehicles"></span></h3>
+      <div id="vehrows"></div>
+      <button class="tadd" id="vehadd">+ vehicle</button>
+    </div>
+    <div class="tcard" id="tc-ground">
+      <h3>Public transit
+        <button class="info" aria-label="About transit emissions" data-tip="CoolClimate per-mile factors (measured): simple public-transit 225 g/mile; advanced — transit rail 205, commuter rail 205, intercity rail 233, bus 1.3 g/mile. That bus number is CoolClimate's own model output and is ~100× lower than their published 107 g/mile constant — almost certainly their bug, duplicated faithfully.">?</button>
+        <span class="tkg" id="kg-ground"></span></h3>
+      <div class="tmode" id="groundmode">
+        <button data-m="simple">Total miles</button><button data-m="advanced">By mode</button>
+      </div>
+      <div id="groundrows"></div>
+    </div>
+    <div class="tcard" id="tc-air">
+      <h3>Air travel
+        <button class="info" aria-label="About air emissions" data-tip="CoolClimate air factors (measured): 0.446 kg CO₂e per mile flown (half direct, half upstream/radiative). Flight mode uses their per-round-trip averages: short 152 kg, medium 408 kg, long 814 kg, extended 1,376 kg.">?</button>
+        <span class="tkg" id="kg-air"></span></h3>
+      <div class="tmode" id="airmode">
+        <button data-m="miles">Total miles</button><button data-m="flights">By flights</button>
+      </div>
+      <div id="airrows"></div>
+    </div>
+    <div class="tcard tsum">Travel footprint: <b id="kg-travel-total">–</b>
+      <span class="hint" style="display:block;margin-top:4px">Annual, using CoolClimate's own factors (measured from their calculator API). Included in the impact totals above. Inputs save automatically.</span></div>
+  </div>
+</div>
+
+<div id="pane-home" class="mainpane" hidden>
+  <p class="hint">Home energy (electricity, natural gas, water) — coming next.</p>
+</div>
+<div id="pane-food" class="mainpane" hidden>
+  <p class="hint">Food — coming next.</p>
 </div>
 
 <div class="panes">
@@ -184,6 +253,7 @@ const DATA = /*__V2DATA__*/null;
 const NAICS_OPTIONS = /*__NAICS_OPTIONS__*/null;  // [{code,title,category}] curated consumer subset
 const CAT_DEFAULTS = /*__CAT_DEFAULTS__*/null;      // category -> representative NAICS
 const BASKET_OPTIONS = /*__BASKET_OPTIONS__*/null;  // commodities for the basket editor
+const TRAVEL_SAVED = /*__TRAVEL__*/null;            // persisted travel inputs
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
@@ -211,6 +281,7 @@ const catMatches = t => !ui.cat ? true
 const ui = { search: "", cat: "", src: "" };
 
 function stats() {
+  if (!DATA) return { per: {}, months: 1, totalKg: 0, totalDollars: 0 };
   const months = DATA.meta.months;
   const per = {};   // cat -> {dollars, kg}
   for (const c of CAT_ORDER) per[c] = { dollars: 0, kg: 0 };
@@ -238,9 +309,12 @@ function stats() {
 
 function renderImpact() {
   const { per, months, totalKg, totalDollars } = stats();
-  const tons = totalKg / months * 12 / 1000;
+  const gsTons = totalKg / months * 12 / 1000;
+  const travelTons = travelKg().total / 1000;
+  const tons = gsTons + travelTons;
   const annualSpend = totalDollars / months * 12;
   $("imp-tons").innerHTML = `${tons.toFixed(1)} <small>t CO₂e/yr</small>`;
+  $("imp-split").textContent = `G&S ${gsTons.toFixed(1)} t · travel ${travelTons.toFixed(1)} t`;
   const damage = tons * 240, offset = tons * 600;
   $("imp-damage").innerHTML = `$${fmt(damage)} <small>/yr</small>`;
   $("imp-damage-pct").textContent = annualSpend ? `${(damage/annualSpend*100).toFixed(1)}% of G&S spending` : "";
@@ -584,6 +658,7 @@ $("tab-txns").onclick = () => setTab("txns");
 $("tab-merch").onclick = () => setTab("merch");
 
 function renderLeft() {
+  if (!DATA) return;
   if ((ui.tab || "txns") === "txns") renderTxns(); else renderMerchants();
 }
 
@@ -614,6 +689,100 @@ $("csvfile").onchange = async e => {
   e.target.value = "";
 };
 
+// ---------- Travel tab (CoolClimate model; factors measured from their API
+// by finite differences — see data/coolclimate_travel_factors.json) ----------
+const TF = {
+  fuel: {1: {label: "Gasoline", d: 8.874, u: 2.307}, 2: {label: "Diesel", d: 11.304, u: 2.360}, 3: {label: "Electric", d: 0, u: 0}},
+  manPerMile: 0.056,
+  ground: {publictrans: 0.2253, bus: 0.0013, transit: 0.2054, commuter: 0.2054, intercity: 0.2331},
+  airPerMile: 0.4464,
+  flight: {short: 152, medium: 408, long: 814, extended: 1376},
+};
+const TRAVEL = TRAVEL_SAVED || {
+  vehicles: [{miles: 0, mpg: 22, fuel: 1}],
+  ground: {mode: "simple", publictrans: 0, bus: 0, transit: 0, commuter: 0, intercity: 0},
+  air: {mode: "miles", total: 0, short: 0, medium: 0, long: 0, extended: 0},
+};
+
+const vehKg = v => {
+  const miles = +v.miles || 0, f = TF.fuel[+v.fuel] || TF.fuel[1];
+  return miles / Math.max(+v.mpg || 22, 1) * (f.d + f.u) + miles * TF.manPerMile;
+};
+
+function travelKg() {
+  const veh = TRAVEL.vehicles.reduce((a, v) => a + vehKg(v), 0);
+  const g = TRAVEL.ground;
+  const ground = g.mode === "simple"
+    ? (+g.publictrans || 0) * TF.ground.publictrans
+    : ["bus", "transit", "commuter", "intercity"].reduce((a, k) => a + (+g[k] || 0) * TF.ground[k], 0);
+  const a = TRAVEL.air;
+  const air = a.mode === "miles"
+    ? (+a.total || 0) * TF.airPerMile
+    : ["short", "medium", "long", "extended"].reduce((s, k) => s + (+a[k] || 0) * TF.flight[k], 0);
+  return {veh, ground, air, total: veh + ground + air};
+}
+
+let travelSaveTimer = null;
+function saveTravel() {
+  clearTimeout(travelSaveTimer);
+  travelSaveTimer = setTimeout(() => fetch("/api/v2/travel", {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(TRAVEL),
+  }), 500);
+}
+
+function renderTravel() {
+  const k = travelKg();
+  $("vehrows").innerHTML = TRAVEL.vehicles.map((v, i) =>
+    `<div class="tvrow"><label>Vehicle ${i + 1}:</label>` +
+    `<input type="number" min="0" step="500" value="${+v.miles || 0}" data-i="${i}" data-k="miles" aria-label="Miles per year"><label>mi/yr at</label>` +
+    `<input type="number" min="1" step="1" value="${+v.mpg || 22}" data-i="${i}" data-k="mpg" style="width:62px" aria-label="MPG"><label>MPG</label>` +
+    `<select data-i="${i}" data-k="fuel" aria-label="Fuel">${[1, 2, 3].map(f =>
+      `<option value="${f}" ${+v.fuel === f ? "selected" : ""}>${TF.fuel[f].label}</option>`).join("")}</select>` +
+    `<span class="rowkg">${fmt(vehKg(v))} kg/yr</span>` +
+    (TRAVEL.vehicles.length > 1 ? `<button class="del" data-i="${i}" title="Remove vehicle">✕</button>` : "") +
+    `</div>`).join("");
+
+  const g = TRAVEL.ground;
+  $("groundmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === g.mode ? "active" : "");
+  $("groundrows").innerHTML = g.mode === "simple"
+    ? `<div class="tvrow"><label>Public transit:</label><input type="number" min="0" step="100" value="${+g.publictrans || 0}" data-g="publictrans" aria-label="Transit miles per year"><label>mi/yr</label></div>`
+    : [["bus", "Bus"], ["transit", "Transit rail (subway/tram)"], ["commuter", "Commuter rail"], ["intercity", "Intercity rail (Amtrak)"]].map(([key, lbl]) =>
+      `<div class="tvrow"><label>${lbl}:</label><input type="number" min="0" step="100" value="${+g[key] || 0}" data-g="${key}" aria-label="${lbl} miles per year"><label>mi/yr</label><span class="rowkg">${(TF.ground[key] * 1000).toFixed(0)} g/mi</span></div>`).join("");
+
+  const a = TRAVEL.air;
+  $("airmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === a.mode ? "active" : "");
+  $("airrows").innerHTML = a.mode === "miles"
+    ? `<div class="tvrow"><label>Miles flown:</label><input type="number" min="0" step="500" value="${+a.total || 0}" data-a="total" aria-label="Air miles per year"><label>mi/yr</label></div>`
+    : [["short", "Short round trips (<400 mi)"], ["medium", "Medium (400–1,500 mi)"], ["long", "Long (1,500–3,000 mi)"], ["extended", "Extended (3,000+ mi)"]].map(([key, lbl]) =>
+      `<div class="tvrow"><label>${lbl}:</label><input type="number" min="0" step="1" value="${+a[key] || 0}" data-a="${key}" aria-label="${lbl} per year"><label>/yr</label><span class="rowkg">${TF.flight[key]} kg each</span></div>`).join("");
+
+  $("kg-vehicles").textContent = `${fmt(k.veh)} kg/yr`;
+  $("kg-ground").textContent = `${fmt(k.ground)} kg/yr`;
+  $("kg-air").textContent = `${fmt(k.air)} kg/yr`;
+  $("kg-travel-total").textContent = `${(k.total / 1000).toFixed(1)} t CO₂e/yr`;
+
+  const touched = () => { renderTravel(); renderImpact(); saveTravel(); };
+  $("vehrows").querySelectorAll("input,select").forEach(el => el.onchange = () => {
+    TRAVEL.vehicles[+el.dataset.i][el.dataset.k] = el.type === "number" ? +el.value : +el.value;
+    touched();
+  });
+  $("vehrows").querySelectorAll(".del").forEach(b => b.onclick = () => { TRAVEL.vehicles.splice(+b.dataset.i, 1); touched(); });
+  $("vehadd").onclick = () => { if (TRAVEL.vehicles.length < 10) { TRAVEL.vehicles.push({miles: 0, mpg: 22, fuel: 1}); touched(); } };
+  $("groundmode").querySelectorAll("button").forEach(b => b.onclick = () => { TRAVEL.ground.mode = b.dataset.m; touched(); });
+  $("groundrows").querySelectorAll("input").forEach(el => el.onchange = () => { TRAVEL.ground[el.dataset.g] = +el.value; touched(); });
+  $("airmode").querySelectorAll("button").forEach(b => b.onclick = () => { TRAVEL.air.mode = b.dataset.m; touched(); });
+  $("airrows").querySelectorAll("input").forEach(el => el.onchange = () => { TRAVEL.air[el.dataset.a] = +el.value; touched(); });
+}
+
+// ---------- main tabs ----------
+function setMainTab(t) {
+  for (const key of ["travel", "home", "food", "gs"]) {
+    $("mtab-" + key).className = key === t ? "active" : "";
+    (key === "gs" ? document.querySelector(".panes") : $("pane-" + key)).hidden = key !== t;
+  }
+}
+["travel", "home", "food", "gs"].forEach(key => $("mtab-" + key).onclick = () => setMainTab(key));
+
 // ---------- emissions chart (ported from v1) ----------
 const GOODS_COLORS = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)"];
 const SERVICES_COLORS = ["var(--s5)","var(--s6)","var(--s7)","var(--s8)"];
@@ -640,6 +809,10 @@ function monthlyEmissions() {
 function renderChart() {
   const host = $("chart-host"), legend = $("chart-legend");
   host.innerHTML = ""; legend.innerHTML = "";
+  if (!DATA) {
+    host.innerHTML = '<p class="hint">Upload a CSV to see monthly emissions.</p>';
+    return;
+  }
   const {byMonth, byCat} = monthlyEmissions();
   const months = Object.keys(byMonth).sort();
   if (!months.length) {
@@ -777,12 +950,11 @@ function renderChart() {
 }
 
 function renderAll() { renderImpact(); renderCats(); renderChart(); renderLeft(); }
-if (DATA) {
-  $("window").textContent = `${DATA.meta.start || "?"} → ${DATA.meta.end || "?"} · ${DATA.meta.months} months · ${DATA.meta.count} transactions`;
-  renderAll();
-} else {
-  $("window").textContent = "No data — upload a transactions CSV (needs Merchant + Amount columns; Category helps)";
-}
+$("window").textContent = DATA
+  ? `${DATA.meta.start || "?"} → ${DATA.meta.end || "?"} · ${DATA.meta.months} months · ${DATA.meta.count} transactions`
+  : "No data — upload a transactions CSV (needs Merchant + Amount columns; Category helps)";
+renderTravel();
+renderAll();
 </script>
 </body>
 </html>
