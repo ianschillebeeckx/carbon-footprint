@@ -153,7 +153,7 @@
 
 <div id="impact">
   <div class="stat"><div class="k">Footprint</div><div class="v" id="imp-tons">–</div><div class="sub" id="imp-split"></div>
-    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (your vehicle/transit/air inputs at CoolClimate's own factors). Home and Food coming next.">?</button></div>
+    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors). Home and Food coming next.">?</button></div>
   <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
     <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: each tonne of CO₂e causes roughly $240 of discounted future damages — storms, floods, wildfire, crop loss, and other climate harms, mostly borne by other people.">?</button></div>
   <div class="stat"><div class="k">To offset · $600/t (Charm)</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
@@ -189,15 +189,16 @@
     </div>
     <div class="tcard" id="tc-air">
       <h3>Air travel
-        <button class="info" aria-label="About air emissions" data-tip="CoolClimate air factors (measured): 0.446 kg CO₂e per mile flown (half direct, half upstream/radiative). Flight mode uses their per-round-trip averages: short 152 kg, medium 408 kg, long 814 kg, extended 1,376 kg.">?</button>
+        <button class="info" aria-label="About air emissions" data-tip="EPA per-haul factors (well-to-wake): short-haul 250, medium 156, long 197 g CO₂e per passenger-mile — the EPA GHG Emission Factors Hub 2025 combustion factors plus ~21% upstream fuel production. Hauls are one-way segment lengths. Deliberately excludes contrail/non-CO₂ effects, which would multiply air by roughly 1.7–2× (contested science — see CoolClimate's flat 0.446, which includes them).">?</button>
         <span class="tkg" id="kg-air"></span></h3>
       <div class="tmode" id="airmode">
-        <button data-m="miles">Total miles</button><button data-m="flights">By flights</button>
+        <button data-m="miles">Total miles</button><button data-m="haul">By haul</button>
       </div>
       <div id="airrows"></div>
     </div>
     <div class="tcard tsum">Travel footprint: <b id="kg-travel-total">–</b>
-      <span class="hint" style="display:block;margin-top:4px">Annual, using CoolClimate's own factors (measured from their calculator API). Included in the impact totals above. Inputs save automatically.</span></div>
+      <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
+    <p class="hint">Sources — Air: <a href="https://www.epa.gov/climateleadership/ghg-emission-factors-hub" target="_blank" rel="noopener">EPA GHG Emission Factors Hub (2025)</a> per-haul passenger-mile factors, plus ~21% well-to-tank fuel-production uplift per the <a href="https://theicct.org/wp-content/uploads/2021/08/update-well-to-wake-co2-aug21-1.pdf" target="_blank" rel="noopener">ICCT well-to-wake analysis</a> (CORSIA baseline 89 vs 73.2 gCO₂e/MJ); excludes contrail/non-CO₂ effects. Vehicles &amp; transit: <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator factors, measured from their API (see data/coolclimate_travel_factors.json).</p>
   </div>
 </div>
 
@@ -695,13 +696,16 @@ const TF = {
   fuel: {1: {label: "Gasoline", d: 8.874, u: 2.307}, 2: {label: "Diesel", d: 11.304, u: 2.360}, 3: {label: "Electric", d: 0, u: 0}},
   manPerMile: 0.056,
   ground: {publictrans: 0.2253, bus: 0.0013, transit: 0.2054, commuter: 0.2054, intercity: 0.2331},
-  airPerMile: 0.4464,
-  flight: {short: 152, medium: 408, long: 814, extended: 1376},
+  // Air: EPA GHG Emission Factors Hub 2025 per-haul combustion factors
+  // (0.207/0.129/0.163 kg per passenger-mile) + ~21% well-to-tank uplift
+  // (CORSIA baseline 89 vs 73.2 gCO2e/MJ). No contrail/non-CO2 uplift.
+  air: {short: 0.250, medium: 0.156, long: 0.197},
+  airSimple: 0.156,   // "total miles" mode assumes medium-haul (300-2,300 mi segments)
 };
 const TRAVEL = TRAVEL_SAVED || {
   vehicles: [{miles: 0, mpg: 22, fuel: 1}],
   ground: {mode: "simple", publictrans: 0, bus: 0, transit: 0, commuter: 0, intercity: 0},
-  air: {mode: "miles", total: 0, short: 0, medium: 0, long: 0, extended: 0},
+  air: {mode: "miles", total: 0, short: 0, medium: 0, long: 0},
 };
 
 const vehKg = v => {
@@ -717,8 +721,8 @@ function travelKg() {
     : ["bus", "transit", "commuter", "intercity"].reduce((a, k) => a + (+g[k] || 0) * TF.ground[k], 0);
   const a = TRAVEL.air;
   const air = a.mode === "miles"
-    ? (+a.total || 0) * TF.airPerMile
-    : ["short", "medium", "long", "extended"].reduce((s, k) => s + (+a[k] || 0) * TF.flight[k], 0);
+    ? (+a.total || 0) * TF.airSimple
+    : ["short", "medium", "long"].reduce((s, k) => s + (+a[k] || 0) * TF.air[k], 0);
   return {veh, ground, air, total: veh + ground + air};
 }
 
@@ -752,9 +756,9 @@ function renderTravel() {
   const a = TRAVEL.air;
   $("airmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === a.mode ? "active" : "");
   $("airrows").innerHTML = a.mode === "miles"
-    ? `<div class="tvrow"><label>Miles flown:</label><input type="number" min="0" step="500" value="${+a.total || 0}" data-a="total" aria-label="Air miles per year"><label>mi/yr</label></div>`
-    : [["short", "Short round trips (<400 mi)"], ["medium", "Medium (400–1,500 mi)"], ["long", "Long (1,500–3,000 mi)"], ["extended", "Extended (3,000+ mi)"]].map(([key, lbl]) =>
-      `<div class="tvrow"><label>${lbl}:</label><input type="number" min="0" step="1" value="${+a[key] || 0}" data-a="${key}" aria-label="${lbl} per year"><label>/yr</label><span class="rowkg">${TF.flight[key]} kg each</span></div>`).join("");
+    ? `<div class="tvrow"><label>Miles flown:</label><input type="number" min="0" step="500" value="${+a.total || 0}" data-a="total" aria-label="Air miles per year"><label>mi/yr</label><span class="rowkg">${(TF.airSimple * 1000).toFixed(0)} g/mi (assumes medium-haul)</span></div>`
+    : [["short", "Short-haul (segments <300 mi)"], ["medium", "Medium-haul (300–2,300 mi)"], ["long", "Long-haul (>2,300 mi)"]].map(([key, lbl]) =>
+      `<div class="tvrow"><label>${lbl}:</label><input type="number" min="0" step="500" value="${+a[key] || 0}" data-a="${key}" aria-label="${lbl} miles per year"><label>mi/yr</label><span class="rowkg">${(TF.air[key] * 1000).toFixed(0)} g/mi</span></div>`).join("");
 
   $("kg-vehicles").textContent = `${fmt(k.veh)} kg/yr`;
   $("kg-ground").textContent = `${fmt(k.ground)} kg/yr`;

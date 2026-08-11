@@ -20,6 +20,7 @@
     "vehicle fuel burn = miles / mpg * fuel_per_gallon (direct + upstream); manufacturing is per-mile and applies to all fuel types (an extra vehicle with 0 miles adds nothing)",
     "fuel=electric zeroes fuel emissions entirely in their model - no electricity is added to the housing section either (quirk, duplicated as-is)",
     "bus 1.3 g/mile is CoolClimate's own staging-model output and is ~100x below their take-action constant (107 g/mi) - almost certainly their units bug, duplicated as-is and flagged in the UI",
-    "air flight counts are round trips: short/medium/long/extended = 152/408/814/1376 kg each incl. upstream; per-mile mode = 0.4464 kg/mile"
+    "air flight counts are round trips: short/medium/long/extended = 152/408/814/1376 kg each incl. upstream; per-mile mode = 0.4464 kg/mile",
+    "NOTE: the app no longer uses CoolClimate's air factors (kept here as measurement record). Air uses EPA GHG Emission Factors Hub 2025 per-haul factors (short <300mi 0.207, medium 300-2300 0.129, long >2300 0.163 kg/passenger-mile) + ~21% well-to-tank uplift (CORSIA 89 vs 73.2 gCO2e/MJ) = 0.250/0.156/0.197, no contrail uplift"
   ]
 }
