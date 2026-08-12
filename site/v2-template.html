@@ -227,8 +227,10 @@
     </div>
     <div class="tcard">
       <h3>Water &amp; sewage
-        <button class="info" aria-label="About water emissions" data-tip="CoolClimate's water & sewage model: the slider is a multiple of the local average household's use (their default for this zip: 428 liters/day ≈ 113 gallons/day — San Francisco usage is low), at 3.28 kg CO₂e per liter/day-year for pumping, treatment, water heating, and sewage. For reference, the US-average household uses ~300 gal/day (EPA WaterSense) ≈ 2.7x on this slider; ~82 gal/day per person, roughly 70% indoors.">?</button>
+        <button class="info" aria-label="About water emissions" data-tip="CoolClimate's water & sewage model: the slider is a multiple of the average household's use for your household size (their SF baselines: 1 person 237 L/day, 2: 394, 3: 428, 4: 500, 5+: 543 — San Francisco usage is low), at 3.28 kg CO₂e per liter/day-year for pumping, treatment, water heating, and sewage. For reference, the US-average household uses ~300 gal/day (EPA WaterSense) ≈ 1,135 L/day; ~82 gal/day per person, roughly 70% indoors.">?</button>
         <span class="tkg" id="kg-water"></span></h3>
+      <div class="tvrow"><label>Household:</label>
+        <select id="watersize" aria-label="Household size"><option value="1">1 person</option><option value="2">2 people</option><option value="3">3 people</option><option value="4">4 people</option><option value="5">5+ people</option></select></div>
       <div class="tvrow"><input type="range" id="waterslider" min="0" max="3" step="0.05" value="1" style="flex:1;max-width:300px" aria-label="Water use relative to average">
         <span class="rowkg" id="waterlabel"></span></div>
       <div class="tvrow" style="justify-content:space-between;max-width:300px;color:var(--muted);font-size:0.7rem"><span>0</span><span>1x</span><span>2x</span><span>3x</span></div>
@@ -835,7 +837,8 @@ const HF = {
   oilPerGallon: 11.793 + 3.066,
   oilDollarsPerGallon: 3.0,
   waterPerLday: 3.2765,         // kg per (liter/day) per year
-  waterBaseLday: 428,           // CoolClimate household default for this profile
+  // CoolClimate 1x baseline scales with household size (L/day, SF zips)
+  waterBase: {1: 237, 2: 394, 3: 428, 4: 500, 5: 543},
   sqftPerYear: 0.93,
   LDAY_TO_GALDAY: 0.264172,
 };
@@ -843,9 +846,11 @@ const HOME = HOME_SAVED || {
   elec: {mode: "kwh", kwh: 0, dollars: 0, clean: 0},
   gas: {mode: "therms", therms: 0, dollars: 0},
   oil: {mode: "gallons", gallons: 0, dollars: 0},
-  water: {mult: 1},
+  water: {mult: 1, size: 3},
   sqft: 0,
 };
+HOME.water.size = HF.waterBase[+HOME.water.size] ? +HOME.water.size : 3;
+const waterBase = () => HF.waterBase[HOME.water.size] || 428;
 
 function homeKg() {
   const e = HOME.elec, g = HOME.gas, o = HOME.oil;
@@ -855,7 +860,7 @@ function homeKg() {
   const gas = therms * HF.gasPerTherm;
   const gallons = o.mode === "gallons" ? (+o.gallons || 0) : (+o.dollars || 0) / HF.oilDollarsPerGallon;
   const oil = gallons * HF.oilPerGallon;
-  const water = (+HOME.water.mult || 0) * HF.waterBaseLday * HF.waterPerLday;
+  const water = (+HOME.water.mult || 0) * waterBase() * HF.waterPerLday;
   const sqft = (+HOME.sqft || 0) * HF.sqftPerYear;
   return {elec, gas, oil, water, sqft, total: elec + gas + oil + water + sqft};
 }
@@ -893,8 +898,12 @@ function renderHome() {
     : numRow("Oil bill", +o.dollars || 0, 'data-h="oil.dollars" step="50"', "$/yr", `≈${fmt((+o.dollars || 0) / HF.oilDollarsPerGallon)} gal`);
 
   $("waterslider").value = +HOME.water.mult || 0;
-  const lday = (+HOME.water.mult || 0) * HF.waterBaseLday;
-  $("waterlabel").textContent = `${(+HOME.water.mult || 0).toFixed(2)}x average ≈ ${fmt(lday * HF.LDAY_TO_GALDAY)} gal/day (${fmt(lday)} L/day)`;
+  $("watersize").value = HOME.water.size;
+  const waterLabel = () => {
+    const lday = (+HOME.water.mult || 0) * waterBase();
+    $("waterlabel").textContent = `${(+HOME.water.mult || 0).toFixed(2)}x average ≈ ${fmt(lday * HF.LDAY_TO_GALDAY)} gal/day (${fmt(lday)} L/day)`;
+  };
+  waterLabel();
   $("sqftinput").value = +HOME.sqft || 0;
 
   $("kg-elec").textContent = `${fmt(k.elec)} kg/yr`;
@@ -915,11 +924,11 @@ function renderHome() {
   }
   $("waterslider").oninput = () => {
     HOME.water.mult = +$("waterslider").value;
-    const l = HOME.water.mult * HF.waterBaseLday;
-    $("waterlabel").textContent = `${HOME.water.mult.toFixed(2)}x average ≈ ${fmt(l * HF.LDAY_TO_GALDAY)} gal/day (${fmt(l)} L/day)`;
+    waterLabel();
     $("kg-water").textContent = `${fmt(homeKg().water)} kg/yr`;
   };
   $("waterslider").onchange = () => { HOME.water.mult = +$("waterslider").value; touched(); };
+  $("watersize").onchange = () => { HOME.water.size = +$("watersize").value; touched(); };
   $("sqftinput").onchange = () => { HOME.sqft = +$("sqftinput").value || 0; touched(); };
 }
 
