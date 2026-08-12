@@ -240,7 +240,7 @@
   <div class="tcol">
     <div class="tcard">
       <h3>Diet — servings per person, per week
-        <button class="info" aria-label="About diet emissions" data-tip="CoolClimate's food model at full meat detail. Servings convert to calories with their own constants (beef/pork 213 cal per serving; poultry/fish/other meat 204; dairy 120; fruit &amp; veg 70; grains 150; other 200), then calories carry measured factors (kg CO₂e per cal/day over a year): beef &amp; pork 2.22, fish 2.08, poultry 1.56, other meat 0.82, dairy 1.46, fruit &amp; veg 1.22, other food 0.82, grains 0.53. US-average defaults prefilled; the cal/day annotation should land near ~2,300 per person if the servings are realistic. Beef→poultry swaps are the biggest lever.">?</button>
+        <button class="info" aria-label="About diet emissions" data-tip="CoolClimate's food model at full meat detail. Servings convert to calories with their own constants (beef/pork 213 cal per serving; poultry/fish/other meat 204; dairy 120; fruits and vegetables 70 each; grains 150; other 200), then calories carry measured factors (kg CO₂e per cal/day over a year): beef &amp; pork 2.22, fish 2.08, poultry 1.56, other meat 0.82, dairy 1.46, fruits/vegetables 1.22 (CoolClimate models them jointly — the split rows share it), other food 0.82, grains 0.53. US-average defaults prefilled; the cal/day annotation should land near ~2,300 per person if the servings are realistic. Beef→poultry swaps are the biggest lever.">?</button>
         <span class="tkg" id="kg-food-diet"></span></h3>
       <div class="tvrow"><label>People in household:</label>
         <input type="number" min="1" max="12" step="1" id="foodsize" style="width:62px" aria-label="People in household"></div>
@@ -929,7 +929,8 @@ const FF = {
   fish: {label: "Fish & seafood", f: 2.0841, cps: 204, def: 2.3},
   meatother: {label: "Other meat & alternatives (processed, nuts…)", f: 0.8176, cps: 204, def: 1.8},
   dairy: {label: "Dairy", f: 1.4600, cps: 120, def: 15.3},
-  fruitveg: {label: "Fruits and vegetables", f: 1.2228, cps: 70, def: 24.8},
+  fruits: {label: "Fruits", f: 1.2228, cps: 70, def: 12.4},
+  veggies: {label: "Vegetables", f: 1.2228, cps: 70, def: 12.4},
   cereals: {label: "Grains & baked goods", f: 0.5292, cps: 150, def: 28.6},
   otherfood: {label: "Snacks, drinks, etc.", f: 0.8176, cps: 200, def: 23.6},
 };
@@ -943,6 +944,12 @@ if (!FOOD.sv && FOOD.cal) {
     [k, Math.round((+FOOD.cal[k] || 0) * 7 / v.cps * 10) / 10]));
   delete FOOD.cal;
 }
+// migrate the combined fruit+veg row into the split pair
+if (FOOD.sv && FOOD.sv.fruitveg != null) {
+  FOOD.sv.fruits = FOOD.sv.veggies = Math.round((+FOOD.sv.fruitveg || 0) / 2 * 10) / 10;
+  delete FOOD.sv.fruitveg;
+}
+for (const k of Object.keys(FF)) if (FOOD.sv[k] == null) FOOD.sv[k] = FF[k].def;
 
 const foodCalDay = k => (+FOOD.sv[k] || 0) * FF[k].cps / 7;   // per person
 
