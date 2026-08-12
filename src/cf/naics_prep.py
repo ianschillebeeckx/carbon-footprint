@@ -126,7 +126,7 @@ PREFIX_CATEGORY = {
     "8122": "services_other",                 # funeral
     "8123": "services_other",                 # laundry/dry cleaning
     "8129": "services_other",                 # pet care, parking->vehicle handled above
-    "6244": "services_other",                 # child care
+    "6244": "services_education",             # child care (day care/preschool -> Education)
     "624": "services_other",                  # individual & family services
     "713": "services_other",                  # amusement/recreation/fitness services
     "712": "services_other",                  # museums
