@@ -227,7 +227,7 @@
     </div>
     <div class="tcard">
       <h3>Water &amp; sewage
-        <button class="info" aria-label="About water emissions" data-tip="CoolClimate's water & sewage factor: 3.28 kg CO₂e per liter/day-year (12.4 per gallon/day-year) for pumping, treatment, water heating, and sewage. Enter your household's total use in gallons/day — your water bill usually shows it (often in CCF: 1 CCF ≈ 748 gallons; divide the billing period's days). Reference points: SF average household ≈ 113 gal/day; US average ≈ 300 gal/day, ~82 gal/day per person (EPA WaterSense).">?</button>
+        <button class="info" aria-label="About water emissions" data-tip="Physical model: supply + treatment + distribution (~2,000 kWh per million gallons, EPA/EPRI) plus wastewater treatment (~2,250) = 4.25 kWh per 1,000 gallons, at your grid's intensity → ~0.37 kg CO₂e per gallon/day-year. Your bill usually shows usage in CCF (1 CCF ≈ 748 gal; divide by billing-period days). References: SF average household ≈ 113 gal/day, US ≈ 300, ~82 per person. Note: CoolClimate shows water ~30× higher — their number is expenditure-based (scales with your income, and their on-screen liters labels are inconsistent with their own results); water heating energy belongs to your gas/electricity inputs, not here.">?</button>
         <span class="tkg" id="kg-water"></span></h3>
       <div class="tvrow"><label>Water use:</label>
         <input type="number" min="0" step="10" id="watergal" aria-label="Water use gallons per day"><label>gal/day</label>
@@ -241,7 +241,7 @@
     </div>
     <div class="tcard tsum">Home footprint: <b id="kg-home-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
-    <p class="hint">Sources — all home factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API for zip 94110 (grid intensity is location-specific). Water slider scale and 428 L/day household default are CoolClimate's own.</p>
+    <p class="hint">Sources — electricity/gas/oil/construction factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API for zip 94110 (grid intensity is location-specific). Water uses a physical model instead: ~4.25 kWh per 1,000 gallons for supply, treatment, distribution, and wastewater (<a href="https://www.epa.gov/sustainable-water-infrastructure/energy-efficiency-water-utilities" target="_blank" rel="noopener">EPA</a>/<a href="https://www.congress.gov/crs_external_products/R/PDF/R43200/R43200.8.pdf" target="_blank" rel="noopener">EPRI via CRS</a>) times the local grid intensity — CoolClimate's expenditure-based water figure runs ~30× higher and double-counts water heating.</p>
   </div>
 </div>
 <div id="pane-food" class="mainpane" hidden>
@@ -834,7 +834,11 @@ const HF = {
   gasDollarsPerTherm: 2.015,    // $830 -> 411.9 therms
   oilPerGallon: 11.793 + 3.066,
   oilDollarsPerGallon: 3.0,
-  waterPerGalday: 3.2765 * 3.78541,   // CoolClimate 3.2765 kg per (L/day)-yr -> 12.40 per (gal/day)-yr
+  // Water: physical model (CoolClimate's water number is expenditure-based
+  // and ~30x higher — see info bubble). Supply+treatment+distribution
+  // ~2,000 kWh/MG (EPA/EPRI) + wastewater ~2,250 kWh/MG = 4.25 kWh per
+  // 1,000 gal, at the local grid intensity.
+  waterKwhPerKgal: 4.25,
   sqftPerYear: 0.93,
 };
 const HOME = HOME_SAVED || {
@@ -858,7 +862,7 @@ function homeKg() {
   const gas = therms * HF.gasPerTherm;
   const gallons = o.mode === "gallons" ? (+o.gallons || 0) : (+o.dollars || 0) / HF.oilDollarsPerGallon;
   const oil = gallons * HF.oilPerGallon;
-  const water = (+HOME.water.galday || 0) * HF.waterPerGalday;
+  const water = (+HOME.water.galday || 0) * 365 / 1000 * HF.waterKwhPerKgal * HF.elecPerKwh;
   const sqft = (+HOME.sqft || 0) * HF.sqftPerYear;
   return {elec, gas, oil, water, sqft, total: elec + gas + oil + water + sqft};
 }
@@ -897,7 +901,7 @@ function renderHome() {
 
   $("watergal").value = +HOME.water.galday || 0;
   const g_ = +HOME.water.galday || 0;
-  $("waterlabel").textContent = `${fmt(g_ / 0.264172)} L/day · ${(HF.waterPerGalday).toFixed(1)} kg per gal/day·yr`;
+  $("waterlabel").textContent = `${fmt(g_ / 0.264172)} L/day · ${(365 / 1000 * HF.waterKwhPerKgal * HF.elecPerKwh).toFixed(2)} kg per gal/day·yr`;
   $("sqftinput").value = +HOME.sqft || 0;
 
   $("kg-elec").textContent = `${fmt(k.elec)} kg/yr`;
