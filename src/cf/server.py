@@ -121,10 +121,11 @@ class Handler(BaseHTTPRequestHandler):
                 f.write_text(json.dumps(body, indent=1))
                 self._send(200, {"ok": True})
             elif self.path == "/api/v2/reset":
-                # Full reset: drop all classified transactions and every
-                # merchant rule (including manual/confirmed corrections).
+                # Full reset: drop all classified transactions, every merchant
+                # rule (including manual/confirmed corrections), and all
+                # travel/home/food/offsets inputs.
                 from . import classify
-                for f in (V2_FILE, classify.CACHE_FILE):
+                for f in (V2_FILE, classify.CACHE_FILE, TRAVEL_FILE, HOME_FILE, FOOD_FILE, OFFSETS_FILE):
                     if f.exists():
                         f.unlink()
                 self._send(200, {"ok": True})

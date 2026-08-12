@@ -825,7 +825,7 @@ for (const c of CAT_ORDER) {
 cf.onchange = e => { ui.cat = e.target.value; renderCats(); renderLeft(); };
 
 $("reset").onclick = async () => {
-  if (!confirm("Delete ALL transactions and EVERY merchant rule — including your manual corrections and confirmations? This cannot be undone.")) return;
+  if (!confirm("Delete ALL transactions, EVERY merchant rule (including your corrections), and all Travel/Home/Food/Offsets inputs? This cannot be undone.")) return;
   const res = await fetch("/api/v2/reset", {method: "POST"});
   if (res.ok) location.reload();
   else alert("Reset failed");
