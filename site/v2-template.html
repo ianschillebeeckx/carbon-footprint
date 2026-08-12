@@ -338,7 +338,6 @@
     </div>
     <div id="fig-gs"></div>
     <div id="chart-host" hidden></div>
-    <div class="legend" id="chart-legend" hidden></div>
     <div id="chart-tip"></div>
     <p class="hint" style="margin-top:12px" id="chart-note">Annualized t CO₂e by category, bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Bar heights are scaled to section totals; hover a segment for its share.</p>
   </div>
@@ -1125,12 +1124,13 @@ function renderGsFig() {
   if (!$("fig-gs")) return;
   if (!DATA) { $("fig-gs").innerHTML = '<p class="hint">Upload a CSV to see the breakdown.</p>'; return; }
   const { per, months } = stats();
-  const sectionParts = section => CAT_ORDER
+  const sectionParts = (section, colorOffset) => CAT_ORDER
     .filter(c => DATA.categories[c].section === section)
-    .map((c, i) => ({label: DATA.categories[c].label, color: PAL[i % 8], kg: per[c].kg / months}))
+    .map(c => ({label: DATA.categories[c].label, kg: per[c].kg / months}))
     .filter(p => p.kg > 0)
-    .sort((a, b) => b.kg - a.kg);
-  const goods = sectionParts("Goods"), services = sectionParts("Services");
+    .sort((a, b) => b.kg - a.kg)
+    .map((p, i) => ({...p, color: PAL[(colorOffset + i) % 8]}));
+  const goods = sectionParts("Goods", 0), services = sectionParts("Services", 4);
   const totOf = ps => ps.reduce((a, p) => a + p.kg, 0);
   const gTot = totOf(goods), sTot = totOf(services);
   const maxTot = Math.max(gTot, sTot, 1);
@@ -1151,7 +1151,7 @@ function renderGsFig() {
 function setChartMode(m) {
   $("chartmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === m ? "active" : "");
   $("fig-gs").hidden = m !== "overall";
-  $("chart-host").hidden = $("chart-legend").hidden = m !== "monthly";
+  $("chart-host").hidden = m !== "monthly";
   $("chart-title").textContent = m === "overall" ? "G&S emissions — overall (t CO₂e/yr)" : "G&S emissions by month (kg CO₂e)";
   $("chart-note").textContent = m === "overall"
     ? "Annualized t CO₂e by category, bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Bar heights are scaled to section totals; hover a segment for its share."
@@ -1234,8 +1234,8 @@ function monthlyEmissions() {
 }
 
 function renderChart() {
-  const host = $("chart-host"), legend = $("chart-legend");
-  host.innerHTML = ""; legend.innerHTML = "";
+  const host = $("chart-host");
+  host.innerHTML = "";
   if (!DATA) {
     host.innerHTML = '<p class="hint">Upload a CSV to see monthly emissions.</p>';
     return;
@@ -1330,21 +1330,6 @@ function renderChart() {
       (mm === "01" || mi === 0) ? `${name} ’${yy.slice(2)}` : name;
   });
   host.appendChild(svg);
-
-  for (const [heading, series] of [["Goods (left bar)", goodsSeries], ["Services (right bar)", servicesSeries]]) {
-    const h = document.createElement("div");
-    h.style.cssText = "font-size:0.66rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:6px";
-    h.textContent = heading;
-    legend.appendChild(h);
-    for (const s of series) {
-      const kg = months.reduce((a, m) => a + kgOf(m, s), 0);
-      const row = document.createElement("div");
-      row.className = "lrow";
-      row.innerHTML = `<span class="sw" style="background:${s.color}"></span><span>${esc(s.label)}</span>` +
-        `<span class="lv">${(kg / DATA.meta.months * 12 / 1000).toFixed(2)} t/yr</span>`;
-      legend.appendChild(row);
-    }
-  }
 }
 
 // info bubbles (?) — delegated so dynamically re-rendered buttons work too
