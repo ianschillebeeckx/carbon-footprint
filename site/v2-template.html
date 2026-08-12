@@ -68,7 +68,7 @@
   .hbrow .hval { flex: 0 0 4.5em; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 0.72rem; text-align: right; }
   .tpane { display: flex; gap: 16px; align-items: flex-start; }
   .tpane > .tcol { flex: 1 1 auto; min-width: 0; }
-  .taside { flex: 0 0 250px; position: sticky; top: 0; }
+  .taside { flex: 0 0 375px; position: sticky; top: 0; }
   @media (max-width: 900px) { .tpane { flex-direction: column; } .taside { position: static; width: 100%; } }
   .vwrap { display: flex; gap: 12px; align-items: stretch; }
   .vbars { display: flex; gap: 28px; flex: none; justify-content: center; }
@@ -245,23 +245,26 @@
   <div class="tcol">
     <div class="tcard">
       <h3>Electricity
-        <button class="info" aria-label="About electricity emissions" data-tip="Your local grid's intensity per CoolClimate: 0.217 kg CO₂e/kWh direct (94110 / PG&E territory) + 0.020 upstream. Dollar mode converts at their local rate assumption (~$0.223/kWh). Green power % scales the whole thing down — 100% renewable plan → zero.">?</button>
+        <button class="info" aria-label="About electricity emissions" data-tip="Your local grid's intensity per CoolClimate: 0.217 kg CO₂e/kWh direct (94110 / PG&E territory) + 0.020 upstream. Green power % scales the whole thing down — 100% renewable plan → zero.">?</button>
         <span class="tkg" id="kg-elec"></span></h3>
-      <div class="tmode" id="elecmode"><button data-m="kwh">kWh</button><button data-m="dollars">Dollars</button></div>
+      <!-- $ mode disabled (no location-dependent $->unit rates); re-enable with the JS blocks:
+      <div class="tmode" id="elecmode"><button data-m="kwh">kWh</button><button data-m="dollars">Dollars</button></div> -->
       <div id="elecrows"></div>
     </div>
     <div class="tcard">
       <h3>Natural gas
-        <button class="info" aria-label="About natural gas emissions" data-tip="CoolClimate factors: 5.47 kg CO₂e/therm combustion + 0.77 upstream (leakage &amp; production). Dollar mode converts at their rate assumption (~$2.02/therm).">?</button>
+        <button class="info" aria-label="About natural gas emissions" data-tip="CoolClimate factors: 5.47 kg CO₂e/therm combustion + 0.77 upstream (leakage &amp; production).">?</button>
         <span class="tkg" id="kg-gas"></span></h3>
-      <div class="tmode" id="gasmode"><button data-m="therms">Therms</button><button data-m="dollars">Dollars</button></div>
+      <!-- $ mode disabled (no location-dependent $->unit rates); re-enable with the JS blocks:
+      <div class="tmode" id="gasmode"><button data-m="therms">Therms</button><button data-m="dollars">Dollars</button></div> -->
       <div id="gasrows"></div>
     </div>
     <div class="tcard">
       <h3>Heating oil
-        <button class="info" aria-label="About heating oil emissions" data-tip="CoolClimate factors: 11.79 kg CO₂e/gallon combustion + 3.07 upstream. Dollar mode converts at $3/gallon (their default).">?</button>
+        <button class="info" aria-label="About heating oil emissions" data-tip="CoolClimate factors: 11.79 kg CO₂e/gallon combustion + 3.07 upstream.">?</button>
         <span class="tkg" id="kg-oil"></span></h3>
-      <div class="tmode" id="oilmode"><button data-m="gallons">Gallons</button><button data-m="dollars">Dollars</button></div>
+      <!-- $ mode disabled (no location-dependent $->unit rates); re-enable with the JS blocks:
+      <div class="tmode" id="oilmode"><button data-m="gallons">Gallons</button><button data-m="dollars">Dollars</button></div> -->
       <div id="oilrows"></div>
     </div>
     <div class="tcard">
@@ -910,6 +913,9 @@ const HOME = HOME_SAVED || {
   oil: {mode: "gallons", gallons: 0, dollars: 0},
   sqft: 0,
 };
+// $ input modes are disabled — physical units only (no location-dependent
+// $->unit rate support). The commented blocks below restore them.
+HOME.elec.mode = "kwh"; HOME.gas.mode = "therms"; HOME.oil.mode = "gallons";
 
 function homeKg() {
   const e = HOME.elec, g = HOME.gas, o = HOME.oil;
@@ -937,23 +943,21 @@ function renderHome() {
     `<div class="tvrow"><label>${label}:</label><input type="number" min="0" step="10" value="${value}" ${attrs} aria-label="${label}"><label>${unit}</label>${note ? `<span class="rowkg">${note}</span>` : ""}</div>`;
 
   const e = HOME.elec;
-  $("elecmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === e.mode ? "active" : "");
-  $("elecrows").innerHTML = (e.mode === "kwh"
-    ? numRow("Electricity", +e.kwh || 0, 'data-h="elec.kwh" step="100"', "kWh/yr", `${(HF.elecPerKwh * 1000).toFixed(0)} g/kWh`)
-    : numRow("Electricity bill", +e.dollars || 0, 'data-h="elec.dollars" step="50"', "$/yr", `≈${fmt((+e.dollars || 0) / HF.elecDollarsPerKwh)} kWh`)) +
+  $("elecrows").innerHTML =
+    numRow("Electricity", +e.kwh || 0, 'data-h="elec.kwh" step="100"', "kWh/yr", `${(HF.elecPerKwh * 1000).toFixed(0)} g/kWh`) +
     numRow("Green power", +e.clean || 0, 'data-h="elec.clean" max="100" step="5" style="width:62px"', "% renewable", "");
-
   const g = HOME.gas;
-  $("gasmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === g.mode ? "active" : "");
-  $("gasrows").innerHTML = g.mode === "therms"
-    ? numRow("Natural gas", +g.therms || 0, 'data-h="gas.therms" step="10"', "therms/yr", `${HF.gasPerTherm.toFixed(1)} kg/therm`)
-    : numRow("Gas bill", +g.dollars || 0, 'data-h="gas.dollars" step="50"', "$/yr", `≈${fmt((+g.dollars || 0) / HF.gasDollarsPerTherm)} therms`);
-
+  $("gasrows").innerHTML =
+    numRow("Natural gas", +g.therms || 0, 'data-h="gas.therms" step="10"', "therms/yr", `${HF.gasPerTherm.toFixed(1)} kg/therm`);
   const o = HOME.oil;
-  $("oilmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === o.mode ? "active" : "");
-  $("oilrows").innerHTML = o.mode === "gallons"
-    ? numRow("Heating oil", +o.gallons || 0, 'data-h="oil.gallons" step="10"', "gal/yr", `${HF.oilPerGallon.toFixed(1)} kg/gal`)
-    : numRow("Oil bill", +o.dollars || 0, 'data-h="oil.dollars" step="50"', "$/yr", `≈${fmt((+o.dollars || 0) / HF.oilDollarsPerGallon)} gal`);
+  $("oilrows").innerHTML =
+    numRow("Heating oil", +o.gallons || 0, 'data-h="oil.gallons" step="10"', "gal/yr", `${HF.oilPerGallon.toFixed(1)} kg/gal`);
+  /* $ modes disabled — restore by re-enabling the mode toggles in the HTML and swapping back:
+  $("elecmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === e.mode ? "active" : "");
+  e.mode === "kwh" ? ...kWh row... : numRow("Electricity bill", +e.dollars || 0, 'data-h="elec.dollars" step="50"', "$/yr", `≈${fmt((+e.dollars || 0) / HF.elecDollarsPerKwh)} kWh`);
+  g.mode === "therms" ? ...therms row... : numRow("Gas bill", +g.dollars || 0, 'data-h="gas.dollars" step="50"', "$/yr", `≈${fmt((+g.dollars || 0) / HF.gasDollarsPerTherm)} therms`);
+  o.mode === "gallons" ? ...gallons row... : numRow("Oil bill", +o.dollars || 0, 'data-h="oil.dollars" step="50"', "$/yr", `≈${fmt((+o.dollars || 0) / HF.oilDollarsPerGallon)} gal`);
+  */
 
   $("sqftinput").value = +HOME.sqft || 0;
 
@@ -970,9 +974,10 @@ function renderHome() {
     HOME[obj][key] = +el.value || 0;
     touched();
   });
+  /* $ mode wiring (disabled with the toggles):
   for (const [id, mode] of [["elecmode", "elec"], ["gasmode", "gas"], ["oilmode", "oil"]]) {
     $(id).querySelectorAll("button").forEach(b => b.onclick = () => { HOME[mode].mode = b.dataset.m; touched(); });
-  }
+  } */
   $("sqftinput").onchange = () => { HOME.sqft = +$("sqftinput").value || 0; touched(); };
 }
 
