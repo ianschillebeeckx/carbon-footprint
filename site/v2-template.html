@@ -1092,9 +1092,10 @@ function saveFood() {
 function renderFood() {
   const size = Math.max(1, +FOOD.size || 1);
   $("foodsize").value = size;
-  $("foodrows").innerHTML = Object.entries(FF).map(([k, v]) =>
+  $("foodrows").innerHTML = `<div class="tvrow" style="color:var(--muted);font-size:0.74rem;margin-top:4px">Servings per person, per week:</div>` +
+    Object.entries(FF).map(([k, v]) =>
     `<div class="tvrow"><label>${v.label}:</label>` +
-    `<input type="number" min="0" step="0.5" value="${+FOOD.sv[k] || 0}" data-f="${k}" style="width:72px" aria-label="${v.label} servings per person per week"><label>sv / person / wk</label>` +
+    `<input type="number" min="0" step="0.5" value="${+FOOD.sv[k] || 0}" data-f="${k}" style="width:72px" aria-label="${v.label} servings per person per week">` +
     `<span class="rowkg" title="${(v.f / 365 * 1000).toFixed(1)} g CO₂e per calorie · ${(v.f / 365 * v.cps).toFixed(2)} kg per serving">` +
       `${(v.f / 365 * 1000).toFixed(1)} g/cal · ${(v.f / 365 * v.cps).toFixed(2)} kg/sv · ${fmt(foodCalDay(k) * size * v.f)} kg/yr</span></div>`).join("");
   const totalCal = Object.keys(FF).reduce((a, k) => a + foodCalDay(k), 0);
