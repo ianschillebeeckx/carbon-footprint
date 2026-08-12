@@ -14,6 +14,7 @@ VALUES_FILE = Path("data/values.json")
 V2_TEMPLATE = Path("site/v2-template.html")
 V2_FILE = Path("data/v2_classified.json")
 TRAVEL_FILE = Path("data/v2_travel.json")
+HOME_FILE = Path("data/v2_home.json")
 
 # The CoolClimate calculator app's origin — the only site allowed to fetch
 # /api/values (used by the prefill bookmarklet running on that page).
@@ -57,6 +58,7 @@ class Handler(BaseHTTPRequestHandler):
             html = html.replace("/*__CAT_DEFAULTS__*/null", json.dumps(classify.default_naics()))
             html = html.replace("/*__BASKET_OPTIONS__*/null", json.dumps(classify.basket_options()))
             html = html.replace("/*__TRAVEL__*/null", TRAVEL_FILE.read_text() if TRAVEL_FILE.exists() else "null")
+            html = html.replace("/*__HOME__*/null", HOME_FILE.read_text() if HOME_FILE.exists() else "null")
             self._send(200, html.encode(), "text/html; charset=utf-8")
         elif path == "/api/status":
             self._send(200, {"has_session": fetch.has_session(), "has_data": VALUES_FILE.exists()})
@@ -107,10 +109,11 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as e:
                     return self._send(400, {"error": str(e)})
                 self._send(200, {"ok": True})
-            elif self.path == "/api/v2/travel":
+            elif self.path in ("/api/v2/travel", "/api/v2/home"):
                 body = self._json_body()
-                TRAVEL_FILE.parent.mkdir(exist_ok=True)
-                TRAVEL_FILE.write_text(json.dumps(body, indent=1))
+                f = TRAVEL_FILE if self.path.endswith("travel") else HOME_FILE
+                f.parent.mkdir(exist_ok=True)
+                f.write_text(json.dumps(body, indent=1))
                 self._send(200, {"ok": True})
             elif self.path == "/api/v2/reset":
                 # Full reset: drop all classified transactions and every

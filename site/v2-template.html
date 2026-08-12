@@ -153,7 +153,7 @@
 
 <div id="impact">
   <div class="stat"><div class="k">Footprint</div><div class="v" id="imp-tons">–</div><div class="sub" id="imp-split"></div>
-    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors). Home and Food coming next.">?</button></div>
+    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors) plus Home (electricity/gas/oil/water/construction at CoolClimate factors for your zip). Food coming next.">?</button></div>
   <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
     <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: each tonne of CO₂e causes roughly $240 of discounted future damages — storms, floods, wildfire, crop loss, and other climate harms, mostly borne by other people.">?</button></div>
   <div class="stat"><div class="k">To offset · $600/t (Charm)</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
@@ -203,7 +203,46 @@
 </div>
 
 <div id="pane-home" class="mainpane" hidden>
-  <p class="hint">Home energy (electricity, natural gas, water) — coming next.</p>
+  <div class="tcol">
+    <div class="tcard">
+      <h3>Electricity
+        <button class="info" aria-label="About electricity emissions" data-tip="Your local grid's intensity per CoolClimate: 0.217 kg CO₂e/kWh direct (94110 / PG&E territory) + 0.020 upstream. Dollar mode converts at their local rate assumption (~$0.223/kWh). Green power % scales the whole thing down — 100% renewable plan → zero.">?</button>
+        <span class="tkg" id="kg-elec"></span></h3>
+      <div class="tmode" id="elecmode"><button data-m="kwh">kWh</button><button data-m="dollars">Dollars</button></div>
+      <div id="elecrows"></div>
+    </div>
+    <div class="tcard">
+      <h3>Natural gas
+        <button class="info" aria-label="About natural gas emissions" data-tip="CoolClimate factors: 5.47 kg CO₂e/therm combustion + 0.77 upstream (leakage &amp; production). Dollar mode converts at their rate assumption (~$2.02/therm).">?</button>
+        <span class="tkg" id="kg-gas"></span></h3>
+      <div class="tmode" id="gasmode"><button data-m="therms">Therms</button><button data-m="dollars">Dollars</button></div>
+      <div id="gasrows"></div>
+    </div>
+    <div class="tcard">
+      <h3>Heating oil
+        <button class="info" aria-label="About heating oil emissions" data-tip="CoolClimate factors: 11.79 kg CO₂e/gallon combustion + 3.07 upstream. Dollar mode converts at $3/gallon (their default).">?</button>
+        <span class="tkg" id="kg-oil"></span></h3>
+      <div class="tmode" id="oilmode"><button data-m="gallons">Gallons</button><button data-m="dollars">Dollars</button></div>
+      <div id="oilrows"></div>
+    </div>
+    <div class="tcard">
+      <h3>Water &amp; sewage
+        <button class="info" aria-label="About water emissions" data-tip="CoolClimate's water & sewage model: the slider is a multiple of the average household's use (their default here: 428 liters/day ≈ 113 gallons/day), at 3.28 kg CO₂e per liter/day-year — the energy to pump, treat, and heat water plus sewage treatment.">?</button>
+        <span class="tkg" id="kg-water"></span></h3>
+      <div class="tvrow"><input type="range" id="waterslider" min="0" max="3" step="0.05" value="1" style="flex:1;max-width:300px" aria-label="Water use relative to average">
+        <span class="rowkg" id="waterlabel"></span></div>
+      <div class="tvrow" style="justify-content:space-between;max-width:300px;color:var(--muted);font-size:0.7rem"><span>0</span><span>1x</span><span>2x</span><span>3x</span></div>
+    </div>
+    <div class="tcard">
+      <h3>Home construction
+        <button class="info" aria-label="About construction emissions" data-tip="CoolClimate amortizes the embodied emissions of building and maintaining your home over its life: ~0.93 kg CO₂e per square foot per year.">?</button>
+        <span class="tkg" id="kg-sqft"></span></h3>
+      <div class="tvrow"><label>Home size:</label><input type="number" min="0" step="50" id="sqftinput" value="0" aria-label="Home square feet"><label>sq ft</label><span class="rowkg">0.93 kg/sqft·yr</span></div>
+    </div>
+    <div class="tcard tsum">Home footprint: <b id="kg-home-total">–</b>
+      <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
+    <p class="hint">Sources — all home factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API for zip 94110 (grid intensity is location-specific). Water slider scale and 428 L/day household default are CoolClimate's own.</p>
+  </div>
 </div>
 <div id="pane-food" class="mainpane" hidden>
   <p class="hint">Food — coming next.</p>
@@ -255,6 +294,7 @@ const NAICS_OPTIONS = /*__NAICS_OPTIONS__*/null;  // [{code,title,category}] cur
 const CAT_DEFAULTS = /*__CAT_DEFAULTS__*/null;      // category -> representative NAICS
 const BASKET_OPTIONS = /*__BASKET_OPTIONS__*/null;  // commodities for the basket editor
 const TRAVEL_SAVED = /*__TRAVEL__*/null;            // persisted travel inputs
+const HOME_SAVED = /*__HOME__*/null;                // persisted home inputs
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
@@ -312,10 +352,11 @@ function renderImpact() {
   const { per, months, totalKg, totalDollars } = stats();
   const gsTons = totalKg / months * 12 / 1000;
   const travelTons = travelKg().total / 1000;
-  const tons = gsTons + travelTons;
+  const homeTons = homeKg().total / 1000;
+  const tons = gsTons + travelTons + homeTons;
   const annualSpend = totalDollars / months * 12;
   $("imp-tons").innerHTML = `${tons.toFixed(1)} <small>t CO₂e/yr</small>`;
-  $("imp-split").textContent = `G&S ${gsTons.toFixed(1)} t · travel ${travelTons.toFixed(1)} t`;
+  $("imp-split").textContent = `G&S ${gsTons.toFixed(1)} · travel ${travelTons.toFixed(1)} · home ${homeTons.toFixed(1)} t`;
   const damage = tons * 240, offset = tons * 600;
   $("imp-damage").innerHTML = `$${fmt(damage)} <small>/yr</small>`;
   $("imp-damage-pct").textContent = annualSpend ? `${(damage/annualSpend*100).toFixed(1)}% of G&S spending` : "";
@@ -784,6 +825,104 @@ function renderTravel() {
   $("airrows").querySelectorAll("input").forEach(el => el.onchange = () => { TRAVEL.air[el.dataset.a] = +el.value; touched(); });
 }
 
+// ---------- Home tab (CoolClimate housing model; factors measured from
+// their API for zip 94110 — grid intensity is location-specific) ----------
+const HF = {
+  elecPerKwh: 0.217 + 0.0195,   // direct + upstream, PG&E/94110
+  elecDollarsPerKwh: 0.2233,    // their local rate assumption ($1390 -> 6224.8 kWh)
+  gasPerTherm: 5.470 + 0.766,
+  gasDollarsPerTherm: 2.015,    // $830 -> 411.9 therms
+  oilPerGallon: 11.793 + 3.066,
+  oilDollarsPerGallon: 3.0,
+  waterPerLday: 3.2765,         // kg per (liter/day) per year
+  waterBaseLday: 428,           // CoolClimate household default for this profile
+  sqftPerYear: 0.93,
+  LDAY_TO_GALDAY: 0.264172,
+};
+const HOME = HOME_SAVED || {
+  elec: {mode: "kwh", kwh: 0, dollars: 0, clean: 0},
+  gas: {mode: "therms", therms: 0, dollars: 0},
+  oil: {mode: "gallons", gallons: 0, dollars: 0},
+  water: {mult: 1},
+  sqft: 0,
+};
+
+function homeKg() {
+  const e = HOME.elec, g = HOME.gas, o = HOME.oil;
+  const kwh = e.mode === "kwh" ? (+e.kwh || 0) : (+e.dollars || 0) / HF.elecDollarsPerKwh;
+  const elec = kwh * HF.elecPerKwh * (1 - Math.min(Math.max(+e.clean || 0, 0), 100) / 100);
+  const therms = g.mode === "therms" ? (+g.therms || 0) : (+g.dollars || 0) / HF.gasDollarsPerTherm;
+  const gas = therms * HF.gasPerTherm;
+  const gallons = o.mode === "gallons" ? (+o.gallons || 0) : (+o.dollars || 0) / HF.oilDollarsPerGallon;
+  const oil = gallons * HF.oilPerGallon;
+  const water = (+HOME.water.mult || 0) * HF.waterBaseLday * HF.waterPerLday;
+  const sqft = (+HOME.sqft || 0) * HF.sqftPerYear;
+  return {elec, gas, oil, water, sqft, total: elec + gas + oil + water + sqft};
+}
+
+let homeSaveTimer = null;
+function saveHome() {
+  clearTimeout(homeSaveTimer);
+  homeSaveTimer = setTimeout(() => fetch("/api/v2/home", {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(HOME),
+  }), 500);
+}
+
+function renderHome() {
+  const k = homeKg();
+  const numRow = (label, value, attrs, unit, note) =>
+    `<div class="tvrow"><label>${label}:</label><input type="number" min="0" step="10" value="${value}" ${attrs} aria-label="${label}"><label>${unit}</label>${note ? `<span class="rowkg">${note}</span>` : ""}</div>`;
+
+  const e = HOME.elec;
+  $("elecmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === e.mode ? "active" : "");
+  $("elecrows").innerHTML = (e.mode === "kwh"
+    ? numRow("Electricity", +e.kwh || 0, 'data-h="elec.kwh" step="100"', "kWh/yr", `${(HF.elecPerKwh * 1000).toFixed(0)} g/kWh`)
+    : numRow("Electricity bill", +e.dollars || 0, 'data-h="elec.dollars" step="50"', "$/yr", `≈${fmt((+e.dollars || 0) / HF.elecDollarsPerKwh)} kWh`)) +
+    numRow("Green power", +e.clean || 0, 'data-h="elec.clean" max="100" step="5" style="width:62px"', "% renewable", "");
+
+  const g = HOME.gas;
+  $("gasmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === g.mode ? "active" : "");
+  $("gasrows").innerHTML = g.mode === "therms"
+    ? numRow("Natural gas", +g.therms || 0, 'data-h="gas.therms" step="10"', "therms/yr", `${HF.gasPerTherm.toFixed(1)} kg/therm`)
+    : numRow("Gas bill", +g.dollars || 0, 'data-h="gas.dollars" step="50"', "$/yr", `≈${fmt((+g.dollars || 0) / HF.gasDollarsPerTherm)} therms`);
+
+  const o = HOME.oil;
+  $("oilmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === o.mode ? "active" : "");
+  $("oilrows").innerHTML = o.mode === "gallons"
+    ? numRow("Heating oil", +o.gallons || 0, 'data-h="oil.gallons" step="10"', "gal/yr", `${HF.oilPerGallon.toFixed(1)} kg/gal`)
+    : numRow("Oil bill", +o.dollars || 0, 'data-h="oil.dollars" step="50"', "$/yr", `≈${fmt((+o.dollars || 0) / HF.oilDollarsPerGallon)} gal`);
+
+  $("waterslider").value = +HOME.water.mult || 0;
+  const lday = (+HOME.water.mult || 0) * HF.waterBaseLday;
+  $("waterlabel").textContent = `${(+HOME.water.mult || 0).toFixed(2)}x average ≈ ${fmt(lday * HF.LDAY_TO_GALDAY)} gal/day (${fmt(lday)} L/day)`;
+  $("sqftinput").value = +HOME.sqft || 0;
+
+  $("kg-elec").textContent = `${fmt(k.elec)} kg/yr`;
+  $("kg-gas").textContent = `${fmt(k.gas)} kg/yr`;
+  $("kg-oil").textContent = `${fmt(k.oil)} kg/yr`;
+  $("kg-water").textContent = `${fmt(k.water)} kg/yr`;
+  $("kg-sqft").textContent = `${fmt(k.sqft)} kg/yr`;
+  $("kg-home-total").textContent = `${(k.total / 1000).toFixed(1)} t CO₂e/yr`;
+
+  const touched = () => { renderHome(); renderImpact(); saveHome(); };
+  document.querySelectorAll("#pane-home [data-h]").forEach(el => el.onchange = () => {
+    const [obj, key] = el.dataset.h.split(".");
+    HOME[obj][key] = +el.value || 0;
+    touched();
+  });
+  for (const [id, mode] of [["elecmode", "elec"], ["gasmode", "gas"], ["oilmode", "oil"]]) {
+    $(id).querySelectorAll("button").forEach(b => b.onclick = () => { HOME[mode].mode = b.dataset.m; touched(); });
+  }
+  $("waterslider").oninput = () => {
+    HOME.water.mult = +$("waterslider").value;
+    const l = HOME.water.mult * HF.waterBaseLday;
+    $("waterlabel").textContent = `${HOME.water.mult.toFixed(2)}x average ≈ ${fmt(l * HF.LDAY_TO_GALDAY)} gal/day (${fmt(l)} L/day)`;
+    $("kg-water").textContent = `${fmt(homeKg().water)} kg/yr`;
+  };
+  $("waterslider").onchange = () => { HOME.water.mult = +$("waterslider").value; touched(); };
+  $("sqftinput").onchange = () => { HOME.sqft = +$("sqftinput").value || 0; touched(); };
+}
+
 // ---------- main tabs ----------
 function setMainTab(t) {
   for (const key of ["travel", "home", "food", "gs"]) {
@@ -964,6 +1103,7 @@ $("window").textContent = DATA
   ? `${DATA.meta.start || "?"} → ${DATA.meta.end || "?"} · ${DATA.meta.months} months · ${DATA.meta.count} transactions`
   : "No data — upload a transactions CSV (needs Merchant + Amount columns; Category helps)";
 renderTravel();
+renderHome();
 renderAll();
 </script>
 </body>
