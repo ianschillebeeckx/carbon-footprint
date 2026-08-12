@@ -239,8 +239,8 @@
 <div id="pane-food" class="mainpane" hidden>
   <div class="tcol">
     <div class="tcard">
-      <h3>Daily diet — calories per person
-        <button class="info" aria-label="About diet emissions" data-tip="CoolClimate's food model at full meat detail, factors measured from their API (kg CO₂e per calorie/day over a year): beef &amp; pork 2.22, fish 2.08, poultry 1.56, other meat/eggs 0.82, dairy 1.46, fruits &amp; vegetables 1.22, other food 0.82, cereals 0.53. Enter the average person's daily calories in your household (US-average defaults are prefilled; a typical adult eats ~2,000–2,500 cal/day total). Beef→poultry swaps and dairy cuts are the big levers.">?</button>
+      <h3>Diet — servings per person, per week
+        <button class="info" aria-label="About diet emissions" data-tip="CoolClimate's food model at full meat detail. Servings convert to calories with their own constants (beef/pork 213 cal per serving; poultry/fish/other meat 204; dairy 120; fruit &amp; veg 70; grains 150; other 200), then calories carry measured factors (kg CO₂e per cal/day over a year): beef &amp; pork 2.22, fish 2.08, poultry 1.56, other meat 0.82, dairy 1.46, fruit &amp; veg 1.22, other food 0.82, grains 0.53. US-average defaults prefilled; the cal/day annotation should land near ~2,300 per person if the servings are realistic. Beef→poultry swaps are the biggest lever.">?</button>
         <span class="tkg" id="kg-food-diet"></span></h3>
       <div class="tvrow"><label>People in household:</label>
         <input type="number" min="1" max="12" step="1" id="foodsize" style="width:62px" aria-label="People in household"></div>
@@ -921,25 +921,35 @@ function renderHome() {
 
 // ---------- Food tab (CoolClimate diet model, meat-type detail; factors
 // measured from their API — kg CO2e per (calorie/day) over a year) ----------
+// f: kg CO2e per (calorie/day)·yr (measured); cps: calories per serving
+// (CoolClimate's own constants); def: US-average servings/person/week.
 const FF = {
-  beefpork: {label: "Beef & pork", f: 2.2228, def: 226},
-  poultry: {label: "Poultry", f: 1.5585, def: 151},
-  fish: {label: "Fish", f: 2.0841, def: 67},
-  meatother: {label: "Other meat & eggs", f: 0.8176, def: 53},
-  dairy: {label: "Dairy", f: 1.4600, def: 262},
-  fruitveg: {label: "Fruits & vegetables", f: 1.2228, def: 248},
-  cereals: {label: "Cereals & grains", f: 0.5292, def: 613},
-  otherfood: {label: "Other food (snacks, oils, drinks…)", f: 0.8176, def: 675},
+  beefpork: {label: "Beef, pork, lamb, veal", f: 2.2228, cps: 213, def: 7.4},
+  poultry: {label: "Poultry & eggs", f: 1.5585, cps: 204, def: 5.2},
+  fish: {label: "Fish & seafood", f: 2.0841, cps: 204, def: 2.3},
+  meatother: {label: "Other meat & alternatives (processed, nuts…)", f: 0.8176, cps: 204, def: 1.8},
+  dairy: {label: "Dairy", f: 1.4600, cps: 120, def: 15.3},
+  fruitveg: {label: "Fruits and vegetables", f: 1.2228, cps: 70, def: 24.8},
+  cereals: {label: "Grains & baked goods", f: 0.5292, cps: 150, def: 28.6},
+  otherfood: {label: "Snacks, drinks, etc.", f: 0.8176, cps: 200, def: 23.6},
 };
 const FOOD = FOOD_SAVED || {
   size: 3,
-  cal: Object.fromEntries(Object.entries(FF).map(([k, v]) => [k, v.def])),  // per person
+  sv: Object.fromEntries(Object.entries(FF).map(([k, v]) => [k, v.def])),  // servings/person/week
 };
+// migrate the earlier calories/day shape
+if (!FOOD.sv && FOOD.cal) {
+  FOOD.sv = Object.fromEntries(Object.entries(FF).map(([k, v]) =>
+    [k, Math.round((+FOOD.cal[k] || 0) * 7 / v.cps * 10) / 10]));
+  delete FOOD.cal;
+}
+
+const foodCalDay = k => (+FOOD.sv[k] || 0) * FF[k].cps / 7;   // per person
 
 function foodKg() {
   const size = Math.max(1, +FOOD.size || 1);
   let total = 0;
-  for (const [k, v] of Object.entries(FF)) total += (+FOOD.cal[k] || 0) * size * v.f;
+  for (const k of Object.keys(FF)) total += foodCalDay(k) * size * FF[k].f;
   return total;
 }
 
@@ -971,11 +981,11 @@ function renderFood() {
   $("foodsize").value = size;
   $("foodrows").innerHTML = Object.entries(FF).map(([k, v]) =>
     `<div class="tvrow"><label>${v.label}:</label>` +
-    `<input type="number" min="0" step="25" value="${+FOOD.cal[k] || 0}" data-f="${k}" style="width:72px" aria-label="${v.label} calories per day"><label>cal/day</label>` +
-    `<span class="rowkg">${v.f.toFixed(2)} kg/cal·yr · ${fmt((+FOOD.cal[k] || 0) * size * v.f)} kg/yr</span></div>`).join("");
-  const totalCal = Object.keys(FF).reduce((a, k) => a + (+FOOD.cal[k] || 0), 0);
+    `<input type="number" min="0" step="0.5" value="${+FOOD.sv[k] || 0}" data-f="${k}" style="width:72px" aria-label="${v.label} servings per week"><label>servings/wk</label>` +
+    `<span class="rowkg">≈${fmt(foodCalDay(k))} cal/day · ${fmt(foodCalDay(k) * size * v.f)} kg/yr</span></div>`).join("");
+  const totalCal = Object.keys(FF).reduce((a, k) => a + foodCalDay(k), 0);
   const kg = foodKg();
-  $("kg-food-diet").textContent = `${fmt(totalCal)} cal/person·day · ${fmt(kg)} kg/yr`;
+  $("kg-food-diet").textContent = `≈${fmt(totalCal)} cal/person·day · ${fmt(kg)} kg/yr`;
   $("kg-food-total").textContent = `${(kg / 1000).toFixed(1)} t CO₂e/yr`;
 
   const x = foodTxnKg();
@@ -993,7 +1003,7 @@ function renderFood() {
   const touched = () => { renderFood(); renderImpact(); saveFood(); };
   $("foodsize").onchange = () => { FOOD.size = Math.max(1, +$("foodsize").value || 1); touched(); };
   $("foodrows").querySelectorAll("input").forEach(el => el.onchange = () => {
-    FOOD.cal[el.dataset.f] = Math.max(0, +el.value || 0);
+    FOOD.sv[el.dataset.f] = Math.max(0, +el.value || 0);
     touched();
   });
 }
