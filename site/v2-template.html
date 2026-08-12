@@ -153,7 +153,7 @@
 
 <div id="impact">
   <div class="stat"><div class="k">Footprint</div><div class="v" id="imp-tons">–</div><div class="sub" id="imp-split"></div>
-    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors) plus Home (electricity/gas/oil/construction at CoolClimate factors for your zip). Food coming next.">?</button></div>
+    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors) plus Home (electricity/gas/oil/construction at CoolClimate factors for your zip) plus Food (your diet at CoolClimate's calorie factors, meat-type detail).">?</button></div>
   <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
     <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: each tonne of CO₂e causes roughly $240 of discounted future damages — storms, floods, wildfire, crop loss, and other climate harms, mostly borne by other people.">?</button></div>
   <div class="stat"><div class="k">To offset · $600/t (Charm)</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
@@ -237,7 +237,25 @@
   </div>
 </div>
 <div id="pane-food" class="mainpane" hidden>
-  <p class="hint">Food — coming next.</p>
+  <div class="tcol">
+    <div class="tcard">
+      <h3>Daily diet — calories per person
+        <button class="info" aria-label="About diet emissions" data-tip="CoolClimate's food model at full meat detail, factors measured from their API (kg CO₂e per calorie/day over a year): beef &amp; pork 2.22, fish 2.08, poultry 1.56, other meat/eggs 0.82, dairy 1.46, fruits &amp; vegetables 1.22, other food 0.82, cereals 0.53. Enter the average person's daily calories in your household (US-average defaults are prefilled; a typical adult eats ~2,000–2,500 cal/day total). Beef→poultry swaps and dairy cuts are the big levers.">?</button>
+        <span class="tkg" id="kg-food-diet"></span></h3>
+      <div class="tvrow"><label>People in household:</label>
+        <input type="number" min="1" max="12" step="1" id="foodsize" style="width:62px" aria-label="People in household"></div>
+      <div id="foodrows"></div>
+    </div>
+    <div class="tcard">
+      <h3>Cross-check from your transactions
+        <button class="info" aria-label="About the transactions cross-check" data-tip="Your already-classified grocery (NAICS 445/311/312) and restaurant (722) transactions, deflated to 2022 USD. Groceries use the design note's commodity composite ~0.60 kg CO₂e/$ (a diet-mix assumption — spend can't see what's in the cart); restaurants use their USEEIO factor (~0.23–0.36 kg/$, mostly the service, diet-blind). If this disagrees strongly with your diet estimate above, the gap usually means lots of dining out (undercounted here) or premium groceries (overcounted).">?</button>
+        <span class="tkg" id="kg-food-txn"></span></h3>
+      <div id="foodxrows" class="hint"></div>
+    </div>
+    <div class="tcard tsum">Food footprint (diet-based): <b id="kg-food-total">–</b>
+      <span class="hint" style="display:block;margin-top:4px">Annual; the diet estimate is what's included in the impact totals above. Inputs save automatically.</span></div>
+    <p class="hint">Sources — diet factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API (linear in calories; meat-type detail enabled). Transactions cross-check: grocery composite per the project's NAICS mapping notes (§3), restaurant factors from EPA/USEEIO.</p>
+  </div>
 </div>
 
 <div class="panes">
@@ -287,6 +305,7 @@ const CAT_DEFAULTS = /*__CAT_DEFAULTS__*/null;      // category -> representativ
 const BASKET_OPTIONS = /*__BASKET_OPTIONS__*/null;  // commodities for the basket editor
 const TRAVEL_SAVED = /*__TRAVEL__*/null;            // persisted travel inputs
 const HOME_SAVED = /*__HOME__*/null;                // persisted home inputs
+const FOOD_SAVED = /*__FOOD__*/null;                // persisted food inputs
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
@@ -345,10 +364,11 @@ function renderImpact() {
   const gsTons = totalKg / months * 12 / 1000;
   const travelTons = travelKg().total / 1000;
   const homeTons = homeKg().total / 1000;
-  const tons = gsTons + travelTons + homeTons;
+  const foodTons = foodKg() / 1000;
+  const tons = gsTons + travelTons + homeTons + foodTons;
   const annualSpend = totalDollars / months * 12;
   $("imp-tons").innerHTML = `${tons.toFixed(1)} <small>t CO₂e/yr</small>`;
-  $("imp-split").textContent = `G&S ${gsTons.toFixed(1)} · travel ${travelTons.toFixed(1)} · home ${homeTons.toFixed(1)} t`;
+  $("imp-split").textContent = `G&S ${gsTons.toFixed(1)} · travel ${travelTons.toFixed(1)} · home ${homeTons.toFixed(1)} · food ${foodTons.toFixed(1)} t`;
   const damage = tons * 240, offset = tons * 600;
   $("imp-damage").innerHTML = `$${fmt(damage)} <small>/yr</small>`;
   $("imp-damage-pct").textContent = annualSpend ? `${(damage/annualSpend*100).toFixed(1)}% of G&S spending` : "";
@@ -899,6 +919,85 @@ function renderHome() {
   $("sqftinput").onchange = () => { HOME.sqft = +$("sqftinput").value || 0; touched(); };
 }
 
+// ---------- Food tab (CoolClimate diet model, meat-type detail; factors
+// measured from their API — kg CO2e per (calorie/day) over a year) ----------
+const FF = {
+  beefpork: {label: "Beef & pork", f: 2.2228, def: 226},
+  poultry: {label: "Poultry", f: 1.5585, def: 151},
+  fish: {label: "Fish", f: 2.0841, def: 67},
+  meatother: {label: "Other meat & eggs", f: 0.8176, def: 53},
+  dairy: {label: "Dairy", f: 1.4600, def: 262},
+  fruitveg: {label: "Fruits & vegetables", f: 1.2228, def: 248},
+  cereals: {label: "Cereals & grains", f: 0.5292, def: 613},
+  otherfood: {label: "Other food (snacks, oils, drinks…)", f: 0.8176, def: 675},
+};
+const FOOD = FOOD_SAVED || {
+  size: 3,
+  cal: Object.fromEntries(Object.entries(FF).map(([k, v]) => [k, v.def])),  // per person
+};
+
+function foodKg() {
+  const size = Math.max(1, +FOOD.size || 1);
+  let total = 0;
+  for (const [k, v] of Object.entries(FF)) total += (+FOOD.cal[k] || 0) * size * v.f;
+  return total;
+}
+
+function foodTxnKg() {
+  // groceries at the mapping note's ~0.60 kg/$ commodity composite;
+  // restaurants at their own USEEIO factor. 2022-USD spend, annualized.
+  if (!DATA) return null;
+  const months = DATA.meta.months;
+  let gNom = 0, gKg = 0, rNom = 0, rKg = 0;
+  for (const t of DATA.transactions) {
+    if (!t.naics || t.mix) continue;
+    const spend = -t.amount, spend22 = spend * (t.deflator || 1);
+    if (/^(445|311|312)/.test(t.naics)) { gNom += spend; gKg += spend22 * 0.60; }
+    else if (/^722/.test(t.naics) && t.factor != null) { rNom += spend; rKg += spend22 * t.factor; }
+  }
+  return {gNom: gNom / months, gKg: gKg / months * 12, rNom: rNom / months, rKg: rKg / months * 12};
+}
+
+let foodSaveTimer = null;
+function saveFood() {
+  clearTimeout(foodSaveTimer);
+  foodSaveTimer = setTimeout(() => fetch("/api/v2/food", {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(FOOD),
+  }), 500);
+}
+
+function renderFood() {
+  const size = Math.max(1, +FOOD.size || 1);
+  $("foodsize").value = size;
+  $("foodrows").innerHTML = Object.entries(FF).map(([k, v]) =>
+    `<div class="tvrow"><label>${v.label}:</label>` +
+    `<input type="number" min="0" step="25" value="${+FOOD.cal[k] || 0}" data-f="${k}" style="width:72px" aria-label="${v.label} calories per day"><label>cal/day</label>` +
+    `<span class="rowkg">${v.f.toFixed(2)} kg/cal·yr · ${fmt((+FOOD.cal[k] || 0) * size * v.f)} kg/yr</span></div>`).join("");
+  const totalCal = Object.keys(FF).reduce((a, k) => a + (+FOOD.cal[k] || 0), 0);
+  const kg = foodKg();
+  $("kg-food-diet").textContent = `${fmt(totalCal)} cal/person·day · ${fmt(kg)} kg/yr`;
+  $("kg-food-total").textContent = `${(kg / 1000).toFixed(1)} t CO₂e/yr`;
+
+  const x = foodTxnKg();
+  if (x) {
+    $("kg-food-txn").textContent = `${((x.gKg + x.rKg) / 1000).toFixed(1)} t/yr`;
+    $("foodxrows").innerHTML =
+      `Groceries $${fmt(x.gNom)}/mo × ~0.60 kg/$ → <b>${(x.gKg / 1000).toFixed(1)} t/yr</b> · ` +
+      `Dining out $${fmt(x.rNom)}/mo → <b>${(x.rKg / 1000).toFixed(1)} t/yr</b><br>` +
+      `vs diet estimate <b>${(kg / 1000).toFixed(1)} t/yr</b> — the diet number is what counts in the totals.`;
+  } else {
+    $("kg-food-txn").textContent = "";
+    $("foodxrows").textContent = "Upload a transactions CSV to see the spend-based cross-check.";
+  }
+
+  const touched = () => { renderFood(); renderImpact(); saveFood(); };
+  $("foodsize").onchange = () => { FOOD.size = Math.max(1, +$("foodsize").value || 1); touched(); };
+  $("foodrows").querySelectorAll("input").forEach(el => el.onchange = () => {
+    FOOD.cal[el.dataset.f] = Math.max(0, +el.value || 0);
+    touched();
+  });
+}
+
 // ---------- main tabs ----------
 function setMainTab(t) {
   for (const key of ["travel", "home", "food", "gs"]) {
@@ -1080,6 +1179,7 @@ $("window").textContent = DATA
   : "No data — upload a transactions CSV (needs Merchant + Amount columns; Category helps)";
 renderTravel();
 renderHome();
+renderFood();
 renderAll();
 </script>
 </body>
