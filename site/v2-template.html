@@ -1101,9 +1101,7 @@ function travelParts() {
   rows.push({label: "Public transit", kg: ground});
   const a = TRAVEL.air;
   const airOf = k => a.mode === "flights" ? (+a["n" + k] || 0) * TF.airTripMiles[k] * TF.air[k] : (+a[k] || 0) * TF.air[k];
-  rows.push({label: "Air — short-haul", kg: airOf("short")});
-  rows.push({label: "Air — medium-haul", kg: airOf("medium")});
-  rows.push({label: "Air — long-haul", kg: airOf("long")});
+  rows.push({label: "Air travel", kg: airOf("short") + airOf("medium") + airOf("long")});
   return rows;
 }
 
@@ -1113,9 +1111,11 @@ function vstack(hostId, parts, valFmt) {
   if (!host) return;
   const fv = valFmt || (kg => `${(kg / 1000).toFixed(2)} t`);
   const total = parts.reduce((a, p) => a + p.kg, 0);
-  const bar = parts.filter(p => p.kg > 0).map(p =>
+  const desc = [...parts].sort((a, b) => b.kg - a.kg);        // legend: highest first
+  const asc = [...desc].reverse();                            // bar: smallest at bottom (column-reverse)
+  const bar = asc.filter(p => p.kg > 0).map(p =>
     `<span class="vseg" style="height:${total ? (p.kg / total * 100).toFixed(2) : 0}%;background:${p.color}" title="${esc(p.label)}: ${fv(p.kg)} (${total ? Math.round(p.kg / total * 100) : 0}%)"></span>`).join("");
-  const leg = parts.map(p =>
+  const leg = desc.map(p =>
     `<div class="lrow"><span class="sw" style="background:${p.color}"></span><span>${esc(p.label)}</span><span class="lv">${fv(p.kg)}</span></div>`).join("");
   host.innerHTML = `<div class="vwrap"><div class="vbar">${bar}</div><div class="vleg">${leg}</div></div>`;
 }
@@ -1138,7 +1138,7 @@ function renderGsFig() {
   const maxTot = Math.max(gTot, sTot, 1);
   const tyr = kg => (kg * 12 / 1000).toFixed(2);
   const col = (label, parts, tot) => {
-    const segs = parts.map(p =>
+    const segs = [...parts].reverse().map(p =>
       `<span class="vseg" style="height:${tot ? (p.kg / tot * 100).toFixed(2) : 0}%;background:${p.color}" data-tip="${esc(p.label)}\n${tyr(p.kg)} t/yr (${tot ? Math.round(p.kg / tot * 100) : 0}%)"></span>`).join("");
     return `<div class="vcol"><div class="vbarwrap"><div class="vbar" style="height:${(tot / maxTot * 100).toFixed(2)}%">${segs}</div></div><small>${label}<br>${tyr(tot)} t/yr</small></div>`;
   };
@@ -1191,10 +1191,17 @@ function renderHomeFig() {
 }
 function renderFoodFig() {
   const size = Math.max(1, +FOOD.size || 1);
-  const parts = Object.entries(FF).map(([k, v], i) =>
-    ({label: v.label, kg: foodCalDay(k) * size * v.f, color: PAL[i % 8]}));
-  parts.sort((a, b) => b.kg - a.kg);   // color follows the group, order follows size
-  vstack("fig-food", parts);
+  const kgOf = k => foodCalDay(k) * size * FF[k].f;
+  const groups = [
+    ["Meat (beef, poultry, fish)", kgOf("beefpork") + kgOf("poultry") + kgOf("fish")],
+    ["Alt meat", kgOf("meatother")],
+    ["Dairy", kgOf("dairy")],
+    ["Fruits", kgOf("fruits")],
+    ["Vegetables", kgOf("veggies")],
+    ["Grains", kgOf("cereals")],
+    ["Snacks & other", kgOf("otherfood")],
+  ];
+  vstack("fig-food", groups.map(([label, kg], i) => ({label, kg, color: PAL[i % 8]})));
 }
 
 // CoolClimate average household for this zip/size (measured defaults), kg/yr
