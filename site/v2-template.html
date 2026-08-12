@@ -153,7 +153,7 @@
 
 <div id="impact">
   <div class="stat"><div class="k">Footprint</div><div class="v" id="imp-tons">–</div><div class="sub" id="imp-split"></div>
-    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors) plus Home (electricity/gas/oil/water/construction at CoolClimate factors for your zip). Food coming next.">?</button></div>
+    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors) plus Home (electricity/gas/oil/construction at CoolClimate factors for your zip). Food coming next.">?</button></div>
   <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
     <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: each tonne of CO₂e causes roughly $240 of discounted future damages — storms, floods, wildfire, crop loss, and other climate harms, mostly borne by other people.">?</button></div>
   <div class="stat"><div class="k">To offset · $600/t (Charm)</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
@@ -226,14 +226,6 @@
       <div id="oilrows"></div>
     </div>
     <div class="tcard">
-      <h3>Water &amp; sewage
-        <button class="info" aria-label="About water emissions" data-tip="Physical model: supply + treatment + distribution (~2,000 kWh per million gallons, EPA/EPRI) plus wastewater treatment (~2,250) = 4.25 kWh per 1,000 gallons, at your grid's intensity → ~0.37 kg CO₂e per gallon/day-year. Your bill usually shows usage in CCF (1 CCF ≈ 748 gal; divide by billing-period days). References: SF average household ≈ 113 gal/day, US ≈ 300, ~82 per person. Note: CoolClimate shows water ~30× higher — their number is expenditure-based (scales with your income, and their on-screen liters labels are inconsistent with their own results); water heating energy belongs to your gas/electricity inputs, not here.">?</button>
-        <span class="tkg" id="kg-water"></span></h3>
-      <div class="tvrow"><label>Water use:</label>
-        <input type="number" min="0" step="10" id="watergal" aria-label="Water use gallons per day"><label>gal/day</label>
-        <span class="rowkg" id="waterlabel"></span></div>
-    </div>
-    <div class="tcard">
       <h3>Home construction
         <button class="info" aria-label="About construction emissions" data-tip="CoolClimate amortizes the embodied emissions of building and maintaining your home over its life: ~0.93 kg CO₂e per square foot per year.">?</button>
         <span class="tkg" id="kg-sqft"></span></h3>
@@ -241,7 +233,7 @@
     </div>
     <div class="tcard tsum">Home footprint: <b id="kg-home-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
-    <p class="hint">Sources — electricity/gas/oil/construction factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API for zip 94110 (grid intensity is location-specific). Water uses a physical model instead: ~4.25 kWh per 1,000 gallons for supply, treatment, distribution, and wastewater (<a href="https://www.epa.gov/sustainable-water-infrastructure/energy-efficiency-water-utilities" target="_blank" rel="noopener">EPA</a>/<a href="https://www.congress.gov/crs_external_products/R/PDF/R43200/R43200.8.pdf" target="_blank" rel="noopener">EPRI via CRS</a>) times the local grid intensity — CoolClimate's expenditure-based water figure runs ~30× higher and double-counts water heating.</p>
+    <p class="hint">Sources — electricity/gas/oil/construction factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API for zip 94110 (grid intensity is location-specific). Water &amp; sewage is deliberately omitted: physically it is ~4.25 kWh per 1,000 gallons (EPA/EPRI) ≈ 25–110 kg CO₂e/yr for typical households — a rounding error (CoolClimate's much larger water figure is expenditure-based and double-counts water heating).</p>
   </div>
 </div>
 <div id="pane-food" class="mainpane" hidden>
@@ -834,25 +826,14 @@ const HF = {
   gasDollarsPerTherm: 2.015,    // $830 -> 411.9 therms
   oilPerGallon: 11.793 + 3.066,
   oilDollarsPerGallon: 3.0,
-  // Water: physical model (CoolClimate's water number is expenditure-based
-  // and ~30x higher — see info bubble). Supply+treatment+distribution
-  // ~2,000 kWh/MG (EPA/EPRI) + wastewater ~2,250 kWh/MG = 4.25 kWh per
-  // 1,000 gal, at the local grid intensity.
-  waterKwhPerKgal: 4.25,
   sqftPerYear: 0.93,
 };
 const HOME = HOME_SAVED || {
   elec: {mode: "kwh", kwh: 0, dollars: 0, clean: 0},
   gas: {mode: "therms", therms: 0, dollars: 0},
   oil: {mode: "gallons", gallons: 0, dollars: 0},
-  water: {galday: 0},
   sqft: 0,
 };
-// migrate older saved shapes (multiplier x L/day baseline) to gal/day
-if (HOME.water.galday == null) {
-  const lday = (+HOME.water.mult || 0) * (+HOME.water.base || 428);
-  HOME.water = {galday: Math.round(lday * 0.264172)};
-}
 
 function homeKg() {
   const e = HOME.elec, g = HOME.gas, o = HOME.oil;
@@ -862,9 +843,8 @@ function homeKg() {
   const gas = therms * HF.gasPerTherm;
   const gallons = o.mode === "gallons" ? (+o.gallons || 0) : (+o.dollars || 0) / HF.oilDollarsPerGallon;
   const oil = gallons * HF.oilPerGallon;
-  const water = (+HOME.water.galday || 0) * 365 / 1000 * HF.waterKwhPerKgal * HF.elecPerKwh;
   const sqft = (+HOME.sqft || 0) * HF.sqftPerYear;
-  return {elec, gas, oil, water, sqft, total: elec + gas + oil + water + sqft};
+  return {elec, gas, oil, sqft, total: elec + gas + oil + sqft};
 }
 
 let homeSaveTimer = null;
@@ -899,15 +879,11 @@ function renderHome() {
     ? numRow("Heating oil", +o.gallons || 0, 'data-h="oil.gallons" step="10"', "gal/yr", `${HF.oilPerGallon.toFixed(1)} kg/gal`)
     : numRow("Oil bill", +o.dollars || 0, 'data-h="oil.dollars" step="50"', "$/yr", `≈${fmt((+o.dollars || 0) / HF.oilDollarsPerGallon)} gal`);
 
-  $("watergal").value = +HOME.water.galday || 0;
-  const g_ = +HOME.water.galday || 0;
-  $("waterlabel").textContent = `${fmt(g_ / 0.264172)} L/day · ${(365 / 1000 * HF.waterKwhPerKgal * HF.elecPerKwh).toFixed(2)} kg per gal/day·yr`;
   $("sqftinput").value = +HOME.sqft || 0;
 
   $("kg-elec").textContent = `${fmt(k.elec)} kg/yr`;
   $("kg-gas").textContent = `${fmt(k.gas)} kg/yr`;
   $("kg-oil").textContent = `${fmt(k.oil)} kg/yr`;
-  $("kg-water").textContent = `${fmt(k.water)} kg/yr`;
   $("kg-sqft").textContent = `${fmt(k.sqft)} kg/yr`;
   $("kg-home-total").textContent = `${(k.total / 1000).toFixed(1)} t CO₂e/yr`;
 
@@ -920,7 +896,6 @@ function renderHome() {
   for (const [id, mode] of [["elecmode", "elec"], ["gasmode", "gas"], ["oilmode", "oil"]]) {
     $(id).querySelectorAll("button").forEach(b => b.onclick = () => { HOME[mode].mode = b.dataset.m; touched(); });
   }
-  $("watergal").onchange = () => { HOME.water.galday = Math.max(0, +$("watergal").value || 0); touched(); };
   $("sqftinput").onchange = () => { HOME.sqft = +$("sqftinput").value || 0; touched(); };
 }
 
