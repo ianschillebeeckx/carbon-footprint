@@ -245,7 +245,7 @@
   <div class="tcol">
     <div class="tcard">
       <h3>Electricity
-        <button class="info" aria-label="About electricity emissions" data-tip="Your local grid's intensity per CoolClimate: 0.217 kg CO₂e/kWh direct (94110 / PG&E territory) + 0.020 upstream. Green power % scales the whole thing down — 100% renewable plan → zero.">?</button>
+        <button class="info" aria-label="About electricity emissions" data-tip="0.199 kg CO₂e/kWh — the average California grid mix (EPA eGRID 2023, CAMX region) — plus ~9% upstream, ≈0.217 all-in. This average already includes the grid's existing renewables/hydro/nuclear, so it is NOT a 0%-green fossil rate (that would be ~0.4+). The Green power % is for voluntary renewable purchases on top of the default mix: set it to the share of your usage on a plan like CleanPowerSF SuperGreen or PG&E Solar Choice (100% plan → zero).">?</button>
         <span class="tkg" id="kg-elec"></span></h3>
       <!-- $ mode disabled (no location-dependent $->unit rates); re-enable with the JS blocks:
       <div class="tmode" id="elecmode"><button data-m="kwh">kWh</button><button data-m="dollars">Dollars</button></div> -->
@@ -275,7 +275,7 @@
     </div>
     <div class="tcard tsum">Home footprint: <b id="kg-home-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
-    <p class="hint">Sources — electricity/gas/oil/construction factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API for zip 94110 (grid intensity is location-specific). Water &amp; sewage is deliberately omitted: physically it is ~4.25 kWh per 1,000 gallons (EPA/EPRI) ≈ 25–110 kg CO₂e/yr for typical households — a rounding error (CoolClimate's much larger water figure is expenditure-based and double-counts water heating).</p>
+    <p class="hint">Sources — electricity/gas/oil/construction factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API for zip 94110; electricity updated to <a href="https://www.epa.gov/egrid/summary-data" target="_blank" rel="noopener">EPA eGRID 2023</a> CAMX (0.199 kg CO₂e/kWh average grid mix — location-specific). Water &amp; sewage is deliberately omitted: physically it is ~4.25 kWh per 1,000 gallons (EPA/EPRI) ≈ 25–110 kg CO₂e/yr for typical households — a rounding error (CoolClimate's much larger water figure is expenditure-based and double-counts water heating).</p>
   </div>
   <aside class="taside"><div class="tcard"><h3>Home breakdown</h3><div id="fig-home"></div></div></aside>
   </div>
@@ -899,7 +899,11 @@ function renderTravel() {
 // ---------- Home tab (CoolClimate housing model; factors measured from
 // their API for zip 94110 — grid intensity is location-specific) ----------
 const HF = {
-  elecPerKwh: 0.217 + 0.0195,   // direct + upstream, PG&E/94110
+  // eGRID 2023 CAMX average grid mix (0.199 kg CO2e/kWh) + ~9% upstream
+  // (CoolClimate's ratio). CoolClimate's own 0.217 was the same construct,
+  // a few eGRID vintages older. This is the AVERAGE mix — the grid's
+  // existing renewables are already in it.
+  elecPerKwh: 0.199 + 0.018,
   elecDollarsPerKwh: 0.2233,    // their local rate assumption ($1390 -> 6224.8 kWh)
   gasPerTherm: 5.470 + 0.766,
   gasDollarsPerTherm: 2.015,    // $830 -> 411.9 therms
