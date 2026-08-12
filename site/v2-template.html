@@ -71,6 +71,10 @@
   .taside { flex: 0 0 250px; position: sticky; top: 0; }
   @media (max-width: 900px) { .tpane { flex-direction: column; } .taside { position: static; width: 100%; } }
   .vwrap { display: flex; gap: 12px; align-items: stretch; }
+  .vbars { display: flex; gap: 10px; align-items: flex-end; height: 240px; flex: none; }
+  .vcol { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .vcol .vbar { min-height: 0; width: 44px; }
+  .vcol small { margin-top: 4px; color: var(--muted); font-size: 0.66rem; text-align: center; line-height: 1.25; }
   .vbar { width: 44px; min-height: 240px; display: flex; flex-direction: column-reverse; border-radius: 6px; overflow: hidden; background: var(--chip); flex: none; }
   .vseg { width: 100%; }
   .vleg { flex: 1; display: flex; flex-direction: column; gap: 4px; justify-content: flex-end; font-size: 0.72rem; }
@@ -1114,18 +1118,32 @@ function vstack(hostId, parts, valFmt) {
   host.innerHTML = `<div class="vwrap"><div class="vbar">${bar}</div><div class="vleg">${leg}</div></div>`;
 }
 
-// G&S overall: one stacked bar of category kg/mo (colors match the Total tab)
+// G&S overall: two stacked bars (Goods | Services), heights scaled to their
+// totals — if services is 2x goods, its bar is twice as tall.
 function renderGsFig() {
   if (!$("fig-gs")) return;
   if (!DATA) { $("fig-gs").innerHTML = '<p class="hint">Upload a CSV to see the breakdown.</p>'; return; }
   const { per, months } = stats();
-  const parts = [];
-  for (const section of ["Goods", "Services"]) {
-    CAT_ORDER.filter(c => DATA.categories[c].section === section)
-      .forEach((c, i) => parts.push({label: DATA.categories[c].label, color: PAL[i % 8], kg: per[c].kg / months}));
-  }
-  parts.sort((a, b) => b.kg - a.kg);
-  vstack("fig-gs", parts.filter(p => p.kg > 0), kg => `${fmt(kg)} kg/mo`);
+  const sectionParts = section => CAT_ORDER
+    .filter(c => DATA.categories[c].section === section)
+    .map((c, i) => ({label: DATA.categories[c].label, color: PAL[i % 8], kg: per[c].kg / months}))
+    .filter(p => p.kg > 0)
+    .sort((a, b) => b.kg - a.kg);
+  const goods = sectionParts("Goods"), services = sectionParts("Services");
+  const totOf = ps => ps.reduce((a, p) => a + p.kg, 0);
+  const gTot = totOf(goods), sTot = totOf(services);
+  const maxTot = Math.max(gTot, sTot, 1);
+  const col = (label, parts, tot) => {
+    const segs = parts.map(p =>
+      `<span class="vseg" style="height:${tot ? (p.kg / tot * 100).toFixed(2) : 0}%;background:${p.color}" title="${esc(p.label)}: ${fmt(p.kg)} kg/mo (${tot ? Math.round(p.kg / tot * 100) : 0}%)"></span>`).join("");
+    return `<div class="vcol"><div class="vbar" style="height:${(tot / maxTot * 100).toFixed(2)}%">${segs}</div><small>${label}<br>${fmt(tot)} kg/mo</small></div>`;
+  };
+  const legend = [["Goods", goods], ["Services", services]].map(([h, ps]) =>
+    `<div style="font-size:0.66rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:6px">${h}</div>` +
+    ps.map(p => `<div class="lrow"><span class="sw" style="background:${p.color}"></span><span>${esc(p.label)}</span><span class="lv">${fmt(p.kg)}</span></div>`).join("")).join("");
+  $("fig-gs").innerHTML =
+    `<div class="vwrap"><div class="vbars">${col("Goods", goods, gTot)}${col("Services", services, sTot)}</div>` +
+    `<div class="vleg">${legend}</div></div>`;
 }
 
 function setChartMode(m) {
