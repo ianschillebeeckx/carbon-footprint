@@ -199,17 +199,18 @@
   <div class="tcol">
     <div class="tcard">
       <h3>Offset purchases
-        <button class="info" aria-label="About offsets" data-tip="Enter what you pay per year for carbon removal or offsets, and the provider's price per tonne — tons offset = dollars ÷ price. Assign each purchase to the section whose emissions you consider it covering; the Total tab and impact cards subtract it. Quality varies enormously: durable removal (Charm bio-oil ~$600/t, Climeworks DAC ~$1000/t) permanently stores carbon; cheap avoidance credits ($5–20/t) often don't hold up — price is a decent proxy for permanence.">?</button>
+        <button class="info" aria-label="About offsets" data-tip="Enter what you pay per year for carbon removal or offsets, and the provider's price per tonne — tons offset = dollars ÷ price. Assign each purchase to the section (Travel/Home/Food/Goods/Services) whose emissions you consider it covering; the Total tab and impact cards subtract it. Quality varies enormously: durable removal (Charm bio-oil ~$600/t, Climeworks DAC ~$1000/t) permanently stores carbon; cheap avoidance credits ($5–20/t) often don't hold up — price is a decent proxy for permanence.">?</button>
         <span class="tkg" id="kg-offsets"></span></h3>
       <div id="offsetrows"></div>
       <button class="tadd" id="offsetadd">+ purchase</button>
     </div>
     <div class="tcard">
       <h3>Recycling &amp; compost
-        <button class="info" aria-label="About recycling and compost" data-tip="Avoided-emission credits, not purchases. Recycling: EPA's equivalency of ~2.9 t CO₂e avoided per ton of mixed recyclables vs landfilling (materials offset virgin production, so it's credited against Goods &amp; Services). Compost: EPA WARM ~0.6 t CO₂e per ton of food scraps diverted from landfill (avoided methane; credited against Food). Estimating lbs/week: US average recycling ≈ 8 lbs/person/wk (EPA); a 13-gal bag of mixed recycling ≈ 8–10 lbs; a full 64-gal cart ≈ 25–40 lbs. A full countertop compost pail ≈ 3–5 lbs; composting all food scraps ≈ 4–7 lbs/person/wk. These are avoidance estimates — softer than paid removal, and your curbside program's actual fate of materials varies.">?</button>
+        <button class="info" aria-label="About recycling and compost" data-tip="Avoided-emission credits, not purchases. Recycling: EPA's equivalency of ~2.9 t CO₂e avoided per ton of mixed recyclables vs landfilling (materials offset virgin production, so it's credited against Goods by default — switch to Food if your bin is mostly food packaging). Compost: EPA WARM ~0.6 t CO₂e per ton of food scraps diverted from landfill (avoided methane; credited against Food). Estimating lbs/week: US average recycling ≈ 8 lbs/person/wk (EPA); a 13-gal bag of mixed recycling ≈ 8–10 lbs; a full 64-gal cart ≈ 25–40 lbs. A full countertop compost pail ≈ 3–5 lbs; composting all food scraps ≈ 4–7 lbs/person/wk. These are avoidance estimates — softer than paid removal, and your curbside program's actual fate of materials varies.">?</button>
         <span class="tkg" id="kg-recycle"></span></h3>
       <div class="tvrow"><label>Recycling (paper, plastic, glass, metal):</label>
-        <input type="number" min="0" step="1" id="recyclelbs" style="width:66px" aria-label="Recycling pounds per week"><label>lbs/wk</label>
+        <input type="number" min="0" step="1" id="recyclelbs" style="width:66px" aria-label="Recycling pounds per week"><label>lbs/wk →</label>
+        <select id="recyclecat" aria-label="Credit recycling against"><option value="goods">Goods</option><option value="food">Food</option></select>
         <span class="rowkg" id="recyclekg"></span></div>
       <div class="tvrow"><label>Compost (food scraps, yard waste):</label>
         <input type="number" min="0" step="1" id="compostlbs" style="width:66px" aria-label="Compost pounds per week"><label>lbs/wk</label>
@@ -231,7 +232,7 @@
   <div class="tcol" style="max-width:860px">
     <div class="tcard">
       <h3>Your footprint by section
-        <button class="info" aria-label="About this figure" data-tip="Each bar stacks that section's components (hover a segment for its share). The amber tick is CoolClimate's average household for your zip and household size — 43.3 t/yr total: travel 11.5, home 7.2, food 7.7, goods 8.9, services 8.0. Green boxes left of the zero line are your offsets, drawn negative against the section they're assigned to (G&S offsets split across Goods and Services by gross share).">?</button>
+        <button class="info" aria-label="About this figure" data-tip="Each bar stacks that section's components (hover a segment for its share). The amber tick is CoolClimate's average household for your zip and household size — 43.3 t/yr total: travel 11.5, home 7.2, food 7.7, goods 8.9, services 8.0. Green boxes left of the zero line are your offsets, drawn negative against the section they're assigned to.">?</button>
         <span class="tkg" id="total-tons"></span></h3>
       <div id="fig-total"></div>
       <p class="hint" style="margin-bottom:0">Amber tick = CoolClimate average household (your zip, 3 people). Goods &amp; Services come from your classified transactions; Travel/Home/Food from your inputs on those tabs.</p>
@@ -1288,11 +1289,8 @@ function renderTotal() {
   rows[0].off = off.per.travel * 1000;
   rows[1].off = off.per.home * 1000;
   rows[2].off = off.per.food * 1000;
-  // G&S offsets split across the Goods and Services rows by their gross share
-  const gKg = rows[3].segs.reduce((a, s) => a + s.kg, 0), sKg = rows[4].segs.reduce((a, s) => a + s.kg, 0);
-  const gShare = gKg + sKg > 0 ? gKg / (gKg + sKg) : 0.5;
-  rows[3].off = off.per.gs * 1000 * gShare;
-  rows[4].off = off.per.gs * 1000 * (1 - gShare);
+  rows[3].off = off.per.goods * 1000;
+  rows[4].off = off.per.services * 1000;
   hbars("fig-total", rows, 0, total);
   $("total-tons").textContent = off.total > 0
     ? `${(total / 1000).toFixed(1)} − ${off.total.toFixed(1)} = ${Math.max(0, total / 1000 - off.total).toFixed(1)} t net · CoolClimate avg 43.3`
@@ -1301,24 +1299,28 @@ function renderTotal() {
 
 // ---------- Offsets tab ----------
 const OFFSETS_SAVED = /*__OFFSETS__*/null;
-const OFFSET_CATS = {travel: "Travel", home: "Home", food: "Food", gs: "Goods & Services"};
-const OFFSETS = OFFSETS_SAVED || {rows: [{label: "Charm Industrial", cat: "gs", dollars: 0, price: 600}], recycle_lbs: 0, compost_lbs: 0};
+const OFFSET_CATS = {travel: "Travel", home: "Home", food: "Food", goods: "Goods", services: "Services"};
+const OFFSETS = OFFSETS_SAVED || {rows: [{label: "Charm Industrial", cat: "goods", dollars: 0, price: 600}], recycle_lbs: 0, compost_lbs: 0, recycle_cat: "goods"};
 if (OFFSETS.recycle_lbs == null) OFFSETS.recycle_lbs = 0;
 if (OFFSETS.compost_lbs == null) OFFSETS.compost_lbs = 0;
+if (!OFFSETS.recycle_cat) OFFSETS.recycle_cat = "goods";
+for (const r of OFFSETS.rows) if (r.cat === "gs" || !(r.cat in OFFSET_CATS)) r.cat = "goods";
 
 // avoided t CO2e per (lb/week) over a year: lbs/wk x 52 / 2000 tons/yr x factor
 const RECYCLE_T_PER_LBWK = 52 / 2000 * 2.9;   // EPA equivalencies, mixed recyclables vs landfill
 const COMPOST_T_PER_LBWK = 52 / 2000 * 0.6;   // EPA WARM, food scraps diverted from landfill
 
 function offsetTons() {
-  const per = {travel: 0, home: 0, food: 0, gs: 0};
+  const per = {travel: 0, home: 0, food: 0, goods: 0, services: 0};
   for (const r of OFFSETS.rows) {
     const t = (+r.dollars || 0) / Math.max(+r.price || 0, 1);
-    per[r.cat in per ? r.cat : "gs"] += t;
+    per[r.cat in per ? r.cat : "goods"] += t;
   }
-  per.gs += (+OFFSETS.recycle_lbs || 0) * RECYCLE_T_PER_LBWK;    // recycling displaces virgin goods production
-  per.food += (+OFFSETS.compost_lbs || 0) * COMPOST_T_PER_LBWK;  // compost avoids landfill methane from food
-  return {per, total: per.travel + per.home + per.food + per.gs};
+  // recycling displaces virgin production — goods by default, food if your
+  // bin is mostly food packaging; compost avoids landfill methane from food
+  per[OFFSETS.recycle_cat === "food" ? "food" : "goods"] += (+OFFSETS.recycle_lbs || 0) * RECYCLE_T_PER_LBWK;
+  per.food += (+OFFSETS.compost_lbs || 0) * COMPOST_T_PER_LBWK;
+  return {per, total: per.travel + per.home + per.food + per.goods + per.services};
 }
 
 const OFFSET_MERCHANT = /charm|climeworks|wren\b|terrapass|tradewater|carbonfund|cool ?effect|gold standard|pachama/i;
@@ -1359,8 +1361,9 @@ function renderOffsets() {
 
   $("recyclelbs").value = +OFFSETS.recycle_lbs || 0;
   $("compostlbs").value = +OFFSETS.compost_lbs || 0;
+  $("recyclecat").value = OFFSETS.recycle_cat;
   const rT = (+OFFSETS.recycle_lbs || 0) * RECYCLE_T_PER_LBWK, cT = (+OFFSETS.compost_lbs || 0) * COMPOST_T_PER_LBWK;
-  $("recyclekg").textContent = `−${rT.toFixed(2)} t/yr → G&S`;
+  $("recyclekg").textContent = `−${rT.toFixed(2)} t/yr`;
   $("compostkg").textContent = `−${cT.toFixed(2)} t/yr → Food`;
   $("kg-recycle").textContent = `−${(rT + cT).toFixed(2)} t/yr`;
 
@@ -1387,6 +1390,7 @@ function renderOffsets() {
   $("offsetadd").onclick = () => { OFFSETS.rows.push({label: "", cat: "gs", dollars: 0, price: 600}); touched(); };
   $("recyclelbs").onchange = () => { OFFSETS.recycle_lbs = Math.max(0, +$("recyclelbs").value || 0); touched(); };
   $("compostlbs").onchange = () => { OFFSETS.compost_lbs = Math.max(0, +$("compostlbs").value || 0); touched(); };
+  $("recyclecat").onchange = () => { OFFSETS.recycle_cat = $("recyclecat").value; touched(); };
 }
 
 // ---------- main tabs ----------
