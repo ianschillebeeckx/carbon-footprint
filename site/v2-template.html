@@ -189,7 +189,30 @@
   <button id="mtab-home">Home</button>
   <button id="mtab-food">Food</button>
   <button id="mtab-gs" class="active">Goods &amp; Services</button>
+  <button id="mtab-offsets">Offsets</button>
   <button id="mtab-total">Total</button>
+</div>
+
+<div id="pane-offsets" class="mainpane" hidden>
+  <div class="tpane">
+  <div class="tcol">
+    <div class="tcard">
+      <h3>Offset purchases
+        <button class="info" aria-label="About offsets" data-tip="Enter what you pay per year for carbon removal or offsets, and the provider's price per tonne — tons offset = dollars ÷ price. Assign each purchase to the section whose emissions you consider it covering; the Total tab and impact cards subtract it. Quality varies enormously: durable removal (Charm bio-oil ~$600/t, Climeworks DAC ~$1000/t) permanently stores carbon; cheap avoidance credits ($5–20/t) often don't hold up — price is a decent proxy for permanence.">?</button>
+        <span class="tkg" id="kg-offsets"></span></h3>
+      <div id="offsetrows"></div>
+      <button class="tadd" id="offsetadd">+ purchase</button>
+    </div>
+    <div class="tcard">
+      <h3>Cross-check from your transactions
+        <button class="info" aria-label="About the offsets cross-check" data-tip="Transactions whose merchant looks like an offset/removal provider (Charm, Climeworks, Wren, Terrapass, Tradewater…). Two things to do with a match: enter it as a purchase here, and mark the transaction Non-purchase in Goods &amp; Services so the spend itself doesn't count as consumption emissions (it usually lands in charity/services otherwise).">?</button></h3>
+      <div id="offsetxrows" class="hint"></div>
+    </div>
+    <div class="tcard tsum">Offsets: <b id="kg-offsets-total">–</b>
+      <span class="hint" style="display:block;margin-top:4px">Subtracted from the impact totals above (never below zero). Inputs save automatically.</span></div>
+  </div>
+  <aside class="taside"><div class="tcard"><h3>Offsets by section</h3><div id="fig-offsets"></div></div></aside>
+  </div>
 </div>
 
 <div id="pane-total" class="mainpane" hidden>
@@ -416,15 +439,19 @@ function renderImpact() {
   const travelTons = travelKg().total / 1000;
   const homeTons = homeKg().total / 1000;
   const foodTons = foodKg() / 1000;
-  const tons = gsTons + travelTons + homeTons + foodTons;
+  const grossTons = gsTons + travelTons + homeTons + foodTons;
+  const offTons = offsetTons().total;
+  const tons = Math.max(0, grossTons - offTons);
   const annualSpend = totalDollars / months * 12;
-  $("imp-tons").innerHTML = `${tons.toFixed(1)} <small>t CO₂e/yr</small>`;
-  const pct = v => tons > 0 ? `${Math.round(v / tons * 100)}%` : "–";
-  $("imp-split").textContent = `G&S ${pct(gsTons)} · travel ${pct(travelTons)} · home ${pct(homeTons)} · food ${pct(foodTons)}`;
+  $("imp-tons").innerHTML = `${tons.toFixed(1)} <small>t CO₂e/yr${offTons > 0 ? " net" : ""}</small>`;
+  const pct = v => grossTons > 0 ? `${Math.round(v / grossTons * 100)}%` : "–";
+  $("imp-split").textContent = `G&S ${pct(gsTons)} · travel ${pct(travelTons)} · home ${pct(homeTons)} · food ${pct(foodTons)}` +
+    (offTons > 0 ? ` · offsets −${offTons.toFixed(1)}t` : "");
   $("mtab-travel").innerHTML = `Travel <small>${travelTons.toFixed(1)}t</small>`;
   $("mtab-home").innerHTML = `Home <small>${homeTons.toFixed(1)}t</small>`;
   $("mtab-food").innerHTML = `Food <small>${foodTons.toFixed(1)}t</small>`;
   $("mtab-gs").innerHTML = `Goods &amp; Services <small>${gsTons.toFixed(1)}t</small>`;
+  $("mtab-offsets").innerHTML = `Offsets <small>−${offTons.toFixed(1)}t</small>`;
   $("mtab-total").innerHTML = `Total <small>${tons.toFixed(1)}t</small>`;
   const damage = tons * 240, offset = tons * 600;
   $("imp-damage").innerHTML = `$${fmt(damage)} <small>/yr</small>`;
@@ -1234,19 +1261,99 @@ function renderTotal() {
     {label: "Services", avg: CC_AVG.services, segs: secSegs("Services")},
   ];
   const total = rows.reduce((a, r) => a + r.segs.reduce((x, s) => x + s.kg, 0), 0);
+  const off = offsetTons();
+  if (off.total > 0) {
+    rows.push({label: "Offsets (subtracted)", segs: Object.entries(OFFSET_CATS)
+      .map(([k, l], i) => ({kg: off.per[k] * 1000, color: PAL[i % 8], title: `${l} offsets`})).filter(sg => sg.kg > 0)});
+  }
   hbars("fig-total", rows, 0, total);
-  $("total-tons").textContent = `${(total / 1000).toFixed(1)} t CO₂e/yr · CoolClimate avg 43.3`;
+  $("total-tons").textContent = off.total > 0
+    ? `${(total / 1000).toFixed(1)} − ${off.total.toFixed(1)} = ${Math.max(0, total / 1000 - off.total).toFixed(1)} t net · CoolClimate avg 43.3`
+    : `${(total / 1000).toFixed(1)} t CO₂e/yr · CoolClimate avg 43.3`;
+}
+
+// ---------- Offsets tab ----------
+const OFFSETS_SAVED = /*__OFFSETS__*/null;
+const OFFSET_CATS = {travel: "Travel", home: "Home", food: "Food", gs: "Goods & Services"};
+const OFFSETS = OFFSETS_SAVED || {rows: [{label: "Charm Industrial", cat: "gs", dollars: 0, price: 600}]};
+
+function offsetTons() {
+  const per = {travel: 0, home: 0, food: 0, gs: 0};
+  for (const r of OFFSETS.rows) {
+    const t = (+r.dollars || 0) / Math.max(+r.price || 0, 1);
+    per[r.cat in per ? r.cat : "gs"] += t;
+  }
+  return {per, total: per.travel + per.home + per.food + per.gs};
+}
+
+const OFFSET_MERCHANT = /charm|climeworks|wren\b|terrapass|tradewater|carbonfund|cool ?effect|gold standard|pachama/i;
+function offsetTxnScan() {
+  if (!DATA) return null;
+  const byM = new Map();
+  for (const t of DATA.transactions) {
+    if (!OFFSET_MERCHANT.test(t.merchant)) continue;
+    const m = byM.get(t.merchant) || {merchant: t.merchant, total: 0, n: 0, counted: t.naics != null || t.mix};
+    m.total += -t.amount; m.n++;
+    byM.set(t.merchant, m);
+  }
+  return [...byM.values()];
+}
+
+let offsetSaveTimer = null;
+function saveOffsets() {
+  clearTimeout(offsetSaveTimer);
+  offsetSaveTimer = setTimeout(() => fetch("/api/v2/offsets", {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(OFFSETS),
+  }), 500);
+}
+
+function renderOffsets() {
+  if (!$("offsetrows")) return;
+  $("offsetrows").innerHTML = OFFSETS.rows.map((r, i) => {
+    const tons = (+r.dollars || 0) / Math.max(+r.price || 0, 1);
+    return `<div class="tvrow">` +
+      `<input type="text" value="${esc(r.label || "")}" data-i="${i}" data-k="label" placeholder="Provider" style="width:130px;font:inherit;font-size:0.78rem;border:1px solid var(--line);border-radius:7px;padding:5px 7px;background:var(--card);color:var(--ink)" aria-label="Provider">` +
+      `<input type="number" min="0" step="50" value="${+r.dollars || 0}" data-i="${i}" data-k="dollars" aria-label="Dollars per year"><label>$/yr at</label>` +
+      `<input type="number" min="1" step="25" value="${+r.price || 600}" data-i="${i}" data-k="price" style="width:70px" aria-label="Price per tonne"><label>$/t →</label>` +
+      `<select data-i="${i}" data-k="cat" aria-label="Section">${Object.entries(OFFSET_CATS).map(([k, l]) =>
+        `<option value="${k}" ${r.cat === k ? "selected" : ""}>${l}</option>`).join("")}</select>` +
+      `<span class="rowkg">−${tons.toFixed(2)} t/yr</span>` +
+      (OFFSETS.rows.length > 1 ? `<button class="del" data-i="${i}" title="Remove">✕</button>` : "") +
+      `</div>`;
+  }).join("");
+
+  const off = offsetTons();
+  $("kg-offsets").textContent = `−${off.total.toFixed(2)} t/yr`;
+  $("kg-offsets-total").textContent = `−${off.total.toFixed(2)} t CO₂e/yr`;
+  vstack("fig-offsets", Object.entries(OFFSET_CATS).map(([k, l], i) =>
+    ({label: l, kg: off.per[k] * 1000, color: PAL[i % 8]})).filter(p => p.kg > 0),
+    kg => `−${(kg / 1000).toFixed(2)} t`);
+
+  const scan = offsetTxnScan();
+  $("offsetxrows").innerHTML = !scan ? "Upload a transactions CSV to scan for offset providers."
+    : !scan.length ? "No offset-provider merchants found in your transactions (looked for Charm, Climeworks, Wren, Terrapass, Tradewater…)."
+    : scan.map(m => `Found <b>${esc(m.merchant)}</b>: $${fmt(m.total)} across ${m.n} transaction${m.n > 1 ? "s" : ""}` +
+        (m.counted ? ` — <span style="color:var(--warn)">still classified as consumption in G&S; mark it Non-purchase there</span>` : " (already non-purchase ✓)")).join("<br>");
+
+  const touched = () => { renderOffsets(); renderImpact(); saveOffsets(); };
+  $("offsetrows").querySelectorAll("input,select").forEach(el => el.onchange = () => {
+    const r = OFFSETS.rows[+el.dataset.i];
+    r[el.dataset.k] = el.dataset.k === "label" || el.dataset.k === "cat" ? el.value : +el.value;
+    touched();
+  });
+  $("offsetrows").querySelectorAll(".del").forEach(b => b.onclick = () => { OFFSETS.rows.splice(+b.dataset.i, 1); touched(); });
+  $("offsetadd").onclick = () => { OFFSETS.rows.push({label: "", cat: "gs", dollars: 0, price: 600}); touched(); };
 }
 
 // ---------- main tabs ----------
 function setMainTab(t) {
-  for (const key of ["travel", "home", "food", "gs", "total"]) {
+  for (const key of ["travel", "home", "food", "gs", "offsets", "total"]) {
     $("mtab-" + key).className = key === t ? "active" : "";
     (key === "gs" ? document.querySelector(".panes") : $("pane-" + key)).hidden = key !== t;
   }
   if (t === "total") renderTotal();
 }
-["travel", "home", "food", "gs", "total"].forEach(key => $("mtab-" + key).onclick = () => setMainTab(key));
+["travel", "home", "food", "gs", "offsets", "total"].forEach(key => $("mtab-" + key).onclick = () => setMainTab(key));
 
 // ---------- emissions chart (ported from v1) ----------
 const GOODS_COLORS = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)"];
@@ -1412,6 +1519,7 @@ $("window").textContent = DATA
 renderTravel();
 renderHome();
 renderFood();
+renderOffsets();
 renderAll();
 </script>
 </body>

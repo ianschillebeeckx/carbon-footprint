@@ -16,6 +16,7 @@ V2_FILE = Path("data/v2_classified.json")
 TRAVEL_FILE = Path("data/v2_travel.json")
 HOME_FILE = Path("data/v2_home.json")
 FOOD_FILE = Path("data/v2_food.json")
+OFFSETS_FILE = Path("data/v2_offsets.json")
 
 # The CoolClimate calculator app's origin — the only site allowed to fetch
 # /api/values (used by the prefill bookmarklet running on that page).
@@ -61,6 +62,7 @@ class Handler(BaseHTTPRequestHandler):
             html = html.replace("/*__TRAVEL__*/null", TRAVEL_FILE.read_text() if TRAVEL_FILE.exists() else "null")
             html = html.replace("/*__HOME__*/null", HOME_FILE.read_text() if HOME_FILE.exists() else "null")
             html = html.replace("/*__FOOD__*/null", FOOD_FILE.read_text() if FOOD_FILE.exists() else "null")
+            html = html.replace("/*__OFFSETS__*/null", OFFSETS_FILE.read_text() if OFFSETS_FILE.exists() else "null")
             self._send(200, html.encode(), "text/html; charset=utf-8")
         elif path == "/api/status":
             self._send(200, {"has_session": fetch.has_session(), "has_data": VALUES_FILE.exists()})
@@ -111,9 +113,10 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as e:
                     return self._send(400, {"error": str(e)})
                 self._send(200, {"ok": True})
-            elif self.path in ("/api/v2/travel", "/api/v2/home", "/api/v2/food"):
+            elif self.path in ("/api/v2/travel", "/api/v2/home", "/api/v2/food", "/api/v2/offsets"):
                 body = self._json_body()
-                f = {"travel": TRAVEL_FILE, "home": HOME_FILE, "food": FOOD_FILE}[self.path.rsplit("/", 1)[1]]
+                f = {"travel": TRAVEL_FILE, "home": HOME_FILE, "food": FOOD_FILE,
+                     "offsets": OFFSETS_FILE}[self.path.rsplit("/", 1)[1]]
                 f.parent.mkdir(exist_ok=True)
                 f.write_text(json.dumps(body, indent=1))
                 self._send(200, {"ok": True})
