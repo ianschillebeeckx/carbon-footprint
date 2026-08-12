@@ -184,27 +184,6 @@
   <button id="mtab-food">Food</button>
   <button id="mtab-gs" class="active">Goods &amp; Services</button>
   <button id="mtab-total">Total</button>
-  <div class="tmode" id="gsmode" style="align-self:center;margin-left:6px;margin-bottom:4px">
-    <button data-m="overview">Overview</button><button data-m="monthly">Monthly detail</button>
-  </div>
-</div>
-
-<div id="gs-overview" class="mainpane" hidden>
-  <div class="tpane">
-  <div class="tcol">
-    <div class="tcard">
-      <h3>Goods <span class="tkg" id="gso-goods"></span></h3>
-      <div id="gso-goodsrows"></div>
-    </div>
-    <div class="tcard">
-      <h3>Services <span class="tkg" id="gso-services"></span></h3>
-      <div id="gso-servicesrows"></div>
-    </div>
-    <div class="tcard tsum">G&amp;S footprint: <b id="gso-total">–</b>
-      <span class="hint" style="display:block;margin-top:4px">Monthly averages over the uploaded window, bottom-up from each transaction's NAICS factor. Switch to Monthly detail to see the month-by-month chart and correct transactions or merchant rules.</span></div>
-  </div>
-  <aside class="taside"><div class="tcard"><h3>G&amp;S breakdown</h3><div id="fig-gs"></div></div></aside>
-  </div>
 </div>
 
 <div id="pane-total" class="mainpane" hidden>
@@ -348,11 +327,15 @@
   </div>
 
   <div id="chartpane">
-    <h2 style="margin-top:0">Emissions by month (kg CO₂e) — goods | services</h2>
-    <div id="chart-host"></div>
-    <div class="legend" id="chart-legend"></div>
+    <h2 style="margin-top:0" id="chart-title">G&amp;S emissions — overall (kg/mo)</h2>
+    <div class="tmode" id="chartmode" style="margin-bottom:10px">
+      <button data-m="overall" class="active">Overall</button><button data-m="monthly">By month</button>
+    </div>
+    <div id="fig-gs"></div>
+    <div id="chart-host" hidden></div>
+    <div class="legend" id="chart-legend" hidden></div>
     <div id="chart-tip"></div>
-    <p class="hint" style="margin-top:12px">Computed bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Each month shows a Goods bar (left) and a Services bar (right); the top three categories of each get their own color, the rest fold into a remainder.</p>
+    <p class="hint" style="margin-top:12px" id="chart-note">Average kg CO₂e per month by category, bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Hover a segment for its share.</p>
   </div>
 </div>
 
@@ -1119,16 +1102,42 @@ function travelParts() {
 }
 
 // vertical stacked bar + legend (parts: [{label, kg, color}])
-function vstack(hostId, parts) {
+function vstack(hostId, parts, valFmt) {
   const host = $(hostId);
   if (!host) return;
+  const fv = valFmt || (kg => `${(kg / 1000).toFixed(2)} t`);
   const total = parts.reduce((a, p) => a + p.kg, 0);
   const bar = parts.filter(p => p.kg > 0).map(p =>
-    `<span class="vseg" style="height:${total ? (p.kg / total * 100).toFixed(2) : 0}%;background:${p.color}" title="${esc(p.label)}: ${fmt(p.kg)} kg/yr (${total ? Math.round(p.kg / total * 100) : 0}%)"></span>`).join("");
+    `<span class="vseg" style="height:${total ? (p.kg / total * 100).toFixed(2) : 0}%;background:${p.color}" title="${esc(p.label)}: ${fv(p.kg)} (${total ? Math.round(p.kg / total * 100) : 0}%)"></span>`).join("");
   const leg = parts.map(p =>
-    `<div class="lrow"><span class="sw" style="background:${p.color}"></span><span>${esc(p.label)}</span><span class="lv">${(p.kg / 1000).toFixed(2)} t</span></div>`).join("");
+    `<div class="lrow"><span class="sw" style="background:${p.color}"></span><span>${esc(p.label)}</span><span class="lv">${fv(p.kg)}</span></div>`).join("");
   host.innerHTML = `<div class="vwrap"><div class="vbar">${bar}</div><div class="vleg">${leg}</div></div>`;
 }
+
+// G&S overall: one stacked bar of category kg/mo (colors match the Total tab)
+function renderGsFig() {
+  if (!$("fig-gs")) return;
+  if (!DATA) { $("fig-gs").innerHTML = '<p class="hint">Upload a CSV to see the breakdown.</p>'; return; }
+  const { per, months } = stats();
+  const parts = [];
+  for (const section of ["Goods", "Services"]) {
+    CAT_ORDER.filter(c => DATA.categories[c].section === section)
+      .forEach((c, i) => parts.push({label: DATA.categories[c].label, color: PAL[i % 8], kg: per[c].kg / months}));
+  }
+  parts.sort((a, b) => b.kg - a.kg);
+  vstack("fig-gs", parts.filter(p => p.kg > 0), kg => `${fmt(kg)} kg/mo`);
+}
+
+function setChartMode(m) {
+  $("chartmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === m ? "active" : "");
+  $("fig-gs").hidden = m !== "overall";
+  $("chart-host").hidden = $("chart-legend").hidden = m !== "monthly";
+  $("chart-title").textContent = m === "overall" ? "G&S emissions — overall (kg/mo)" : "G&S emissions by month (kg CO₂e)";
+  $("chart-note").textContent = m === "overall"
+    ? "Average kg CO₂e per month by category, bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Hover a segment for its share."
+    : "Each month shows a Goods bar (left) and a Services bar (right); the top three categories of each get their own color, the rest fold into a remainder.";
+}
+$("chartmode").querySelectorAll("button").forEach(b => b.onclick = () => setChartMode(b.dataset.m));
 
 function renderTravelFig() {
   vstack("fig-travel", travelParts().map((r, i) => ({label: r.label, kg: r.kg, color: PAL[i % 8]})));
@@ -1171,57 +1180,15 @@ function renderTotal() {
   $("total-tons").textContent = `${(total / 1000).toFixed(1)} t CO₂e/yr · CoolClimate avg 43.3`;
 }
 
-function renderGsOverview() {
-  if (!$("gso-goodsrows")) return;
-  if (!DATA) {
-    $("gso-goodsrows").innerHTML = '<p class="hint">Upload a transactions CSV to see categories.</p>';
-    $("gso-servicesrows").innerHTML = "";
-    $("gso-goods").textContent = $("gso-services").textContent = "";
-    $("gso-total").textContent = "–";
-    vstack("fig-gs", []);
-    return;
-  }
-  const { per, months, totalKg, totalDollars } = stats();
-  const maxKg = Math.max(1, ...CAT_ORDER.filter(c => DATA.categories[c].section !== "Excluded").map(c => per[c].kg / months));
-  const sectionParts = section => CAT_ORDER
-    .filter(c => DATA.categories[c].section === section)
-    .map((c, i) => ({c, label: DATA.categories[c].label, color: PAL[i % 8],
-                     d: per[c].dollars / months, kg: per[c].kg / months}))
-    .filter(o => o.d !== 0 || o.kg !== 0)
-    .sort((a, b) => b.kg - a.kg);
-  const renderSection = (section, rowsId, totId) => {
-    const parts = sectionParts(section);
-    $(rowsId).innerHTML = parts.map(o =>
-      `<div class="hbrow"><span class="hlbl" title="${esc(o.label)}">${esc(o.label)}</span>` +
-      `<span class="htrack"><span class="hseg" style="width:${(Math.max(o.kg, 0) / maxKg * 100).toFixed(2)}%;background:${o.color}" title="${esc(o.label)}: ${fmt(o.kg)} kg/mo · ${o.d > 0 ? (o.kg / o.d).toFixed(2) : "–"} kg/$"></span></span>` +
-      `<span class="hval" style="flex-basis:11em" title="${o.d > 0 ? (o.kg / o.d).toFixed(2) : "–"} kg/$">${fmt(o.d)} $/mo · ${fmt(o.kg)} kg/mo</span></div>`).join("");
-    const D = parts.reduce((a, o) => a + o.d, 0), K = parts.reduce((a, o) => a + o.kg, 0);
-    $(totId).textContent = `${fmt(D)} $/mo · ${fmt(K)} kg/mo`;
-    return parts;
-  };
-  const g = renderSection("Goods", "gso-goodsrows", "gso-goods");
-  const sv = renderSection("Services", "gso-servicesrows", "gso-services");
-  $("gso-total").textContent = `${(totalKg / months * 12 / 1000).toFixed(1)} t CO₂e/yr · ${fmt(totalDollars / months)} $/mo`;
-  vstack("fig-gs", g.concat(sv).map(o => ({label: o.label, kg: o.kg * 12, color: o.color})));
-}
-
 // ---------- main tabs ----------
-const MTABS = ["travel", "home", "food", "gs", "total"];
-let gsView = "overview";
 function setMainTab(t) {
-  ui.mtab = t;
-  for (const key of MTABS) $("mtab-" + key).className = key === t ? "active" : "";
-  for (const key of ["travel", "home", "food", "total"]) $("pane-" + key).hidden = key !== t;
-  $("gs-overview").hidden = !(t === "gs" && gsView === "overview");
-  document.querySelector(".panes").hidden = !(t === "gs" && gsView === "monthly");
-  const gm = $("gsmode");
-  gm.hidden = t !== "gs";
-  gm.querySelectorAll("button").forEach(b => b.className = b.dataset.m === gsView ? "active" : "");
+  for (const key of ["travel", "home", "food", "gs", "total"]) {
+    $("mtab-" + key).className = key === t ? "active" : "";
+    (key === "gs" ? document.querySelector(".panes") : $("pane-" + key)).hidden = key !== t;
+  }
   if (t === "total") renderTotal();
-  if (t === "gs" && gsView === "overview") renderGsOverview();
 }
-MTABS.forEach(key => $("mtab-" + key).onclick = () => setMainTab(key));
-$("gsmode").querySelectorAll("button").forEach(b => b.onclick = () => { gsView = b.dataset.m; setMainTab("gs"); });
+["travel", "home", "food", "gs", "total"].forEach(key => $("mtab-" + key).onclick = () => setMainTab(key));
 
 // ---------- emissions chart (ported from v1) ----------
 const GOODS_COLORS = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)"];
@@ -1389,7 +1356,7 @@ function renderChart() {
   });
 }
 
-function renderAll() { renderImpact(); renderCats(); renderChart(); renderLeft(); renderGsOverview(); }
+function renderAll() { renderImpact(); renderCats(); renderChart(); renderGsFig(); renderLeft(); }
 $("window").textContent = DATA
   ? `${DATA.meta.start || "?"} → ${DATA.meta.end || "?"} · ${DATA.meta.months} months · ${DATA.meta.count} transactions`
   : "No data — upload a transactions CSV (needs Merchant + Amount columns; Category helps)";
@@ -1397,7 +1364,6 @@ renderTravel();
 renderHome();
 renderFood();
 renderAll();
-setMainTab("gs");
 </script>
 </body>
 </html>
