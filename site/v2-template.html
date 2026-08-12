@@ -204,6 +204,17 @@
       <button class="tadd" id="offsetadd">+ purchase</button>
     </div>
     <div class="tcard">
+      <h3>Recycling &amp; compost
+        <button class="info" aria-label="About recycling and compost" data-tip="Avoided-emission credits, not purchases. Recycling: EPA's equivalency of ~2.9 t CO₂e avoided per ton of mixed recyclables vs landfilling (materials offset virgin production, so it's credited against Goods &amp; Services). Compost: EPA WARM ~0.6 t CO₂e per ton of food scraps diverted from landfill (avoided methane; credited against Food). These are avoidance estimates — softer than paid removal, and your curbside program's actual fate of materials varies.">?</button>
+        <span class="tkg" id="kg-recycle"></span></h3>
+      <div class="tvrow"><label>Recycling (paper, plastic, glass, metal):</label>
+        <input type="number" min="0" step="1" id="recyclelbs" style="width:66px" aria-label="Recycling pounds per week"><label>lbs/wk</label>
+        <span class="rowkg" id="recyclekg"></span></div>
+      <div class="tvrow"><label>Compost (food scraps, yard waste):</label>
+        <input type="number" min="0" step="1" id="compostlbs" style="width:66px" aria-label="Compost pounds per week"><label>lbs/wk</label>
+        <span class="rowkg" id="compostkg"></span></div>
+    </div>
+    <div class="tcard">
       <h3>Cross-check from your transactions
         <button class="info" aria-label="About the offsets cross-check" data-tip="Transactions whose merchant looks like an offset/removal provider (Charm, Climeworks, Wren, Terrapass, Tradewater…). Two things to do with a match: enter it as a purchase here, and mark the transaction Non-purchase in Goods &amp; Services so the spend itself doesn't count as consumption emissions (it usually lands in charity/services otherwise).">?</button></h3>
       <div id="offsetxrows" class="hint"></div>
@@ -1275,7 +1286,13 @@ function renderTotal() {
 // ---------- Offsets tab ----------
 const OFFSETS_SAVED = /*__OFFSETS__*/null;
 const OFFSET_CATS = {travel: "Travel", home: "Home", food: "Food", gs: "Goods & Services"};
-const OFFSETS = OFFSETS_SAVED || {rows: [{label: "Charm Industrial", cat: "gs", dollars: 0, price: 600}]};
+const OFFSETS = OFFSETS_SAVED || {rows: [{label: "Charm Industrial", cat: "gs", dollars: 0, price: 600}], recycle_lbs: 0, compost_lbs: 0};
+if (OFFSETS.recycle_lbs == null) OFFSETS.recycle_lbs = 0;
+if (OFFSETS.compost_lbs == null) OFFSETS.compost_lbs = 0;
+
+// avoided t CO2e per (lb/week) over a year: lbs/wk x 52 / 2000 tons/yr x factor
+const RECYCLE_T_PER_LBWK = 52 / 2000 * 2.9;   // EPA equivalencies, mixed recyclables vs landfill
+const COMPOST_T_PER_LBWK = 52 / 2000 * 0.6;   // EPA WARM, food scraps diverted from landfill
 
 function offsetTons() {
   const per = {travel: 0, home: 0, food: 0, gs: 0};
@@ -1283,6 +1300,8 @@ function offsetTons() {
     const t = (+r.dollars || 0) / Math.max(+r.price || 0, 1);
     per[r.cat in per ? r.cat : "gs"] += t;
   }
+  per.gs += (+OFFSETS.recycle_lbs || 0) * RECYCLE_T_PER_LBWK;    // recycling displaces virgin goods production
+  per.food += (+OFFSETS.compost_lbs || 0) * COMPOST_T_PER_LBWK;  // compost avoids landfill methane from food
   return {per, total: per.travel + per.home + per.food + per.gs};
 }
 
@@ -1322,8 +1341,15 @@ function renderOffsets() {
       `</div>`;
   }).join("");
 
+  $("recyclelbs").value = +OFFSETS.recycle_lbs || 0;
+  $("compostlbs").value = +OFFSETS.compost_lbs || 0;
+  const rT = (+OFFSETS.recycle_lbs || 0) * RECYCLE_T_PER_LBWK, cT = (+OFFSETS.compost_lbs || 0) * COMPOST_T_PER_LBWK;
+  $("recyclekg").textContent = `−${rT.toFixed(2)} t/yr → G&S`;
+  $("compostkg").textContent = `−${cT.toFixed(2)} t/yr → Food`;
+  $("kg-recycle").textContent = `−${(rT + cT).toFixed(2)} t/yr`;
+
   const off = offsetTons();
-  $("kg-offsets").textContent = `−${off.total.toFixed(2)} t/yr`;
+  $("kg-offsets").textContent = `−${(off.total - rT - cT).toFixed(2)} t/yr`;
   $("kg-offsets-total").textContent = `−${off.total.toFixed(2)} t CO₂e/yr`;
   vstack("fig-offsets", Object.entries(OFFSET_CATS).map(([k, l], i) =>
     ({label: l, kg: off.per[k] * 1000, color: PAL[i % 8]})).filter(p => p.kg > 0),
@@ -1343,6 +1369,8 @@ function renderOffsets() {
   });
   $("offsetrows").querySelectorAll(".del").forEach(b => b.onclick = () => { OFFSETS.rows.splice(+b.dataset.i, 1); touched(); });
   $("offsetadd").onclick = () => { OFFSETS.rows.push({label: "", cat: "gs", dollars: 0, price: 600}); touched(); };
+  $("recyclelbs").onchange = () => { OFFSETS.recycle_lbs = Math.max(0, +$("recyclelbs").value || 0); touched(); };
+  $("compostlbs").onchange = () => { OFFSETS.compost_lbs = Math.max(0, +$("compostlbs").value || 0); touched(); };
 }
 
 // ---------- main tabs ----------
