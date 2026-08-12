@@ -66,6 +66,15 @@
   .hbrow .hseg:first-child { border-radius: 4px 0 0 4px; }
   .hbrow .havg { position: absolute; top: -3px; width: 2px; height: 20px; background: var(--warn); }
   .hbrow .hval { flex: 0 0 4.5em; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 0.72rem; text-align: right; }
+  .tpane { display: flex; gap: 16px; align-items: flex-start; }
+  .tpane > .tcol { flex: 1 1 auto; min-width: 0; }
+  .taside { flex: 0 0 250px; position: sticky; top: 0; }
+  @media (max-width: 900px) { .tpane { flex-direction: column; } .taside { position: static; width: 100%; } }
+  .vwrap { display: flex; gap: 12px; align-items: stretch; }
+  .vbar { width: 44px; min-height: 240px; display: flex; flex-direction: column-reverse; border-radius: 6px; overflow: hidden; background: var(--chip); flex: none; }
+  .vseg { width: 100%; }
+  .vleg { flex: 1; display: flex; flex-direction: column; gap: 4px; justify-content: flex-end; font-size: 0.72rem; }
+  .maintabs button small { font-family: var(--mono); font-size: 0.7rem; opacity: 0.75; margin-left: 4px; }
   .panes { flex: 1; display: flex; min-height: 0; }
   /* visual order: categories | chart | transactions (flex `order`, DOM unchanged) */
   #right { order: 1; flex: 0 0 360px; overflow-y: auto; padding: 14px 18px 40px; border-right: 1px solid var(--line); }
@@ -190,6 +199,7 @@
 </div>
 
 <div id="pane-travel" class="mainpane" hidden>
+  <div class="tpane">
   <div class="tcol">
     <div class="tcard" id="tc-vehicles">
       <h3>Vehicles
@@ -216,14 +226,16 @@
       </div>
       <div id="airrows"></div>
     </div>
-    <div class="tcard"><h3>Travel breakdown <span class="tkg"></span></h3><div id="fig-travel"></div></div>
     <div class="tcard tsum">Travel footprint: <b id="kg-travel-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
     <p class="hint">Sources — Air: <a href="https://www.epa.gov/climateleadership/ghg-emission-factors-hub" target="_blank" rel="noopener">EPA GHG Emission Factors Hub (2025)</a> per-haul passenger-mile factors, plus ~21% well-to-tank fuel-production uplift per the <a href="https://theicct.org/wp-content/uploads/2021/08/update-well-to-wake-co2-aug21-1.pdf" target="_blank" rel="noopener">ICCT well-to-wake analysis</a> (CORSIA baseline 89 vs 73.2 gCO₂e/MJ); excludes contrail/non-CO₂ effects. Vehicles &amp; transit: <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator factors, measured from their API (see data/coolclimate_travel_factors.json).</p>
   </div>
+  <aside class="taside"><div class="tcard"><h3>Travel breakdown</h3><div id="fig-travel"></div></div></aside>
+  </div>
 </div>
 
 <div id="pane-home" class="mainpane" hidden>
+  <div class="tpane">
   <div class="tcol">
     <div class="tcard">
       <h3>Electricity
@@ -252,13 +264,15 @@
         <span class="tkg" id="kg-sqft"></span></h3>
       <div class="tvrow"><label>Home size:</label><input type="number" min="0" step="50" id="sqftinput" value="0" aria-label="Home square feet"><label>sq ft</label><span class="rowkg">0.93 kg/sqft·yr</span></div>
     </div>
-    <div class="tcard"><h3>Home breakdown <span class="tkg"></span></h3><div id="fig-home"></div></div>
     <div class="tcard tsum">Home footprint: <b id="kg-home-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
     <p class="hint">Sources — electricity/gas/oil/construction factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API for zip 94110 (grid intensity is location-specific). Water &amp; sewage is deliberately omitted: physically it is ~4.25 kWh per 1,000 gallons (EPA/EPRI) ≈ 25–110 kg CO₂e/yr for typical households — a rounding error (CoolClimate's much larger water figure is expenditure-based and double-counts water heating).</p>
   </div>
+  <aside class="taside"><div class="tcard"><h3>Home breakdown</h3><div id="fig-home"></div></div></aside>
+  </div>
 </div>
 <div id="pane-food" class="mainpane" hidden>
+  <div class="tpane">
   <div class="tcol">
     <div class="tcard">
       <h3>Diet — servings per person, per week
@@ -274,10 +288,11 @@
         <span class="tkg" id="kg-food-txn"></span></h3>
       <div id="foodxrows" class="hint"></div>
     </div>
-    <div class="tcard"><h3>Food breakdown <span class="tkg"></span></h3><div id="fig-food"></div></div>
     <div class="tcard tsum">Food footprint (diet-based): <b id="kg-food-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; the diet estimate is what's included in the impact totals above. Inputs save automatically.</span></div>
     <p class="hint">Sources — diet factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API (linear in calories; meat-type detail enabled). Transactions cross-check: grocery composite per the project's NAICS mapping notes (§3), restaurant factors from EPA/USEEIO.</p>
+  </div>
+  <aside class="taside"><div class="tcard"><h3>Food breakdown</h3><div id="fig-food"></div></div></aside>
   </div>
 </div>
 
@@ -391,7 +406,13 @@ function renderImpact() {
   const tons = gsTons + travelTons + homeTons + foodTons;
   const annualSpend = totalDollars / months * 12;
   $("imp-tons").innerHTML = `${tons.toFixed(1)} <small>t CO₂e/yr</small>`;
-  $("imp-split").textContent = `G&S ${gsTons.toFixed(1)} · travel ${travelTons.toFixed(1)} · home ${homeTons.toFixed(1)} · food ${foodTons.toFixed(1)} t`;
+  const pct = v => tons > 0 ? `${Math.round(v / tons * 100)}%` : "–";
+  $("imp-split").textContent = `G&S ${pct(gsTons)} · travel ${pct(travelTons)} · home ${pct(homeTons)} · food ${pct(foodTons)}`;
+  $("mtab-travel").innerHTML = `Travel <small>${travelTons.toFixed(1)}t</small>`;
+  $("mtab-home").innerHTML = `Home <small>${homeTons.toFixed(1)}t</small>`;
+  $("mtab-food").innerHTML = `Food <small>${foodTons.toFixed(1)}t</small>`;
+  $("mtab-gs").innerHTML = `Goods &amp; Services <small>${gsTons.toFixed(1)}t</small>`;
+  $("mtab-total").innerHTML = `Total <small>${tons.toFixed(1)}t</small>`;
   const damage = tons * 240, offset = tons * 600;
   $("imp-damage").innerHTML = `$${fmt(damage)} <small>/yr</small>`;
   $("imp-damage-pct").textContent = annualSpend ? `${(damage/annualSpend*100).toFixed(1)}% of G&S spending` : "";
@@ -1047,7 +1068,7 @@ function renderFood() {
 const PAL = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)", "var(--s7)", "var(--s8)"];
 
 // rows: [{label, segs: [{kg, color, title}], avg}] — kg annual; avg = amber reference tick
-function hbars(hostId, rows, scaleMax) {
+function hbars(hostId, rows, scaleMax, grand) {
   const host = $(hostId);
   if (!host) return;
   const max = Math.max(scaleMax || 0, 1,
@@ -1057,7 +1078,8 @@ function hbars(hostId, rows, scaleMax) {
     const segs = r.segs.filter(s => s.kg > 0).map(s =>
       `<span class="hseg" style="width:${(s.kg / max * 100).toFixed(2)}%;background:${s.color}" title="${esc(s.title)}: ${fmt(s.kg)} kg/yr (${tot ? Math.round(s.kg / tot * 100) : 0}%)"></span>`).join("");
     const avg = r.avg ? `<span class="havg" style="left:${Math.min(r.avg / max * 100, 100).toFixed(2)}%" title="CoolClimate average household: ${(r.avg / 1000).toFixed(1)} t/yr"></span>` : "";
-    return `<div class="hbrow"><span class="hlbl" title="${esc(r.label)}">${esc(r.label)}</span><span class="htrack">${segs}${avg}</span><span class="hval">${(tot / 1000).toFixed(2)} t</span></div>`;
+    const val = grand ? `${grand > 0 ? Math.round(tot / grand * 100) : 0}%` : `${(tot / 1000).toFixed(2)} t`;
+    return `<div class="hbrow"><span class="hlbl" title="${esc(r.label)}">${esc(r.label)}</span><span class="htrack">${segs}${avg}</span><span class="hval" title="${(tot / 1000).toFixed(2)} t/yr">${val}</span></div>`;
   }).join("");
 }
 
@@ -1075,20 +1097,32 @@ function travelParts() {
   return rows;
 }
 
+// vertical stacked bar + legend (parts: [{label, kg, color}])
+function vstack(hostId, parts) {
+  const host = $(hostId);
+  if (!host) return;
+  const total = parts.reduce((a, p) => a + p.kg, 0);
+  const bar = parts.filter(p => p.kg > 0).map(p =>
+    `<span class="vseg" style="height:${total ? (p.kg / total * 100).toFixed(2) : 0}%;background:${p.color}" title="${esc(p.label)}: ${fmt(p.kg)} kg/yr (${total ? Math.round(p.kg / total * 100) : 0}%)"></span>`).join("");
+  const leg = parts.map(p =>
+    `<div class="lrow"><span class="sw" style="background:${p.color}"></span><span>${esc(p.label)}</span><span class="lv">${(p.kg / 1000).toFixed(2)} t</span></div>`).join("");
+  host.innerHTML = `<div class="vwrap"><div class="vbar">${bar}</div><div class="vleg">${leg}</div></div>`;
+}
+
 function renderTravelFig() {
-  hbars("fig-travel", travelParts().map((r, i) => ({label: r.label, segs: [{kg: r.kg, color: PAL[i % 8], title: r.label}]})));
+  vstack("fig-travel", travelParts().map((r, i) => ({label: r.label, kg: r.kg, color: PAL[i % 8]})));
 }
 function renderHomeFig() {
   const k = homeKg();
-  hbars("fig-home", [["Electricity", k.elec], ["Natural gas", k.gas], ["Heating oil", k.oil], ["Construction", k.sqft]]
-    .map(([label, kg], i) => ({label, segs: [{kg, color: PAL[i % 8], title: label}]})));
+  vstack("fig-home", [["Electricity", k.elec], ["Natural gas", k.gas], ["Heating oil", k.oil], ["Construction", k.sqft]]
+    .map(([label, kg], i) => ({label, kg, color: PAL[i % 8]})));
 }
 function renderFoodFig() {
   const size = Math.max(1, +FOOD.size || 1);
-  const rows = Object.entries(FF).map(([k, v], i) =>
-    ({label: v.label, segs: [{kg: foodCalDay(k) * size * v.f, color: PAL[i % 8], title: v.label}]}));
-  rows.sort((a, b) => b.segs[0].kg - a.segs[0].kg);
-  hbars("fig-food", rows);
+  const parts = Object.entries(FF).map(([k, v], i) =>
+    ({label: v.label, kg: foodCalDay(k) * size * v.f, color: PAL[i % 8]}));
+  parts.sort((a, b) => b.kg - a.kg);   // color follows the group, order follows size
+  vstack("fig-food", parts);
 }
 
 // CoolClimate average household for this zip/size (measured defaults), kg/yr
@@ -1111,8 +1145,8 @@ function renderTotal() {
     {label: "Goods", avg: CC_AVG.goods, segs: secSegs("Goods")},
     {label: "Services", avg: CC_AVG.services, segs: secSegs("Services")},
   ];
-  hbars("fig-total", rows);
   const total = rows.reduce((a, r) => a + r.segs.reduce((x, s) => x + s.kg, 0), 0);
+  hbars("fig-total", rows, 0, total);
   $("total-tons").textContent = `${(total / 1000).toFixed(1)} t CO₂e/yr · CoolClimate avg 43.3`;
 }
 
