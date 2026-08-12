@@ -1139,7 +1139,7 @@ function renderGsFig() {
   const tyr = kg => (kg * 12 / 1000).toFixed(2);
   const col = (label, parts, tot) => {
     const segs = parts.map(p =>
-      `<span class="vseg" style="height:${tot ? (p.kg / tot * 100).toFixed(2) : 0}%;background:${p.color}" data-tip="${esc(p.label)}: ${tyr(p.kg)} t/yr (${tot ? Math.round(p.kg / tot * 100) : 0}%)"></span>`).join("");
+      `<span class="vseg" style="height:${tot ? (p.kg / tot * 100).toFixed(2) : 0}%;background:${p.color}" data-tip="${esc(p.label)}\n${tyr(p.kg)} t/yr (${tot ? Math.round(p.kg / tot * 100) : 0}%)"></span>`).join("");
     return `<div class="vcol"><div class="vbarwrap"><div class="vbar" style="height:${(tot / maxTot * 100).toFixed(2)}%">${segs}</div></div><small>${label}<br>${tyr(tot)} t/yr</small></div>`;
   };
   overallLegend = [["Goods", goods], ["Services", services]].map(([h, ps]) =>
