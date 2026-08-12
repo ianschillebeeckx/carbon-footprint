@@ -989,7 +989,8 @@ function renderFood() {
   $("foodrows").innerHTML = Object.entries(FF).map(([k, v]) =>
     `<div class="tvrow"><label>${v.label}:</label>` +
     `<input type="number" min="0" step="0.5" value="${+FOOD.sv[k] || 0}" data-f="${k}" style="width:72px" aria-label="${v.label} servings per week"><label>servings/wk</label>` +
-    `<span class="rowkg">≈${fmt(foodCalDay(k))} cal/day · ${fmt(foodCalDay(k) * size * v.f)} kg/yr</span></div>`).join("");
+    `<span class="rowkg" title="${(v.f / 365 * 1000).toFixed(1)} g CO₂e per calorie · ${(v.f / 365 * v.cps).toFixed(2)} kg per serving">` +
+      `${(v.f / 365 * 1000).toFixed(1)} g/cal · ${(v.f / 365 * v.cps).toFixed(2)} kg/sv · ${fmt(foodCalDay(k) * size * v.f)} kg/yr</span></div>`).join("");
   const totalCal = Object.keys(FF).reduce((a, k) => a + foodCalDay(k), 0);
   const kg = foodKg();
   $("kg-food-diet").textContent = `≈${fmt(totalCal)} cal/person·day · ${fmt(kg)} kg/yr`;
