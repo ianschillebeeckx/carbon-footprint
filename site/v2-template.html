@@ -227,14 +227,11 @@
     </div>
     <div class="tcard">
       <h3>Water &amp; sewage
-        <button class="info" aria-label="About water emissions" data-tip="CoolClimate's water & sewage model: kg = slider × baseline × 3.28 kg CO₂e per liter/day-year (pumping, treatment, water heating, sewage). Their 1x baseline scales with zip, household size AND income — SF at average income: 237/394/428/500/543 L/day for 1–5+ people; top income bracket runs ~25% higher (3-person: 549 → 1.80 t at 1x). Picking a household size resets the baseline to their average-income default; edit the baseline directly to match your CoolClimate profile. US-average household: ~300 gal/day ≈ 1,135 L/day (EPA WaterSense).">?</button>
+        <button class="info" aria-label="About water emissions" data-tip="CoolClimate's water & sewage factor: 3.28 kg CO₂e per liter/day-year (12.4 per gallon/day-year) for pumping, treatment, water heating, and sewage. Enter your household's total use in gallons/day — your water bill usually shows it (often in CCF: 1 CCF ≈ 748 gallons; divide the billing period's days). Reference points: SF average household ≈ 113 gal/day; US average ≈ 300 gal/day, ~82 gal/day per person (EPA WaterSense).">?</button>
         <span class="tkg" id="kg-water"></span></h3>
-      <div class="tvrow"><label>Household:</label>
-        <select id="watersize" aria-label="Household size"><option value="1">1 person</option><option value="2">2 people</option><option value="3">3 people</option><option value="4">4 people</option><option value="5">5+ people</option></select>
-        <label>1x baseline:</label><input type="number" min="1" step="10" id="waterbase" style="width:80px" aria-label="1x baseline liters per day"><label>L/day</label></div>
-      <div class="tvrow"><input type="range" id="waterslider" min="0" max="3" step="0.05" value="1" style="flex:1;max-width:300px" aria-label="Water use relative to average">
+      <div class="tvrow"><label>Water use:</label>
+        <input type="number" min="0" step="10" id="watergal" aria-label="Water use gallons per day"><label>gal/day</label>
         <span class="rowkg" id="waterlabel"></span></div>
-      <div class="tvrow" style="justify-content:space-between;max-width:300px;color:var(--muted);font-size:0.7rem"><span>0</span><span>1x</span><span>2x</span><span>3x</span></div>
     </div>
     <div class="tcard">
       <h3>Home construction
@@ -837,22 +834,21 @@ const HF = {
   gasDollarsPerTherm: 2.015,    // $830 -> 411.9 therms
   oilPerGallon: 11.793 + 3.066,
   oilDollarsPerGallon: 3.0,
-  waterPerLday: 3.2765,         // kg per (liter/day) per year
-  // CoolClimate 1x baseline scales with household size (L/day, SF zips)
-  waterBase: {1: 237, 2: 394, 3: 428, 4: 500, 5: 543},
+  waterPerGalday: 3.2765 * 3.78541,   // CoolClimate 3.2765 kg per (L/day)-yr -> 12.40 per (gal/day)-yr
   sqftPerYear: 0.93,
-  LDAY_TO_GALDAY: 0.264172,
 };
 const HOME = HOME_SAVED || {
   elec: {mode: "kwh", kwh: 0, dollars: 0, clean: 0},
   gas: {mode: "therms", therms: 0, dollars: 0},
   oil: {mode: "gallons", gallons: 0, dollars: 0},
-  water: {mult: 1, size: 3, base: 428},
+  water: {galday: 0},
   sqft: 0,
 };
-HOME.water.size = HF.waterBase[+HOME.water.size] ? +HOME.water.size : 3;
-if (!(+HOME.water.base > 0)) HOME.water.base = HF.waterBase[HOME.water.size];
-const waterBase = () => +HOME.water.base || 428;
+// migrate older saved shapes (multiplier x L/day baseline) to gal/day
+if (HOME.water.galday == null) {
+  const lday = (+HOME.water.mult || 0) * (+HOME.water.base || 428);
+  HOME.water = {galday: Math.round(lday * 0.264172)};
+}
 
 function homeKg() {
   const e = HOME.elec, g = HOME.gas, o = HOME.oil;
@@ -862,7 +858,7 @@ function homeKg() {
   const gas = therms * HF.gasPerTherm;
   const gallons = o.mode === "gallons" ? (+o.gallons || 0) : (+o.dollars || 0) / HF.oilDollarsPerGallon;
   const oil = gallons * HF.oilPerGallon;
-  const water = (+HOME.water.mult || 0) * waterBase() * HF.waterPerLday;
+  const water = (+HOME.water.galday || 0) * HF.waterPerGalday;
   const sqft = (+HOME.sqft || 0) * HF.sqftPerYear;
   return {elec, gas, oil, water, sqft, total: elec + gas + oil + water + sqft};
 }
@@ -899,14 +895,9 @@ function renderHome() {
     ? numRow("Heating oil", +o.gallons || 0, 'data-h="oil.gallons" step="10"', "gal/yr", `${HF.oilPerGallon.toFixed(1)} kg/gal`)
     : numRow("Oil bill", +o.dollars || 0, 'data-h="oil.dollars" step="50"', "$/yr", `≈${fmt((+o.dollars || 0) / HF.oilDollarsPerGallon)} gal`);
 
-  $("waterslider").value = +HOME.water.mult || 0;
-  $("watersize").value = HOME.water.size;
-  $("waterbase").value = waterBase();
-  const waterLabel = () => {
-    const lday = (+HOME.water.mult || 0) * waterBase();
-    $("waterlabel").textContent = `${(+HOME.water.mult || 0).toFixed(2)}x average ≈ ${fmt(lday * HF.LDAY_TO_GALDAY)} gal/day (${fmt(lday)} L/day)`;
-  };
-  waterLabel();
+  $("watergal").value = +HOME.water.galday || 0;
+  const g_ = +HOME.water.galday || 0;
+  $("waterlabel").textContent = `${fmt(g_ / 0.264172)} L/day · ${(HF.waterPerGalday).toFixed(1)} kg per gal/day·yr`;
   $("sqftinput").value = +HOME.sqft || 0;
 
   $("kg-elec").textContent = `${fmt(k.elec)} kg/yr`;
@@ -925,18 +916,7 @@ function renderHome() {
   for (const [id, mode] of [["elecmode", "elec"], ["gasmode", "gas"], ["oilmode", "oil"]]) {
     $(id).querySelectorAll("button").forEach(b => b.onclick = () => { HOME[mode].mode = b.dataset.m; touched(); });
   }
-  $("waterslider").oninput = () => {
-    HOME.water.mult = +$("waterslider").value;
-    waterLabel();
-    $("kg-water").textContent = `${fmt(homeKg().water)} kg/yr`;
-  };
-  $("waterslider").onchange = () => { HOME.water.mult = +$("waterslider").value; touched(); };
-  $("watersize").onchange = () => {
-    HOME.water.size = +$("watersize").value;
-    HOME.water.base = HF.waterBase[HOME.water.size];   // size resets baseline to CoolClimate's default
-    touched();
-  };
-  $("waterbase").onchange = () => { HOME.water.base = Math.max(1, +$("waterbase").value || 428); touched(); };
+  $("watergal").onchange = () => { HOME.water.galday = Math.max(0, +$("watergal").value || 0); touched(); };
   $("sqftinput").onchange = () => { HOME.sqft = +$("sqftinput").value || 0; touched(); };
 }
 
