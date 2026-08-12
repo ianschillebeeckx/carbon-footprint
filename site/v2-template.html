@@ -338,6 +338,7 @@
     </div>
     <div id="fig-gs"></div>
     <div id="chart-host" hidden></div>
+    <div class="legend" id="chart-legend"></div>
     <div id="chart-tip"></div>
     <p class="hint" style="margin-top:12px" id="chart-note">Annualized t CO₂e by category, bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Bar heights are scaled to section totals; hover a segment for its share.</p>
   </div>
@@ -1140,12 +1141,20 @@ function renderGsFig() {
       `<span class="vseg" style="height:${tot ? (p.kg / tot * 100).toFixed(2) : 0}%;background:${p.color}" title="${esc(p.label)}: ${tyr(p.kg)} t/yr (${tot ? Math.round(p.kg / tot * 100) : 0}%)"></span>`).join("");
     return `<div class="vcol"><div class="vbarwrap"><div class="vbar" style="height:${(tot / maxTot * 100).toFixed(2)}%">${segs}</div></div><small>${label}<br>${tyr(tot)} t/yr</small></div>`;
   };
-  const legend = [["Goods", goods], ["Services", services]].map(([h, ps]) =>
-    `<div style="font-size:0.66rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:6px">${h}</div>` +
-    ps.map(p => `<div class="lrow"><span class="sw" style="background:${p.color}"></span><span>${esc(p.label)}</span><span class="lv">${tyr(p.kg)}</span></div>`).join("")).join("");
-  $("fig-gs").innerHTML =
-    `<div class="vwrap"><div class="vbars">${col("Goods", goods, gTot)}${col("Services", services, sTot)}</div>` +
-    `<div class="vleg">${legend}</div></div>`;
+  overallLegend = [["Goods", goods], ["Services", services]].map(([h, ps]) =>
+    ({heading: h, rows: ps.map(p => ({label: p.label, color: p.color, val: `${tyr(p.kg)} t/yr`}))}));
+  $("fig-gs").innerHTML = `<div class="vbars">${col("Goods", goods, gTot)}${col("Services", services, sTot)}</div>`;
+  renderChartLegend();
+}
+
+let overallLegend = [], monthlyLegend = [], chartMode = "overall";
+function renderChartLegend() {
+  const legend = $("chart-legend");
+  if (!legend) return;
+  const data = chartMode === "overall" ? overallLegend : monthlyLegend;
+  legend.innerHTML = data.map(g =>
+    `<div style="font-size:0.66rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:6px">${esc(g.heading)}</div>` +
+    g.rows.map(r => `<div class="lrow"><span class="sw" style="background:${r.color}"></span><span>${esc(r.label)}</span><span class="lv">${r.val}</span></div>`).join("")).join("");
 }
 
 function setChartMode(m) {
@@ -1330,6 +1339,12 @@ function renderChart() {
       (mm === "01" || mi === 0) ? `${name} ’${yy.slice(2)}` : name;
   });
   host.appendChild(svg);
+  monthlyLegend = [["Goods (left bar)", goodsSeries], ["Services (right bar)", servicesSeries]].map(([heading, series]) =>
+    ({heading, rows: series.map(sr => {
+      const kg = months.reduce((a, m) => a + kgOf(m, sr), 0);
+      return {label: sr.label, color: sr.color, val: `${fmt(kg / DATA.meta.months)} kg/mo`};
+    })}));
+  renderChartLegend();
 }
 
 // info bubbles (?) — delegated so dynamically re-rendered buttons work too
