@@ -170,7 +170,8 @@
   <span class="window" id="window"></span>
   <span id="upload-msg"></span>
   <button id="reset" class="resetbtn" title="Delete all transactions and every merchant rule">Reset all</button>
-  <label class="filebtn" for="csvfile">Upload CSV</label>
+  <button class="info" aria-label="What to upload" data-tip="A CSV export of your bank/credit-card transactions — Monarch Money's export works as-is. Required columns: Merchant (or Description/Name/Payee) and Amount (negative = spending, positive = refunds/income). Date and Category columns improve results: dates enable the monthly chart and inflation adjustment, and the category is a strong hint for classification. Export ~12 months across ALL accounts and include everything — transfers, card payments, and income are detected and excluded automatically.">?</button>
+  <label class="filebtn" for="csvfile">Upload Transactions</label>
   <input id="csvfile" type="file" accept=".csv,text/csv" hidden>
 </header>
 
@@ -1564,7 +1565,7 @@ function renderChart() {
 function renderAll() { renderImpact(); renderCats(); renderChart(); renderGsFig(); renderLeft(); }
 $("window").textContent = DATA
   ? `${DATA.meta.start || "?"} → ${DATA.meta.end || "?"} · ${DATA.meta.months} months · ${DATA.meta.count} transactions`
-  : "No data — upload a transactions CSV (needs Merchant + Amount columns; Category helps)";
+  : "No data — upload a transactions CSV (Merchant + Amount required; Date and Category help — see the ? by the upload button)";
 renderTravel();
 renderHome();
 renderFood();
