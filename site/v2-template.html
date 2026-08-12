@@ -232,10 +232,10 @@
   <div class="tcol" style="max-width:860px">
     <div class="tcard">
       <h3>Your footprint by section
-        <button class="info" aria-label="About this figure" data-tip="Each bar stacks that section's components (hover a segment for its share). The amber tick is CoolClimate's average household for your zip and household size — 43.3 t/yr total: travel 11.5, home 7.2, food 7.7, goods 8.9, services 8.0. Green boxes left of the zero line are your offsets, drawn negative against the section they're assigned to.">?</button>
+        <button class="info" aria-label="About this figure" data-tip="Each bar stacks that section's components (hover a segment for its share). The amber tick is the average US household (CoolClimate national defaults) — 49.9 t/yr total: travel 15.7, home 12.2, food 7.0, goods 7.9, services 7.0. Green boxes left of the zero line are your offsets, drawn negative against the section they're assigned to.">?</button>
         <span class="tkg" id="total-tons"></span></h3>
       <div id="fig-total"></div>
-      <p class="hint" style="margin-bottom:0">Amber tick = CoolClimate average household (your zip, 3 people). Goods &amp; Services come from your classified transactions; Travel/Home/Food from your inputs on those tabs.</p>
+      <p class="hint" style="margin-bottom:0">Amber tick = average US household (CoolClimate national defaults). Goods &amp; Services come from your classified transactions; Travel/Home/Food from your inputs on those tabs.</p>
     </div>
   </div>
 </div>
@@ -1145,7 +1145,7 @@ function hbars(hostId, rows, scaleMax, grand) {
     }).join("");
     const off = r.off > 0 ? `<span class="hneg" style="left:${((negMax - r.off) / span * 100).toFixed(2)}%;width:${(r.off / span * 100).toFixed(2)}%" title="Offsets assigned to ${esc(r.label)}: −${(r.off / 1000).toFixed(2)} t/yr"></span>` : "";
     const zeroLine = negMax > 0 ? `<span class="hzero" style="left:${zero.toFixed(2)}%"></span>` : "";
-    const avg = r.avg ? `<span class="havg" style="left:${Math.min(zero + r.avg / span * 100, 100).toFixed(2)}%" title="CoolClimate average household: ${(r.avg / 1000).toFixed(1)} t/yr"></span>` : "";
+    const avg = r.avg ? `<span class="havg" style="left:${Math.min(zero + r.avg / span * 100, 100).toFixed(2)}%" title="Average US household (CoolClimate): ${(r.avg / 1000).toFixed(1)} t/yr"></span>` : "";
     const net = tot - (r.off || 0);
     const val = grand ? `${grand > 0 ? Math.round(tot / grand * 100) : 0}%` : `${(tot / 1000).toFixed(2)} t`;
     const vtip = `${(tot / 1000).toFixed(2)} t gross` + (r.off > 0 ? ` − ${(r.off / 1000).toFixed(2)} offsets = ${(net / 1000).toFixed(2)} t net` : "");
@@ -1264,8 +1264,8 @@ function renderFoodFig() {
   vstack("fig-food", groups.map(([label, kg], i) => ({label, kg, color: PAL[i % 8]})));
 }
 
-// CoolClimate average household for this zip/size (measured defaults), kg/yr
-const CC_AVG = {travel: 11468, home: 7246, food: 7702, goods: 8925, services: 7952};
+// Average US household (CoolClimate national defaults, country mode), kg/yr
+const CC_AVG = {travel: 15718, home: 12219, food: 7002, goods: 7920, services: 7032};
 
 function renderTotal() {
   if (!$("fig-total")) return;
@@ -1293,8 +1293,8 @@ function renderTotal() {
   rows[4].off = off.per.services * 1000;
   hbars("fig-total", rows, 0, total);
   $("total-tons").textContent = off.total > 0
-    ? `${(total / 1000).toFixed(1)} − ${off.total.toFixed(1)} = ${Math.max(0, total / 1000 - off.total).toFixed(1)} t net · CoolClimate avg 43.3`
-    : `${(total / 1000).toFixed(1)} t CO₂e/yr · CoolClimate avg 43.3`;
+    ? `${(total / 1000).toFixed(1)} − ${off.total.toFixed(1)} = ${Math.max(0, total / 1000 - off.total).toFixed(1)} t net · US avg 49.9`
+    : `${(total / 1000).toFixed(1)} t CO₂e/yr · US avg 49.9`;
 }
 
 // ---------- Offsets tab ----------
