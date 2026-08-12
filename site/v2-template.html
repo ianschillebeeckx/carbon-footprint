@@ -61,9 +61,10 @@
   .tsum b { font-family: var(--mono); }
   .hbrow { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 0.78rem; }
   .hbrow .hlbl { flex: 0 0 10.5em; text-align: right; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .hbrow .htrack { flex: 1; position: relative; height: 14px; background: var(--chip); border-radius: 4px; display: flex; gap: 1px; overflow: visible; }
-  .hbrow .hseg { height: 100%; min-width: 1px; }
-  .hbrow .hseg:first-child { border-radius: 4px 0 0 4px; }
+  .hbrow .htrack { flex: 1; position: relative; height: 14px; background: var(--chip); border-radius: 4px; overflow: visible; }
+  .hbrow .hseg { position: absolute; top: 0; height: 100%; min-width: 1px; box-shadow: inset 1px 0 0 var(--card); }
+  .hbrow .hneg { position: absolute; top: 0; height: 100%; background: var(--leaf); border-radius: 4px 0 0 4px; opacity: 0.9; }
+  .hbrow .hzero { position: absolute; top: -3px; width: 1.5px; height: 20px; background: var(--muted); }
   .hbrow .havg { position: absolute; top: -3px; width: 2px; height: 20px; background: var(--warn); }
   .hbrow .hval { flex: 0 0 4.5em; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 0.72rem; text-align: right; }
   .tpane { display: flex; gap: 16px; align-items: flex-start; }
@@ -230,7 +231,7 @@
   <div class="tcol" style="max-width:860px">
     <div class="tcard">
       <h3>Your footprint by section
-        <button class="info" aria-label="About this figure" data-tip="Each bar stacks that section's components (hover a segment for its share). The amber tick is CoolClimate's average household for your zip and household size — 43.3 t/yr total: travel 11.5, home 7.2, food 7.7, goods 8.9, services 8.0.">?</button>
+        <button class="info" aria-label="About this figure" data-tip="Each bar stacks that section's components (hover a segment for its share). The amber tick is CoolClimate's average household for your zip and household size — 43.3 t/yr total: travel 11.5, home 7.2, food 7.7, goods 8.9, services 8.0. Green boxes left of the zero line are your offsets, drawn negative against the section they're assigned to (G&S offsets split across Goods and Services by gross share).">?</button>
         <span class="tkg" id="total-tons"></span></h3>
       <div id="fig-total"></div>
       <p class="hint" style="margin-bottom:0">Amber tick = CoolClimate average household (your zip, 3 people). Goods &amp; Services come from your classified transactions; Travel/Home/Food from your inputs on those tabs.</p>
@@ -1128,15 +1129,26 @@ const PAL = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "v
 function hbars(hostId, rows, scaleMax, grand) {
   const host = $(hostId);
   if (!host) return;
-  const max = Math.max(scaleMax || 0, 1,
+  const posMax = Math.max(scaleMax || 0, 1,
     ...rows.map(r => Math.max(r.segs.reduce((a, s) => a + s.kg, 0), r.avg || 0)));
+  const negMax = Math.max(0, ...rows.map(r => r.off || 0));
+  const span = posMax + negMax;
+  const zero = negMax / span * 100;
   host.innerHTML = rows.map(r => {
     const tot = r.segs.reduce((a, s) => a + s.kg, 0);
-    const segs = r.segs.filter(s => s.kg > 0).map(s =>
-      `<span class="hseg" style="width:${(s.kg / max * 100).toFixed(2)}%;background:${s.color}" title="${esc(s.title)}: ${fmt(s.kg)} kg/yr (${tot ? Math.round(s.kg / tot * 100) : 0}%)"></span>`).join("");
-    const avg = r.avg ? `<span class="havg" style="left:${Math.min(r.avg / max * 100, 100).toFixed(2)}%" title="CoolClimate average household: ${(r.avg / 1000).toFixed(1)} t/yr"></span>` : "";
+    let acc = 0;
+    const segs = r.segs.filter(s => s.kg > 0).map(s => {
+      const el = `<span class="hseg" style="left:${(zero + acc / span * 100).toFixed(2)}%;width:${(s.kg / span * 100).toFixed(2)}%;background:${s.color}" title="${esc(s.title)}: ${fmt(s.kg)} kg/yr (${tot ? Math.round(s.kg / tot * 100) : 0}%)"></span>`;
+      acc += s.kg;
+      return el;
+    }).join("");
+    const off = r.off > 0 ? `<span class="hneg" style="left:${((negMax - r.off) / span * 100).toFixed(2)}%;width:${(r.off / span * 100).toFixed(2)}%" title="Offsets assigned to ${esc(r.label)}: −${(r.off / 1000).toFixed(2)} t/yr"></span>` : "";
+    const zeroLine = negMax > 0 ? `<span class="hzero" style="left:${zero.toFixed(2)}%"></span>` : "";
+    const avg = r.avg ? `<span class="havg" style="left:${Math.min(zero + r.avg / span * 100, 100).toFixed(2)}%" title="CoolClimate average household: ${(r.avg / 1000).toFixed(1)} t/yr"></span>` : "";
+    const net = tot - (r.off || 0);
     const val = grand ? `${grand > 0 ? Math.round(tot / grand * 100) : 0}%` : `${(tot / 1000).toFixed(2)} t`;
-    return `<div class="hbrow"><span class="hlbl" title="${esc(r.label)}">${esc(r.label)}</span><span class="htrack">${segs}${avg}</span><span class="hval" title="${(tot / 1000).toFixed(2)} t/yr">${val}</span></div>`;
+    const vtip = `${(tot / 1000).toFixed(2)} t gross` + (r.off > 0 ? ` − ${(r.off / 1000).toFixed(2)} offsets = ${(net / 1000).toFixed(2)} t net` : "");
+    return `<div class="hbrow"><span class="hlbl" title="${esc(r.label)}">${esc(r.label)}</span><span class="htrack">${off}${segs}${zeroLine}${avg}</span><span class="hval" title="${vtip}">${val}</span></div>`;
   }).join("");
 }
 
@@ -1273,10 +1285,14 @@ function renderTotal() {
   ];
   const total = rows.reduce((a, r) => a + r.segs.reduce((x, s) => x + s.kg, 0), 0);
   const off = offsetTons();
-  if (off.total > 0) {
-    rows.push({label: "Offsets (subtracted)", segs: Object.entries(OFFSET_CATS)
-      .map(([k, l], i) => ({kg: off.per[k] * 1000, color: PAL[i % 8], title: `${l} offsets`})).filter(sg => sg.kg > 0)});
-  }
+  rows[0].off = off.per.travel * 1000;
+  rows[1].off = off.per.home * 1000;
+  rows[2].off = off.per.food * 1000;
+  // G&S offsets split across the Goods and Services rows by their gross share
+  const gKg = rows[3].segs.reduce((a, s) => a + s.kg, 0), sKg = rows[4].segs.reduce((a, s) => a + s.kg, 0);
+  const gShare = gKg + sKg > 0 ? gKg / (gKg + sKg) : 0.5;
+  rows[3].off = off.per.gs * 1000 * gShare;
+  rows[4].off = off.per.gs * 1000 * (1 - gShare);
   hbars("fig-total", rows, 0, total);
   $("total-tons").textContent = off.total > 0
     ? `${(total / 1000).toFixed(1)} − ${off.total.toFixed(1)} = ${Math.max(0, total / 1000 - off.total).toFixed(1)} t net · CoolClimate avg 43.3`
