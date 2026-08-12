@@ -71,8 +71,9 @@
   .taside { flex: 0 0 250px; position: sticky; top: 0; }
   @media (max-width: 900px) { .tpane { flex-direction: column; } .taside { position: static; width: 100%; } }
   .vwrap { display: flex; gap: 12px; align-items: stretch; }
-  .vbars { display: flex; gap: 10px; align-items: flex-end; height: 240px; flex: none; }
-  .vcol { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .vbars { display: flex; gap: 10px; flex: none; }
+  .vcol { display: flex; flex-direction: column; align-items: center; }
+  .vbarwrap { height: 220px; display: flex; align-items: flex-end; }
   .vcol .vbar { min-height: 0; width: 44px; }
   .vcol small { margin-top: 4px; color: var(--muted); font-size: 0.66rem; text-align: center; line-height: 1.25; }
   .vbar { width: 44px; min-height: 240px; display: flex; flex-direction: column-reverse; border-radius: 6px; overflow: hidden; background: var(--chip); flex: none; }
@@ -331,7 +332,7 @@
   </div>
 
   <div id="chartpane">
-    <h2 style="margin-top:0" id="chart-title">G&amp;S emissions — overall (kg/mo)</h2>
+    <h2 style="margin-top:0" id="chart-title">G&amp;S emissions — overall (t CO₂e/yr)</h2>
     <div class="tmode" id="chartmode" style="margin-bottom:10px">
       <button data-m="overall" class="active">Overall</button><button data-m="monthly">By month</button>
     </div>
@@ -339,7 +340,7 @@
     <div id="chart-host" hidden></div>
     <div class="legend" id="chart-legend" hidden></div>
     <div id="chart-tip"></div>
-    <p class="hint" style="margin-top:12px" id="chart-note">Average kg CO₂e per month by category, bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Hover a segment for its share.</p>
+    <p class="hint" style="margin-top:12px" id="chart-note">Annualized t CO₂e by category, bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Bar heights are scaled to section totals; hover a segment for its share.</p>
   </div>
 </div>
 
@@ -1133,14 +1134,15 @@ function renderGsFig() {
   const totOf = ps => ps.reduce((a, p) => a + p.kg, 0);
   const gTot = totOf(goods), sTot = totOf(services);
   const maxTot = Math.max(gTot, sTot, 1);
+  const tyr = kg => (kg * 12 / 1000).toFixed(2);
   const col = (label, parts, tot) => {
     const segs = parts.map(p =>
-      `<span class="vseg" style="height:${tot ? (p.kg / tot * 100).toFixed(2) : 0}%;background:${p.color}" title="${esc(p.label)}: ${fmt(p.kg)} kg/mo (${tot ? Math.round(p.kg / tot * 100) : 0}%)"></span>`).join("");
-    return `<div class="vcol"><div class="vbar" style="height:${(tot / maxTot * 100).toFixed(2)}%">${segs}</div><small>${label}<br>${fmt(tot)} kg/mo</small></div>`;
+      `<span class="vseg" style="height:${tot ? (p.kg / tot * 100).toFixed(2) : 0}%;background:${p.color}" title="${esc(p.label)}: ${tyr(p.kg)} t/yr (${tot ? Math.round(p.kg / tot * 100) : 0}%)"></span>`).join("");
+    return `<div class="vcol"><div class="vbarwrap"><div class="vbar" style="height:${(tot / maxTot * 100).toFixed(2)}%">${segs}</div></div><small>${label}<br>${tyr(tot)} t/yr</small></div>`;
   };
   const legend = [["Goods", goods], ["Services", services]].map(([h, ps]) =>
     `<div style="font-size:0.66rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:6px">${h}</div>` +
-    ps.map(p => `<div class="lrow"><span class="sw" style="background:${p.color}"></span><span>${esc(p.label)}</span><span class="lv">${fmt(p.kg)}</span></div>`).join("")).join("");
+    ps.map(p => `<div class="lrow"><span class="sw" style="background:${p.color}"></span><span>${esc(p.label)}</span><span class="lv">${tyr(p.kg)}</span></div>`).join("")).join("");
   $("fig-gs").innerHTML =
     `<div class="vwrap"><div class="vbars">${col("Goods", goods, gTot)}${col("Services", services, sTot)}</div>` +
     `<div class="vleg">${legend}</div></div>`;
@@ -1150,9 +1152,9 @@ function setChartMode(m) {
   $("chartmode").querySelectorAll("button").forEach(b => b.className = b.dataset.m === m ? "active" : "");
   $("fig-gs").hidden = m !== "overall";
   $("chart-host").hidden = $("chart-legend").hidden = m !== "monthly";
-  $("chart-title").textContent = m === "overall" ? "G&S emissions — overall (kg/mo)" : "G&S emissions by month (kg CO₂e)";
+  $("chart-title").textContent = m === "overall" ? "G&S emissions — overall (t CO₂e/yr)" : "G&S emissions by month (kg CO₂e)";
   $("chart-note").textContent = m === "overall"
-    ? "Average kg CO₂e per month by category, bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Hover a segment for its share."
+    ? "Annualized t CO₂e by category, bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Bar heights are scaled to section totals; hover a segment for its share."
     : "Each month shows a Goods bar (left) and a Services bar (right); the top three categories of each get their own color, the rest fold into a remainder.";
 }
 $("chartmode").querySelectorAll("button").forEach(b => b.onclick = () => setChartMode(b.dataset.m));
