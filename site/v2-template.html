@@ -71,7 +71,8 @@
   .taside { flex: 0 0 250px; position: sticky; top: 0; }
   @media (max-width: 900px) { .tpane { flex-direction: column; } .taside { position: static; width: 100%; } }
   .vwrap { display: flex; gap: 12px; align-items: stretch; }
-  .vbars { display: flex; gap: 10px; flex: none; }
+  .vbars { display: flex; gap: 28px; flex: none; justify-content: center; }
+  #fig-gs .vcol .vbar { width: 80px; }
   .vcol { display: flex; flex-direction: column; align-items: center; }
   .vbarwrap { height: 220px; display: flex; align-items: flex-end; }
   .vcol .vbar { min-height: 0; width: 44px; }
@@ -1138,7 +1139,7 @@ function renderGsFig() {
   const tyr = kg => (kg * 12 / 1000).toFixed(2);
   const col = (label, parts, tot) => {
     const segs = parts.map(p =>
-      `<span class="vseg" style="height:${tot ? (p.kg / tot * 100).toFixed(2) : 0}%;background:${p.color}" title="${esc(p.label)}: ${tyr(p.kg)} t/yr (${tot ? Math.round(p.kg / tot * 100) : 0}%)"></span>`).join("");
+      `<span class="vseg" style="height:${tot ? (p.kg / tot * 100).toFixed(2) : 0}%;background:${p.color}" data-tip="${esc(p.label)}: ${tyr(p.kg)} t/yr (${tot ? Math.round(p.kg / tot * 100) : 0}%)"></span>`).join("");
     return `<div class="vcol"><div class="vbarwrap"><div class="vbar" style="height:${(tot / maxTot * 100).toFixed(2)}%">${segs}</div></div><small>${label}<br>${tyr(tot)} t/yr</small></div>`;
   };
   overallLegend = [["Goods", goods], ["Services", services]].map(([h, ps]) =>
@@ -1146,6 +1147,18 @@ function renderGsFig() {
   $("fig-gs").innerHTML = `<div class="vbars">${col("Goods", goods, gTot)}${col("Services", services, sTot)}</div>`;
   renderChartLegend();
 }
+
+$("fig-gs").addEventListener("mousemove", ev => {
+  const seg = ev.target.closest(".vseg[data-tip]");
+  const tip = $("chart-tip");
+  if (!seg) { tip.style.opacity = 0; return; }
+  const r = $("chartpane").getBoundingClientRect();
+  tip.textContent = seg.dataset.tip;
+  tip.style.left = Math.min(ev.clientX - r.left + 12, r.width - 170) + "px";
+  tip.style.top = (ev.clientY - r.top + 14) + "px";
+  tip.style.opacity = 1;
+});
+$("fig-gs").addEventListener("mouseleave", () => { $("chart-tip").style.opacity = 0; });
 
 let overallLegend = [], monthlyLegend = [], chartMode = "overall";
 function renderChartLegend() {
