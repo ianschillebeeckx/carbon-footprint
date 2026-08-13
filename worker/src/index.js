@@ -111,6 +111,7 @@ async function classifyWithLLM(env, items) {
     body: JSON.stringify({
       model: env.CLASSIFY_MODEL,
       max_tokens: 4000,
+      temperature: 0,
       messages: [{ role: "user", content: buildPrompt(items) }],
     }),
   });
@@ -119,7 +120,26 @@ async function classifyWithLLM(env, items) {
   const text = data.content.find((b) => b.type === "text")?.text || "";
   const m = text.match(/\[.*\]/s);
   if (!m) throw new Error("no JSON array in model output");
-  return JSON.parse(m[0]);
+  // models drift on long arrays: trailing commas, unquoted keys, single quotes
+  const raw = m[0];
+  try { return JSON.parse(raw); } catch (e1) {
+    const repaired = raw
+      .replace(/,\s*([\]}])/g, "$1")                      // trailing commas
+      .replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":')  // unquoted keys
+      .replace(/'/g, '"');
+    try { return JSON.parse(repaired); } catch (e2) {
+      console.log("llm_parse_failed", { error: String(e1.message).slice(0, 120) });
+      throw new Error("llm output unparseable: " + String(e1.message).slice(0, 120));
+    }
+  }
+}
+
+async function classifyWithRetry(env, items) {
+  try { return await classifyWithLLM(env, items); }
+  catch (e) {
+    console.log("classify_retry", { error: String(e.message || e).slice(0, 120) });
+    return await classifyWithLLM(env, items);   // one retry, then surface the error
+  }
 }
 
 export default {
@@ -184,7 +204,7 @@ async function handle(request, env) {
         } catch (e) {
           console.log("candidates_failed", { error: String(e.message || e).slice(0, 100) });
         }
-        const out = await classifyWithLLM(env, batch);
+        const out = await classifyWithRetry(env, batch);
         for (const r of out) {
           const m = batch[r.i];
           if (!m) continue;
