@@ -36,8 +36,9 @@ function buildPrompt(items) {
   const lines = items.map((it, i) =>
     `${i}. "${it.merchant}"${it.hint ? ` (statement category: ${it.hint})` : ""}`);
   return (
-    "Assign each consumer credit-card merchant below to the single best NAICS 2022 code " +
-    "for WHAT WAS BOUGHT, not where it was bought.\n" +
+    "Assign each consumer credit-card merchant below to the single best NAICS code " +
+    "for WHAT WAS BOUGHT, not where it was bought. Use 2022-revision codes only " +
+    "(apparel mfg is 315250 not 315220; clothing stores 458110 not 448140; streaming 516210).\n" +
     "Rules:\n" +
     "- Goods from a single-category brand: the commodity/manufacturing code (sectors 11-33).\n" +
     "- Multi-category stores (home centers, pharmacies, department stores, warehouse clubs, " +

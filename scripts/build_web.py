@@ -55,6 +55,15 @@ def build() -> None:
 
     categories = {k: {"section": sec, "label": lbl} for k, (sec, lbl) in CATEGORIES.items()}
 
+    # LLMs sometimes emit 2017-vintage codes; the EPA CSV is the crosswalk.
+    import csv as _csv
+    remap = dict(classify.NO_FACTOR_REMAP)
+    with open("data/naics2022_with_2017_emission_factors_1.csv") as fh:
+        for row in _csv.DictReader(fh):
+            c17, c22 = row["2017 NAICS Code"].strip(), row["2022 NAICS Code"].strip()
+            if c17 and c22 in by_code and c17 not in by_code and c17 not in remap:
+                remap[c17] = c22
+
     runtime = WEB_RUNTIME \
         .replace("__BY_CODE__", json.dumps(by_code, separators=(",", ":"))) \
         .replace("__CATEGORIES__", json.dumps(categories, separators=(",", ":"))) \
@@ -65,7 +74,7 @@ def build() -> None:
         .replace("__PREFIX_RE__", js_regex(classify._PREFIXES)) \
         .replace("__HEALTH_RE__", js_regex(classify.HEALTH_INSURER)) \
         .replace("__HEALTH_MIX__", json.dumps(classify.HEALTH_INSURANCE_MIX)) \
-        .replace("__REMAP__", json.dumps(classify.NO_FACTOR_REMAP))
+        .replace("__REMAP__", json.dumps(remap, separators=(",", ":")))
 
     # ---- static reference data: inline at build time (as the server does) ----
     s = sub(s, "/*__NAICS_OPTIONS__*/null", json.dumps(classify.naics_options(), separators=(",", ":")))
