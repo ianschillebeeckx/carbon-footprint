@@ -1,7 +1,8 @@
 # Deploying to Cloudflare
 
-Architecture: static frontend on **Cloudflare Pages** (all transaction data
-stays in the browser — IndexedDB), plus one **Worker** (`worker/`) that holds
+Architecture: one git-connected **Worker** (`worker/`, build path `worker`)
+serving the static frontend (all transaction data stays in the browser —
+IndexedDB) and holding
 the only two server-side jobs: the shared merchant→NAICS cache (KV) and a
 rate-limited Anthropic classification proxy. No user financial data is ever
 stored server-side; the Worker only sees normalized merchant names + category
@@ -18,9 +19,12 @@ hints.
    - Add the secret: Worker → Settings → Variables → `ANTHROPIC_API_KEY`
      (from console.anthropic.com — separate billing from a Claude
      subscription; ~$5 credit goes a long way on Haiku).
-3. **Pages**: create a Pages project from the same repo, build output
-   directory `web/` (the static frontend — port in progress).
-   Set `ALLOWED_ORIGIN` in `wrangler.toml` to the Pages URL.
+3. **Domain**: after the first green deploy, Worker -> Settings ->
+   Domains & Routes -> add custom domain `carbon.outis.cc` (the zone is
+   already in the account; TLS/DNS are automatic).
+4. **Frontend**: no separate Pages project — the Worker serves the static
+   `web/` app via its `[assets]` block (uncomment in wrangler.toml once
+   `web/` lands), same origin as the API.
 
 ## Cost expectations
 

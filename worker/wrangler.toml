@@ -9,9 +9,17 @@ compatibility_date = "2026-08-01"
 binding = "MERCHANT_CACHE"
 id = "REPLACE_WITH_KV_NAMESPACE_ID"
 
+# Static frontend (uncomment once web/ lands — the same Worker then serves
+# the app and the API from one origin, no CORS needed):
+# [assets]
+# directory = "../web"
+# Custom domain: after the first deploy, Settings -> Domains & Routes ->
+# add carbon.outis.cc.
+
 [vars]
-# Origin allowed to call this API (the Pages deployment; add localhost while developing)
-ALLOWED_ORIGIN = "https://carbon-footprint.pages.dev"
+# Origin allowed to call this API cross-origin (belt-and-suspenders; the
+# frontend will be same-origin once assets are enabled)
+ALLOWED_ORIGIN = "https://carbon.outis.cc"
 CLASSIFY_MODEL = "claude-haiku-4-5"
 DAILY_IP_LIMIT = "20"
 
