@@ -81,6 +81,7 @@ export default {
     try {
       return await handle(request, env);
     } catch (e) {
+      console.error("unhandled", { path: new URL(request.url).pathname, error: String(e.message || e).slice(0, 300) });
       return new Response(JSON.stringify({ error: String(e.message || e).slice(0, 300) }),
         { status: 500, headers: { ...JSON_HEADERS, ...cors(env) } });
     }
@@ -99,6 +100,7 @@ async function handle(request, env) {
         const v = await env.MERCHANT_CACHE.get(cacheKey(k.merchant, k.hint));
         if (v) found[`${k.merchant}|${k.hint || ""}`] = JSON.parse(v);
       }));
+      console.log("cache_lookup", { asked: keys.length, found: Object.keys(found).length });
       return new Response(JSON.stringify({ found }), { headers: { ...JSON_HEADERS, ...cors(env) } });
     }
 
@@ -110,9 +112,11 @@ async function handle(request, env) {
       }
       const ip = request.headers.get("CF-Connecting-IP") || "unknown";
       if (!(await ipAllowed(env, ip))) {
+        console.log("rate_limited", {});
         return new Response(JSON.stringify({ error: "daily limit reached" }),
           { status: 429, headers: { ...JSON_HEADERS, ...cors(env) } });
       }
+      const t0 = Date.now();
       const { merchants = [] } = await request.json();
       const assignments = {};
       const toClassify = [];
@@ -138,6 +142,8 @@ async function handle(request, env) {
           await env.MERCHANT_CACHE.put(cacheKey(m.merchant, m.hint), JSON.stringify(a));
         }
       }
+      console.log("classify", { asked: merchants.length, rule: Object.values(assignments).filter(a => a.source === "rule").length,
+        llm_batches: Math.ceil(toClassify.length / 40), llm_merchants: toClassify.length, ms: Date.now() - t0 });
       return new Response(JSON.stringify({ assignments }), { headers: { ...JSON_HEADERS, ...cors(env) } });
     }
 

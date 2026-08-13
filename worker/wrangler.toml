@@ -15,6 +15,10 @@ id = "ecce561dbee546d097405fd8531d43ca"
 [assets]
 directory = "../web"
 
+# Persistent request logs (dashboard: Worker -> Logs). Free tier is ample.
+[observability]
+enabled = true
+
 [vars]
 # Origin allowed to call this API cross-origin (belt-and-suspenders; the
 # frontend will be same-origin once assets are enabled)
