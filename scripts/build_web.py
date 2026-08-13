@@ -95,6 +95,7 @@ def build() -> None:
         .replace("__PREFIX_RE__", js_regex(classify._PREFIXES)) \
         .replace("__HEALTH_RE__", js_regex(classify.HEALTH_INSURER)) \
         .replace("__HEALTH_MIX__", json.dumps(classify.HEALTH_INSURANCE_MIX)) \
+    .replace("__HINT_RULES__", json.dumps(classify.HINT_RULES)) \
         .replace("__REMAP__", json.dumps(remap, separators=(",", ":")))
 
     # ---- static reference data: inline at build time (as the server does) ----
@@ -123,10 +124,10 @@ def build() -> None:
     s = s2
 
     # ---- corrections: local rules instead of the server ----
-    s = sub(s, '''async function postCorrection(merchant, hint, naics, mix, confirm, allCats, basket) {
+    s = sub(s, '''async function postCorrection(merchant, hint, naics, mix, confirm, allCats, basket, category) {
   const res = await fetch("/api/v2/correct", {
     method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({merchant, category_hint: hint, naics, mix, basket,
+    body: JSON.stringify({merchant, category_hint: hint, naics, mix, basket, category,
                           all_categories: !!allCats, confirm: !!confirm}),
   });
   if (!res.ok) { alert("Correction failed"); return false; }
@@ -138,9 +139,9 @@ def build() -> None:
   }
   renderAll();
   return true;
-}''', '''async function postCorrection(merchant, hint, naics, mix, confirm, allCats, basket) {
+}''', '''async function postCorrection(merchant, hint, naics, mix, confirm, allCats, basket, category) {
   try {
-    applyCorrectionW(merchant, hint, {naics, mix, basket,
+    applyCorrectionW(merchant, hint, {naics, mix, basket, category,
       source: confirm ? "confirmed" : "manual", all_categories: !!allCats});
   } catch (e) { alert("Correction failed: " + (e.message || e)); return false; }
   renderAll();
@@ -219,6 +220,7 @@ const M_PREFIX = __PREFIX_RE__;
 const M_STORE = /\s*#?\d{3,}\s*$/;
 const HEALTH_RE = __HEALTH_RE__;
 const HEALTH_MIX = __HEALTH_MIX__;
+const HINT_RULES = __HINT_RULES__;
 const NAICS_REMAP = __REMAP__;
 
 function deflatorFor(d) {
@@ -280,7 +282,8 @@ function expandAssignmentW(a) {
     const prod = parts.length ? +parts.reduce((x, p) => x + p.factor_production * p.weight, 0).toFixed(4) : null;
     const marg = parts.length ? +parts.reduce((x, p) => x + p.factor_margins * p.weight, 0).toFixed(4) : null;
     return {naics: code, naics_title: entry.title + " · custom basket", factor,
-            category: entry.category, mix: null, factor_production: prod, factor_margins: marg,
+            category: WEB_CATEGORIES[a.cat] ? a.cat : entry.category,
+            mix: null, factor_production: prod, factor_margins: marg,
             naics2017: entry.naics2017, useeio: entry.useeio, basket: parts, basket_custom: true,
             margin_warn: false, unmapped: false};
   }
@@ -292,10 +295,11 @@ function expandAssignmentW(a) {
                mix: null, basket: db, unmapped: false};
   out.margin_warn = !!(entry.category.startsWith("goods_") && !db &&
                        !(entry.factor_margins > 0) && !code.startsWith("4595"));
+  if (a.cat && WEB_CATEGORIES[a.cat]) out.category = a.cat;   // user rollup override
   return out;
 }
 
-function applyCorrectionW(merchant, hint, {naics = null, mix = null, basket = null,
+function applyCorrectionW(merchant, hint, {naics = null, mix = null, basket = null, category = null,
                                            source = "manual", all_categories = false} = {}) {
   const key = all_categories ? `${merchant}|*` : `${merchant}|${hint}`;
   let assignment;
@@ -309,6 +313,10 @@ function applyCorrectionW(merchant, hint, {naics = null, mix = null, basket = nu
   } else {
     if (naics != null && !BY_CODE[naics] && !NAICS_REMAP[naics]) throw new Error(`unknown NAICS ${naics}`);
     assignment = {naics, confidence: 1, source};
+  }
+  if (category != null) {
+    if (!WEB_CATEGORIES[category]) throw new Error(`unknown category ${category}`);
+    assignment.cat = category;
   }
   WEB_RULES[key] = assignment;
   const locked_hints = [];
@@ -396,6 +404,10 @@ async function webUpload(text) {
   for (const [k, m] of merchants) {
     const local = WEB_RULES[k] || WEB_RULES[`${m.merchant}|*`];
     const locked = local && ["manual", "confirmed"].includes(local.source);
+    if (!locked && HINT_RULES[m.hint.toLowerCase()]) {
+      assignments[k] = {...HINT_RULES[m.hint.toLowerCase()]};
+      continue;
+    }
     if (!locked && HEALTH_RE.test(m.merchant)) {
       assignments[k] = {naics: null, mix: HEALTH_MIX, confidence: 1, source: "rule"};
       continue;

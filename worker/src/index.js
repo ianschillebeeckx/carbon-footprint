@@ -45,7 +45,8 @@ function buildPrompt(items) {
     "459999; department stores 455110; warehouse clubs (Costco) 455211; home centers 444110; " +
     "pharmacies 456110.\n" +
     "- Services: the service's own code (51-81). Restaurants/food/travel/utilities keep their usual codes.\n" +
-    "- Health insurance premiums fund healthcare delivery: 622110, not 524114.\n" +
+    "- Insurance premiums are real purchases, never null: auto/home/renters 524126, " +
+    "life 524113. Health insurance premiums fund healthcare delivery: 622110, not 524114.\n" +
     "- Digital subscriptions: 513210 software/SaaS, 516210 streaming, 518210 cloud.\n" +
     "- Pure money movement (transfers, card payments, income): null. BUT a payment app " +
     "(Zelle, Venmo, PayPal, Check) WITH a real statement category is just how a purchase was " +

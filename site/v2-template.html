@@ -518,11 +518,22 @@ function catSelect(t) {
   return html;
 }
 
-function wireCatSelect(row, merchant, hint) {
+function wireCatSelect(row, merchant, hint, t) {
   row.querySelector(".catsel").onchange = e => {
     const c = e.target.value;
     if (!c) return;
-    postCorrection(merchant, hint, c === "excluded" ? null : CAT_DEFAULTS[c], null, false, allCatsChecked(row));
+    const allCats = allCatsChecked(row);
+    if (c === "excluded") { postCorrection(merchant, hint, null, null, false, allCats); return; }
+    if (t && t.mix) {  // splits carry their parts' categories; repoint via default code
+      postCorrection(merchant, hint, CAT_DEFAULTS[c], null, false, allCats);
+      return;
+    }
+    if (t && t.naics) {  // rollup override only — the NAICS code stays put
+      const basket = t.basket_custom ? t.basket.map(p => ({naics: p.naics, weight: p.weight})) : null;
+      postCorrection(merchant, hint, t.naics, null, false, allCats, basket, c);
+      return;
+    }
+    postCorrection(merchant, hint, CAT_DEFAULTS[c], null, false, allCats);  // non-purchase -> representative code
   };
 }
 
@@ -565,7 +576,7 @@ function renderTxns() {
       `<span class="kgd" title="${esc(factorTip(t))}">${t.factor != null ? t.factor.toFixed(2) + " kg/$" : "–"}</span>` +
       `<span class="a">${t.amount < 0 ? "$" + fmt(-t.amount) : "−$" + fmt(t.amount)}</span>` +
       catSelect(t) + naicsSelect(t);
-    wireCatSelect(row, t.merchant, t.category_hint);
+    wireCatSelect(row, t.merchant, t.category_hint, t);
     row.querySelector("select:not(.catsel)").onchange = e => {
       const v = e.target.value;
       if (!v) return;
@@ -581,10 +592,10 @@ function renderTxns() {
 
 const allCatsChecked = row => !!row.querySelector(".allcats input:checked");
 
-async function postCorrection(merchant, hint, naics, mix, confirm, allCats, basket) {
+async function postCorrection(merchant, hint, naics, mix, confirm, allCats, basket, category) {
   const res = await fetch("/api/v2/correct", {
     method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({merchant, category_hint: hint, naics, mix, basket,
+    body: JSON.stringify({merchant, category_hint: hint, naics, mix, basket, category,
                           all_categories: !!allCats, confirm: !!confirm}),
   });
   if (!res.ok) { alert("Correction failed"); return false; }
@@ -656,7 +667,7 @@ function renderMerchants() {
       row.style.cursor = "pointer";
       row.onclick = e => { if (e.target.closest("select,button,input,label")) return; openBasketEditor(row, m, t); };
     }
-    wireCatSelect(row, m.merchant, m.category_hint);
+    wireCatSelect(row, m.merchant, m.category_hint, t);
     row.querySelector("select:not(.catsel)").onchange = e => {
       const v = e.target.value;
       if (!v) return;

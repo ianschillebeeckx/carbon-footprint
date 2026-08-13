@@ -44,6 +44,7 @@ def deflator_for(date_str: str) -> float:
 # the standard proxy instead of silently missing the join.
 NO_FACTOR_REMAP = {
     "814110": "561720",  # private households (housekeeper/nanny) -> janitorial services
+    "452990": "455219",  # 2012-vintage general merchandise code LLMs still emit
 }
 
 # Money movement, not consumption: skip classification entirely (tier 0 rule).
@@ -65,6 +66,17 @@ HEALTH_INSURER = re.compile(
     r"oscar health|health net|molina|delta dental|vsp)\b", re.I)
 HEALTH_INSURANCE_MIX = [{"naics": "622110", "weight": 0.6},   # hospitals
                         {"naics": "621111", "weight": 0.4}]   # physicians
+
+# Hint-level tier-0: the statement category alone pins these, whatever the
+# merchant string says (Geico, State Farm, Zelle, ...).
+HINT_RULES = {
+    "auto insurance": {"naics": "524126", "confidence": 1.0, "source": "rule"},
+    "home insurance": {"naics": "524126", "confidence": 1.0, "source": "rule"},
+    "renters insurance": {"naics": "524126", "confidence": 1.0, "source": "rule"},
+    "life insurance": {"naics": "524113", "confidence": 1.0, "source": "rule"},
+    "health insurance": {"naics": None, "mix": HEALTH_INSURANCE_MIX, "confidence": 1.0, "source": "rule"},
+    "child care": {"naics": "624410", "confidence": 1.0, "source": "rule"},
+}
 
 # ---------------- merchant normalization ----------------
 
@@ -234,6 +246,9 @@ def run(csv_path: str, coverage: float = LLM_SPEND_COVERAGE) -> dict:
         if cached is None:
             cached, scope = cache.get(f"{m['merchant']}|*"), "merchant"
         user_locked = cached is not None and cached.get("source") in ("manual", "confirmed")
+        if not user_locked and m["category_hint"].lower() in HINT_RULES:
+            m["assignment"] = dict(HINT_RULES[m["category_hint"].lower()])
+            continue
         if not user_locked and HEALTH_INSURER.search(m["merchant"]):
             m["assignment"] = {"naics": None, "mix": HEALTH_INSURANCE_MIX,
                                "confidence": 1.0, "source": "rule"}
@@ -360,7 +375,9 @@ def expand_assignment(a: dict, by_code: dict) -> dict:
         prod = round(sum(p["factor_production"] * p["weight"] for p in parts), 4) if parts else None
         marg = round(sum(p["factor_margins"] * p["weight"] for p in parts), 4) if parts else None
         return {"naics": code, "naics_title": entry["title"] + " · custom basket",
-                "factor": factor, "category": entry["category"], "mix": None,
+                "factor": factor,
+                "category": a.get("cat") if a.get("cat") in CATEGORY_DEFAULT_NAICS else entry["category"],
+                "mix": None,
                 "factor_production": prod, "factor_margins": marg,
                 "naics2017": entry.get("naics2017"), "useeio": entry.get("useeio"),
                 "basket": parts, "basket_custom": True,
@@ -385,6 +402,7 @@ def expand_assignment(a: dict, by_code: dict) -> dict:
 
 def apply_correction(merchant: str, category_hint: str, naics: str | None = None,
                      mix: list[dict] | None = None, basket: list[dict] | None = None,
+                     category: str | None = None,
                      source: str = "manual", all_categories: bool = False) -> dict:
     """Manual correction from the v2 UI: update the merchant cache and rewrite
     all matching transactions in v2_classified.json. With all_categories the
@@ -418,6 +436,10 @@ def apply_correction(merchant: str, category_hint: str, naics: str | None = None
         if naics is not None and naics not in by_code and naics not in NO_FACTOR_REMAP:
             raise ValueError(f"unknown NAICS code {naics}")
         assignment = {"naics": naics, "confidence": 1.0, "source": source}
+    if category is not None:
+        if category not in CATEGORY_DEFAULT_NAICS and category != "excluded":
+            raise ValueError(f"unknown category {category}")
+        assignment["cat"] = category
 
     cache = json.loads(CACHE_FILE.read_text()) if CACHE_FILE.exists() else {}
     cache[key] = assignment

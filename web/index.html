@@ -399,7 +399,8 @@ const M_PREFIX = /^(SQ \*|SQ\*|TST\*|TST \*|PYPL \*|PAYPAL \*|IN \*|IN\*|GOOGLE 
 const M_STORE = /\s*#?\d{3,}\s*$/;
 const HEALTH_RE = /\b(kaiser|blue shield|blue cross|anthem|aetna|cigna|united ?health|humana|oscar health|health net|molina|delta dental|vsp)\b/i;
 const HEALTH_MIX = [{"naics": "622110", "weight": 0.6}, {"naics": "621111", "weight": 0.4}];
-const NAICS_REMAP = {"814110":"561720","212111":"212114","212112":"212115","212113":"212114","212221":"212220","212222":"212220","212291":"212290","212299":"212290","212324":"212323","212325":"212323","212391":"212390","212392":"212390","212393":"212390","212399":"212390","315110":"315120","315190":"315120","315220":"315250","315240":"315250","315280":"315250","316992":"316990","316998":"316990","321213":"321215","321214":"321215","322121":"322120","322122":"322120","333244":"333248","333249":"333248","333314":"333310","333316":"333310","333318":"333310","333997":"333998","333999":"333998","334613":"334610","334614":"334610","335110":"335139","335121":"335131","335122":"335132","335129":"335139","335911":"335910","335912":"335910","336111":"336110","336112":"336110","337124":"337126","337125":"337126","424320":"424350","424330":"424350","425110":"425120","441228":"441227","441310":"441330","441320":"441340","442110":"449110","442210":"449121","442291":"449122","442299":"449129","443141":"449210","443142":"449210","444130":"444140","444190":"444180","444210":"444230","444220":"444240","445120":"445131","445210":"445240","445220":"445250","445299":"445298","445310":"445320","446110":"456110","446120":"456120","446130":"456130","446191":"456191","446199":"456199","447110":"457110","447190":"457120","448110":"458110","448120":"458110","448130":"458110","448140":"458110","448150":"458110","448190":"458110","448210":"458210","448310":"458310","448320":"458320","451110":"459110","451120":"459120","451130":"459130","451140":"459140","451211":"459210","451212":"459210","452210":"455110","452311":"455211","452319":"455219","453110":"459310","453210":"459410","453220":"459420","453310":"459510","453910":"459910","453920":"459920","453930":"459930","453991":"459991","453998":"459999","454110":"459999","454210":"445132","454310":"457210","454390":"459999","511110":"513110","511120":"513120","511130":"513130","511140":"513140","511191":"513191","511199":"513199","511210":"513210","515111":"516210","515112":"516110","515120":"516210","515210":"516210","517311":"517111","517312":"517112","517911":"517121","517919":"517810","519110":"516210","519120":"519210","519130":"516210","519190":"519290","522120":"522180","522190":"522180","522293":"522299","522294":"522299","522298":"522299","523110":"523150","523120":"523150","523130":"523160","523140":"523160","523920":"523940","523930":"523940","811112":"811114","811113":"811114","811118":"811114","811211":"811210","811212":"811210","811213":"811210","811219":"811210"};
+const HINT_RULES = {"auto insurance": {"naics": "524126", "confidence": 1.0, "source": "rule"}, "home insurance": {"naics": "524126", "confidence": 1.0, "source": "rule"}, "renters insurance": {"naics": "524126", "confidence": 1.0, "source": "rule"}, "life insurance": {"naics": "524113", "confidence": 1.0, "source": "rule"}, "health insurance": {"naics": null, "mix": [{"naics": "622110", "weight": 0.6}, {"naics": "621111", "weight": 0.4}], "confidence": 1.0, "source": "rule"}, "child care": {"naics": "624410", "confidence": 1.0, "source": "rule"}};
+const NAICS_REMAP = {"814110":"561720","452990":"455219","212111":"212114","212112":"212115","212113":"212114","212221":"212220","212222":"212220","212291":"212290","212299":"212290","212324":"212323","212325":"212323","212391":"212390","212392":"212390","212393":"212390","212399":"212390","315110":"315120","315190":"315120","315220":"315250","315240":"315250","315280":"315250","316992":"316990","316998":"316990","321213":"321215","321214":"321215","322121":"322120","322122":"322120","333244":"333248","333249":"333248","333314":"333310","333316":"333310","333318":"333310","333997":"333998","333999":"333998","334613":"334610","334614":"334610","335110":"335139","335121":"335131","335122":"335132","335129":"335139","335911":"335910","335912":"335910","336111":"336110","336112":"336110","337124":"337126","337125":"337126","424320":"424350","424330":"424350","425110":"425120","441228":"441227","441310":"441330","441320":"441340","442110":"449110","442210":"449121","442291":"449122","442299":"449129","443141":"449210","443142":"449210","444130":"444140","444190":"444180","444210":"444230","444220":"444240","445120":"445131","445210":"445240","445220":"445250","445299":"445298","445310":"445320","446110":"456110","446120":"456120","446130":"456130","446191":"456191","446199":"456199","447110":"457110","447190":"457120","448110":"458110","448120":"458110","448130":"458110","448140":"458110","448150":"458110","448190":"458110","448210":"458210","448310":"458310","448320":"458320","451110":"459110","451120":"459120","451130":"459130","451140":"459140","451211":"459210","451212":"459210","452210":"455110","452311":"455211","452319":"455219","453110":"459310","453210":"459410","453220":"459420","453310":"459510","453910":"459910","453920":"459920","453930":"459930","453991":"459991","453998":"459999","454110":"459999","454210":"445132","454310":"457210","454390":"459999","511110":"513110","511120":"513120","511130":"513130","511140":"513140","511191":"513191","511199":"513199","511210":"513210","515111":"516210","515112":"516110","515120":"516210","515210":"516210","517311":"517111","517312":"517112","517911":"517121","517919":"517810","519110":"516210","519120":"519210","519130":"516210","519190":"519290","522120":"522180","522190":"522180","522293":"522299","522294":"522299","522298":"522299","523110":"523150","523120":"523150","523130":"523160","523140":"523160","523920":"523940","523930":"523940","811112":"811114","811113":"811114","811118":"811114","811211":"811210","811212":"811210","811213":"811210","811219":"811210"};
 
 function deflatorFor(d) {
   const y = parseInt((d || "").slice(0, 4), 10);
@@ -460,7 +461,8 @@ function expandAssignmentW(a) {
     const prod = parts.length ? +parts.reduce((x, p) => x + p.factor_production * p.weight, 0).toFixed(4) : null;
     const marg = parts.length ? +parts.reduce((x, p) => x + p.factor_margins * p.weight, 0).toFixed(4) : null;
     return {naics: code, naics_title: entry.title + " · custom basket", factor,
-            category: entry.category, mix: null, factor_production: prod, factor_margins: marg,
+            category: WEB_CATEGORIES[a.cat] ? a.cat : entry.category,
+            mix: null, factor_production: prod, factor_margins: marg,
             naics2017: entry.naics2017, useeio: entry.useeio, basket: parts, basket_custom: true,
             margin_warn: false, unmapped: false};
   }
@@ -472,10 +474,11 @@ function expandAssignmentW(a) {
                mix: null, basket: db, unmapped: false};
   out.margin_warn = !!(entry.category.startsWith("goods_") && !db &&
                        !(entry.factor_margins > 0) && !code.startsWith("4595"));
+  if (a.cat && WEB_CATEGORIES[a.cat]) out.category = a.cat;   // user rollup override
   return out;
 }
 
-function applyCorrectionW(merchant, hint, {naics = null, mix = null, basket = null,
+function applyCorrectionW(merchant, hint, {naics = null, mix = null, basket = null, category = null,
                                            source = "manual", all_categories = false} = {}) {
   const key = all_categories ? `${merchant}|*` : `${merchant}|${hint}`;
   let assignment;
@@ -489,6 +492,10 @@ function applyCorrectionW(merchant, hint, {naics = null, mix = null, basket = nu
   } else {
     if (naics != null && !BY_CODE[naics] && !NAICS_REMAP[naics]) throw new Error(`unknown NAICS ${naics}`);
     assignment = {naics, confidence: 1, source};
+  }
+  if (category != null) {
+    if (!WEB_CATEGORIES[category]) throw new Error(`unknown category ${category}`);
+    assignment.cat = category;
   }
   WEB_RULES[key] = assignment;
   const locked_hints = [];
@@ -576,6 +583,10 @@ async function webUpload(text) {
   for (const [k, m] of merchants) {
     const local = WEB_RULES[k] || WEB_RULES[`${m.merchant}|*`];
     const locked = local && ["manual", "confirmed"].includes(local.source);
+    if (!locked && HINT_RULES[m.hint.toLowerCase()]) {
+      assignments[k] = {...HINT_RULES[m.hint.toLowerCase()]};
+      continue;
+    }
     if (!locked && HEALTH_RE.test(m.merchant)) {
       assignments[k] = {naics: null, mix: HEALTH_MIX, confidence: 1, source: "rule"};
       continue;
@@ -753,11 +764,22 @@ function catSelect(t) {
   return html;
 }
 
-function wireCatSelect(row, merchant, hint) {
+function wireCatSelect(row, merchant, hint, t) {
   row.querySelector(".catsel").onchange = e => {
     const c = e.target.value;
     if (!c) return;
-    postCorrection(merchant, hint, c === "excluded" ? null : CAT_DEFAULTS[c], null, false, allCatsChecked(row));
+    const allCats = allCatsChecked(row);
+    if (c === "excluded") { postCorrection(merchant, hint, null, null, false, allCats); return; }
+    if (t && t.mix) {  // splits carry their parts' categories; repoint via default code
+      postCorrection(merchant, hint, CAT_DEFAULTS[c], null, false, allCats);
+      return;
+    }
+    if (t && t.naics) {  // rollup override only — the NAICS code stays put
+      const basket = t.basket_custom ? t.basket.map(p => ({naics: p.naics, weight: p.weight})) : null;
+      postCorrection(merchant, hint, t.naics, null, false, allCats, basket, c);
+      return;
+    }
+    postCorrection(merchant, hint, CAT_DEFAULTS[c], null, false, allCats);  // non-purchase -> representative code
   };
 }
 
@@ -800,7 +822,7 @@ function renderTxns() {
       `<span class="kgd" title="${esc(factorTip(t))}">${t.factor != null ? t.factor.toFixed(2) + " kg/$" : "–"}</span>` +
       `<span class="a">${t.amount < 0 ? "$" + fmt(-t.amount) : "−$" + fmt(t.amount)}</span>` +
       catSelect(t) + naicsSelect(t);
-    wireCatSelect(row, t.merchant, t.category_hint);
+    wireCatSelect(row, t.merchant, t.category_hint, t);
     row.querySelector("select:not(.catsel)").onchange = e => {
       const v = e.target.value;
       if (!v) return;
@@ -816,9 +838,9 @@ function renderTxns() {
 
 const allCatsChecked = row => !!row.querySelector(".allcats input:checked");
 
-async function postCorrection(merchant, hint, naics, mix, confirm, allCats, basket) {
+async function postCorrection(merchant, hint, naics, mix, confirm, allCats, basket, category) {
   try {
-    applyCorrectionW(merchant, hint, {naics, mix, basket,
+    applyCorrectionW(merchant, hint, {naics, mix, basket, category,
       source: confirm ? "confirmed" : "manual", all_categories: !!allCats});
   } catch (e) { alert("Correction failed: " + (e.message || e)); return false; }
   renderAll();
@@ -883,7 +905,7 @@ function renderMerchants() {
       row.style.cursor = "pointer";
       row.onclick = e => { if (e.target.closest("select,button,input,label")) return; openBasketEditor(row, m, t); };
     }
-    wireCatSelect(row, m.merchant, m.category_hint);
+    wireCatSelect(row, m.merchant, m.category_hint, t);
     row.querySelector("select:not(.catsel)").onchange = e => {
       const v = e.target.value;
       if (!v) return;

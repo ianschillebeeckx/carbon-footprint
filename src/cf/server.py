@@ -137,6 +137,7 @@ class Handler(BaseHTTPRequestHandler):
                         body.get("merchant", ""), body.get("category_hint", ""),
                         naics=body.get("naics"), mix=body.get("mix"),
                         basket=body.get("basket"),
+                        category=body.get("category"),
                         all_categories=bool(body.get("all_categories")),
                         source="confirmed" if body.get("confirm") else "manual")
                 except (ValueError, KeyError, TypeError) as e:
