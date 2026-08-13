@@ -46,7 +46,8 @@ CATEGORIES = {
     "services_household_maintenance_repair": ("Services", "Household Maintenance & Repair"),
     "services_organizations_charity": ("Services", "Organizations & Charity"),
     "services_other": ("Services", "Other services"),
-    "excluded": ("Excluded", "Excluded (food/travel/housing/etc.)"),
+    "excluded": ("Excluded", "Excluded — counted elsewhere (food/travel/home)"),
+    "ignored": ("Excluded", "Ignored (transfers, payments, income)"),
 }
 
 # NAICS prefix -> category. Longest matching prefix wins; per-code overrides
@@ -379,6 +380,22 @@ def build() -> dict:
         entry["factor_note"] = "commodity basket (manufacturing incl.)"
         entry["basket"] = [{"naics": c, "weight": round(w / total_w, 4)} for c, w in avail]
         n_basket += 1
+
+    # Utilities have no EPA factors (physical-unit territory — the Home tab
+    # handles them via kWh/therms). Synthetic factor-0 entries let PG&E-style
+    # payments classify cleanly to an excluded utility code instead of
+    # landing somewhere random.
+    for code, title in (("221122", "Electric Power Distribution"),
+                        ("221210", "Natural Gas Distribution"),
+                        ("221310", "Water Supply and Irrigation Systems"),
+                        ("221320", "Sewage Treatment Facilities")):
+        if code not in seen:
+            search = title + ((" — " + ENRICH[code]) if code in ENRICH else "")
+            seen[code] = {"code": code, "title": title, "factor": 0.0,
+                          "factor_production": 0.0, "factor_margins": 0.0,
+                          "naics2017": code, "useeio": None, "category": "excluded",
+                          "factor_note": "no EPA factor — enter physical usage in the Home tab",
+                          "search_text": search}
 
     index = {
         "dataset": DATASET,

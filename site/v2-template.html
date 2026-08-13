@@ -269,6 +269,11 @@
       </div>
       <div id="airrows"></div>
     </div>
+    <div class="tcard">
+      <h3>Cross-check from your transactions
+        <button class="info" aria-label="About the travel cross-check" data-tip="Gas-station (NAICS 457) and airline (481) transactions from your upload — excluded from Goods &amp; Services because their emissions belong here. Gallons assume ~$4.50/gal; implied vehicle miles use your fleet's mileage-weighted MPG; airline miles assume a typical ~15¢ per mile economy fare. Rough yardsticks, not accounting.">?</button></h3>
+      <div id="travelxrows" class="hint">Upload a transactions CSV to see fuel and airline spend.</div>
+    </div>
     <div class="tcard tsum">Travel footprint: <b id="kg-travel-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
     <p class="hint">Sources — Air: <a href="https://www.epa.gov/climateleadership/ghg-emission-factors-hub" target="_blank" rel="noopener">EPA GHG Emission Factors Hub (2025)</a> per-haul passenger-mile factors, plus ~21% well-to-tank fuel-production uplift per the <a href="https://theicct.org/wp-content/uploads/2021/08/update-well-to-wake-co2-aug21-1.pdf" target="_blank" rel="noopener">ICCT well-to-wake analysis</a> (CORSIA baseline 89 vs 73.2 gCO₂e/MJ); excludes contrail/non-CO₂ effects. Vehicles &amp; transit: <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator factors, measured from their API (see data/coolclimate_travel_factors.json).</p>
@@ -309,6 +314,11 @@
         <button class="info" aria-label="About construction emissions" data-tip="CoolClimate amortizes the embodied emissions of building and maintaining your home over its life: ~0.93 kg CO₂e per square foot per year.">?</button>
         <span class="tkg" id="kg-sqft"></span></h3>
       <div class="tvrow"><label>Home size:</label><input type="number" min="0" step="50" id="sqftinput" value="0" aria-label="Home square feet"><label>sq ft</label><span class="rowkg">0.93 kg/sqft·yr</span></div>
+    </div>
+    <div class="tcard">
+      <h3>Cross-check from your transactions
+        <button class="info" aria-label="About the home cross-check" data-tip="Utility transactions from your upload (NAICS 2211 electric, 221210 natural gas, 2213 water/sewer) — they carry no G&amp;S emissions; their footprint is computed here from the physical usage you enter. kWh and therms are implied at ~$0.223/kWh and ~$2.02/therm (CoolClimate's rate assumptions) to compare against your inputs.">?</button></h3>
+      <div id="homexrows" class="hint">Upload a transactions CSV to see utility spend.</div>
     </div>
     <div class="tcard tsum">Home footprint: <b id="kg-home-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
@@ -500,8 +510,9 @@ function renderCats() {
     const row = document.createElement("div");
     row.className = "frow" + (ui.cat === c ? " active" : "");
     row.innerHTML = `<span>${esc(info.label)}</span>` +
-      (c !== "excluded" && d > 0 ? `<span class="kgd">${(kg/d).toFixed(2)} kg/$ · ${(kg*12/1000).toFixed(2)} t/yr</span>` : "") +
-      `<span class="amt">${d.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}<small> $/mo</small></span>`;
+      (info.section !== "Excluded" && d > 0 ? `<span class="kgd">${(kg/d).toFixed(2)} kg/$ · ${(kg*12/1000).toFixed(2)} t/yr</span>` : "") +
+      (c === "ignored" ? `<span class="amt">–</span>`
+        : `<span class="amt">${d.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}<small> $/mo</small></span>`);
     row.onclick = () => { ui.cat = ui.cat === c ? "" : c; $("catfilter").value = ui.cat; renderCats(); renderLeft(); };
     host.appendChild(row);
   }
@@ -511,8 +522,7 @@ function catSelect(t) {
   let html = `<select class="catsel" aria-label="Category assignment">`;
   if (t.mix) html += `<option value="" selected>Split</option>`;
   for (const c of CAT_ORDER) {
-    const label = c === "excluded" ? "Excluded / non-purchase" : DATA.categories[c].label;
-    html += `<option value="${c}" ${!t.mix && t.category === c ? "selected" : ""}>${esc(label)}</option>`;
+    html += `<option value="${c}" ${!t.mix && t.category === c ? "selected" : ""}>${esc(DATA.categories[c].label)}</option>`;
   }
   html += `</select>`;
   return html;
@@ -523,7 +533,14 @@ function wireCatSelect(row, merchant, hint, t) {
     const c = e.target.value;
     if (!c) return;
     const allCats = allCatsChecked(row);
-    if (c === "excluded") { postCorrection(merchant, hint, null, null, false, allCats); return; }
+    if (c === "ignored") { postCorrection(merchant, hint, null, null, false, allCats); return; }
+    if (c === "excluded") {   // real purchase counted in another tab: keep the code, override the rollup
+      if (t && t.naics) {
+        const basket = t.basket_custom ? t.basket.map(p => ({naics: p.naics, weight: p.weight})) : null;
+        postCorrection(merchant, hint, t.naics, null, false, allCats, basket, "excluded");
+      } else postCorrection(merchant, hint, null, null, false, allCats);
+      return;
+    }
     if (t && t.mix) {  // splits carry their parts' categories; repoint via default code
       postCorrection(merchant, hint, CAT_DEFAULTS[c], null, false, allCats);
       return;
@@ -901,6 +918,60 @@ function saveTravel() {
   }), 500);
 }
 
+function txnSpendByPrefix(res) {
+  // res: [{label, prefixes:[..]}] -> monthly nominal $ per bucket from DATA
+  if (!DATA) return null;
+  const months = DATA.meta.months;
+  const out = res.map(r => ({...r, mo: 0}));
+  for (const t of DATA.transactions) {
+    if (!t.naics) continue;
+    for (const r of out) if (r.prefixes.some(p => t.naics.startsWith(p))) { r.mo += -t.amount / months; break; }
+  }
+  return out;
+}
+
+function renderTravelX() {
+  const host = $("travelxrows");
+  if (!host) return;
+  const scan = txnSpendByPrefix([
+    {label: "Gas stations", prefixes: ["457"]},
+    {label: "Airlines", prefixes: ["481"]},
+  ]);
+  if (!scan) return;
+  const [gas, air] = scan;
+  const fleetMiles = TRAVEL.vehicles.reduce((a, v) => a + (+v.miles || 0), 0);
+  const fleetGal = TRAVEL.vehicles.reduce((a, v) => a + (+v.miles || 0) / Math.max(+v.mpg || 22, 1), 0);
+  const mpg = fleetGal > 0 ? fleetMiles / fleetGal : 22;
+  const galYr = gas.mo * 12 / 4.50;
+  const impliedMi = galYr * mpg;
+  const airMode = TRAVEL.air;
+  const enteredAir = airMode.mode === "flights"
+    ? ["short", "medium", "long"].reduce((a, k2) => a + (+airMode["n" + k2] || 0) * TF.airTripMiles[k2], 0)
+    : ["short", "medium", "long"].reduce((a, k2) => a + (+airMode[k2] || 0), 0);
+  const impliedAirMi = air.mo * 12 / 0.15;
+  host.innerHTML =
+    `Gas stations: <b>$${fmt(gas.mo)}/mo</b> ≈ ${fmt(galYr)} gal/yr ≈ <b>${fmt(impliedMi)} mi/yr</b> at your ${mpg.toFixed(0)} MPG — you entered ${fmt(fleetMiles)} mi/yr.<br>` +
+    `Airlines: <b>$${fmt(air.mo)}/mo</b> ≈ <b>${fmt(impliedAirMi)} mi/yr</b> at ~15¢/mi — you entered ${fmt(enteredAir)} mi/yr.`;
+}
+
+function renderHomeX() {
+  const host = $("homexrows");
+  if (!host) return;
+  const scan = txnSpendByPrefix([
+    {label: "Electric", prefixes: ["2211"]},
+    {label: "Natural gas", prefixes: ["221210"]},
+    {label: "Water & sewer", prefixes: ["2213"]},
+  ]);
+  if (!scan) return;
+  const [el, ng, wa] = scan;
+  const impliedKwh = el.mo * 12 / HF.elecDollarsPerKwh;
+  const impliedTherms = ng.mo * 12 / HF.gasDollarsPerTherm;
+  host.innerHTML =
+    `Electric utility: <b>$${fmt(el.mo)}/mo</b> ≈ <b>${fmt(impliedKwh)} kWh/yr</b> at ~$${HF.elecDollarsPerKwh}/kWh — you entered ${fmt(+HOME.elec.kwh || 0)} kWh/yr.<br>` +
+    `Natural gas: <b>$${fmt(ng.mo)}/mo</b> ≈ <b>${fmt(impliedTherms)} therms/yr</b> at ~$${HF.gasDollarsPerTherm}/therm — you entered ${fmt(+HOME.gas.therms || 0)} therms/yr.<br>` +
+    `Water & sewer: <b>$${fmt(wa.mo)}/mo</b> (omitted from the footprint — see Home sources note).`;
+}
+
 function renderTravel() {
   const k = travelKg();
   $("vehrows").innerHTML = TRAVEL.vehicles.map((v, i) =>
@@ -934,6 +1005,7 @@ function renderTravel() {
   $("kg-air").textContent = `${fmt(k.air)} kg/yr`;
   $("kg-travel-total").textContent = `${(k.total / 1000).toFixed(1)} t CO₂e/yr`;
   renderTravelFig();
+  renderTravelX();
 
   const touched = () => { renderTravel(); renderImpact(); saveTravel(); };
   $("vehrows").querySelectorAll("input,select").forEach(el => el.onchange = () => {
@@ -1023,6 +1095,7 @@ function renderHome() {
   $("kg-sqft").textContent = `${fmt(k.sqft)} kg/yr`;
   $("kg-home-total").textContent = `${(k.total / 1000).toFixed(1)} t CO₂e/yr`;
   renderHomeFig();
+  renderHomeX();
 
   const touched = () => { renderHome(); renderImpact(); saveHome(); };
   document.querySelectorAll("#pane-home [data-h]").forEach(el => el.onchange = () => {

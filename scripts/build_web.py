@@ -269,7 +269,7 @@ function expandAssignmentW(a) {
   }
   if (a.naics == null) {
     return {naics: null, naics_title: "Non-purchase (transfer/income/payment)", factor: null,
-            category: "excluded", mix: null, basket: null, margin_warn: false, unmapped: false};
+            category: "ignored", mix: null, basket: null, margin_warn: false, unmapped: false};
   }
   const code = NAICS_REMAP[a.naics] || a.naics;
   const entry = BY_CODE[code];

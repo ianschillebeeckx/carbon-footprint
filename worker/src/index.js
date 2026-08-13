@@ -86,6 +86,8 @@ function buildPrompt(items) {
     "- Insurance premiums are real purchases, never null: auto/home/renters 524126, " +
     "life 524113. Health insurance premiums fund healthcare delivery: 622110, not 524114.\n" +
     "- Digital subscriptions: 513210 software/SaaS, 516210 streaming, 518210 cloud.\n" +
+    "- Utility bills: electricity 221122, natural gas 221210, water 221310, sewer 221320 " +
+    "(PG&E and other combined utilities: 221122).\n" +
     "- Pure money movement (transfers, card payments, income): null. BUT a payment app " +
     "(Zelle, Venmo, PayPal, Check) WITH a real statement category is just how a purchase was " +
     "paid — classify by the category: Zelle + Child Care is 624410, Venmo + Haircut is 812112.\n" +

@@ -360,7 +360,7 @@ def expand_assignment(a: dict, by_code: dict) -> dict:
                     "margin_warn": False, "unmapped": False}
     if a.get("naics") is None:
         return {"naics": None, "naics_title": "Non-purchase (transfer/income/payment)",
-                "factor": None, "category": "excluded", "mix": None, "basket": None,
+                "factor": None, "category": "ignored", "mix": None, "basket": None,
                 "margin_warn": False, "unmapped": False}
     code = NO_FACTOR_REMAP.get(a["naics"], a["naics"])
     entry = by_code.get(code)
