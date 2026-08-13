@@ -36,7 +36,7 @@ async function ipAllowed(env, ip) {
 // Workers AI model used for queries) + brute-force cosine in the worker. ----
 let VEC = null;   // {dim, codes, titles, mat: Float32Array} | false when absent
 async function loadVectors(env) {
-  if (VEC !== null) return VEC;
+  if (VEC) return VEC;
   try {
     const res = await env.ASSETS.fetch("https://assets.local/data/naics_vectors.json");
     if (!res.ok) throw new Error(String(res.status));
@@ -45,7 +45,7 @@ async function loadVectors(env) {
     VEC = { dim: d.dim, codes: d.codes, titles: d.titles, mat: new Float32Array(bin.buffer) };
   } catch (e) {
     console.log("vectors_unavailable", { error: String(e.message || e).slice(0, 100) });
-    VEC = false;
+    return null;   // don't cache the failure — retry on the next request
   }
   return VEC;
 }
@@ -195,7 +195,8 @@ async function handle(request, env) {
         }
       }
       console.log("classify", { asked: merchants.length, rule: Object.values(assignments).filter(a => a.source === "rule").length,
-        llm_batches: Math.ceil(toClassify.length / 40), llm_merchants: toClassify.length, ms: Date.now() - t0 });
+        llm_batches: Math.ceil(toClassify.length / 40), llm_merchants: toClassify.length,
+        with_candidates: toClassify.filter(m => m.cands).length, ms: Date.now() - t0 });
       return new Response(JSON.stringify({ assignments }), { headers: { ...JSON_HEADERS, ...cors(env) } });
     }
 
