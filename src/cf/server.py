@@ -59,6 +59,8 @@ class Handler(BaseHTTPRequestHandler):
             html = html.replace("/*__NAICS_OPTIONS__*/null", json.dumps(classify.naics_options()))
             html = html.replace("/*__CAT_DEFAULTS__*/null", json.dumps(classify.default_naics()))
             html = html.replace("/*__BASKET_OPTIONS__*/null", json.dumps(classify.basket_options()))
+            idx_cats = json.loads(Path("data/naics_index.json").read_text())["categories"]
+            html = html.replace("/*__CATS__*/null", json.dumps(idx_cats))
             html = html.replace("/*__TRAVEL__*/null", TRAVEL_FILE.read_text() if TRAVEL_FILE.exists() else "null")
             html = html.replace("/*__HOME__*/null", HOME_FILE.read_text() if HOME_FILE.exists() else "null")
             html = html.replace("/*__FOOD__*/null", FOOD_FILE.read_text() if FOOD_FILE.exists() else "null")

@@ -103,6 +103,8 @@ def build() -> None:
     s = sub(s, "/*__CAT_DEFAULTS__*/null", json.dumps(classify.default_naics(), separators=(",", ":")))
     s = sub(s, "/*__BASKET_OPTIONS__*/null", json.dumps(classify.basket_options(), separators=(",", ":")))
 
+    s = sub(s, "/*__CATS__*/null", json.dumps(categories, separators=(",", ":")))
+
     # ---- user state: localStorage instead of server injection ----
     s = sub(s, "/*__V2DATA__*/null", 'JSON.parse(localStorage.getItem("cf_data") || "null")')
     s = sub(s, "/*__TRAVEL__*/null", 'JSON.parse(localStorage.getItem("cf_travel") || "null")')

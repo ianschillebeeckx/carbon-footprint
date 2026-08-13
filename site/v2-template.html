@@ -401,6 +401,7 @@ const DATA = /*__V2DATA__*/null;
 const NAICS_OPTIONS = /*__NAICS_OPTIONS__*/null;  // [{code,title,category}] curated consumer subset
 const CAT_DEFAULTS = /*__CAT_DEFAULTS__*/null;      // category -> representative NAICS
 const BASKET_OPTIONS = /*__BASKET_OPTIONS__*/null;  // commodities for the basket editor
+const CATS_STATIC = /*__CATS__*/null;               // canonical category taxonomy (build/server-injected)
 const TRAVEL_SAVED = /*__TRAVEL__*/null;            // persisted travel inputs
 const HOME_SAVED = /*__HOME__*/null;                // persisted home inputs
 const FOOD_SAVED = /*__FOOD__*/null;                // persisted food inputs
@@ -409,7 +410,8 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
 const fmt = n => n.toLocaleString("en-US", {maximumFractionDigits: 0});
 
-const CAT_ORDER = Object.keys(DATA?.categories || {});
+const CATS = CATS_STATIC || (DATA ? DATA.categories : {});
+const CAT_ORDER = Object.keys(CATS);
 const isLow = t => t.unmapped || (t.source !== "manual" && t.source !== "confirmed" &&
   (t.source === "vector" || (t.source === "llm" && t.confidence != null && t.confidence < 0.7) || t.margin_warn));
 const basketDesc = t => t.basket ? t.basket.map(p => `${Math.round(p.weight*100)}% ${p.title}`).join(", ") : "";
@@ -493,12 +495,12 @@ function renderCats() {
   host.innerHTML = "";
   const secTotal = {};
   for (const c of CAT_ORDER) {
-    const sec = DATA.categories[c].section;
+    const sec = CATS[c].section;
     secTotal[sec] = (secTotal[sec] || 0) + per[c].dollars;
   }
   let section = null;
   for (const c of CAT_ORDER) {
-    const info = DATA.categories[c];
+    const info = CATS[c];
     if (info.section !== section) {
       section = info.section;
       const h = document.createElement("h2");
@@ -522,7 +524,7 @@ function catSelect(t) {
   let html = `<select class="catsel" aria-label="Category assignment">`;
   if (t.mix) html += `<option value="" selected>Split</option>`;
   for (const c of CAT_ORDER) {
-    html += `<option value="${c}" ${!t.mix && t.category === c ? "selected" : ""}>${esc(DATA.categories[c].label)}</option>`;
+    html += `<option value="${c}" ${!t.mix && t.category === c ? "selected" : ""}>${esc(CATS[c].label)}</option>`;
   }
   html += `</select>`;
   return html;
@@ -561,7 +563,7 @@ function naicsSelect(t) {
   html += `<option value="">${t.mix ? `Split across ${t.mix.length} industries` : t.naics ? esc(`${t.naics} · ${t.naics_title}`) : "Non-purchase"}</option>`;
   for (const c of CAT_ORDER) {
     if (!groups[c]) continue;
-    html += `<optgroup label="${esc(DATA.categories[c].label)}">`;
+    html += `<optgroup label="${esc(CATS[c].label)}">`;
     for (const o of groups[c]) html += `<option value="${o.code}">${esc(o.title)}${o.basket ? " · 🧺 store basket" : ""}</option>`;
     html += `</optgroup>`;
   }
@@ -713,7 +715,7 @@ function openSplitEditor(row, m, t) {
   const groups = {};
   for (const o of NAICS_OPTIONS) (groups[o.category] = groups[o.category] || []).push(o);
   const optionsHtml = sel => CAT_ORDER.filter(c => groups[c]).map(c =>
-    `<optgroup label="${esc(DATA.categories[c].label)}">` +
+    `<optgroup label="${esc(CATS[c].label)}">` +
     groups[c].map(o => `<option value="${o.code}" ${o.code === sel ? "selected" : ""}>${esc(o.title)}${o.basket ? " · 🧺 store basket" : ""}</option>`).join("") +
     `</optgroup>`).join("");
   const draw = () => {
@@ -755,7 +757,7 @@ function openBasketEditor(row, m, t) {
   if (!parts.length) parts.push({naics: BASKET_OPTIONS[0].code, weight: 100});
   const optionsHtml = sel =>
     CAT_ORDER.filter(c => groups[c]).map(c => {
-      const glabel = c === "excluded" ? "Raw / intermediate commodities" : DATA.categories[c].label;
+      const glabel = c === "excluded" ? "Raw / intermediate commodities" : CATS[c].label;
       return `<optgroup label="${esc(glabel)}">` +
         groups[c].map(o => `<option value="${o.code}" ${o.code === sel ? "selected" : ""}>${esc(o.title)} — ${o.factor_production.toFixed(2)} kg/$ mfg</option>`).join("") +
         `</optgroup>`;
@@ -772,7 +774,7 @@ function openBasketEditor(row, m, t) {
     return {prod, marg, tw};
   };
   ed.innerHTML =
-    `<div class="sprow" style="color:var(--muted)">Manufacturing mix for a dollar at ${esc(m.merchant)} (weights sum to 100%). Category stays ${esc(DATA.categories[t.category]?.label || t.category)}.</div>` +
+    `<div class="sprow" style="color:var(--muted)">Manufacturing mix for a dollar at ${esc(m.merchant)} (weights sum to 100%). Category stays ${esc(CATS[t.category]?.label || t.category)}.</div>` +
     `<div class="brows"></div>` +
     `<div class="sprow" style="position:relative"><span style="color:var(--muted)">Add:</span>` +
       `<input type="search" class="bfind" placeholder="Search ${BASKET_OPTIONS.length} commodities to add (soap, lumber, 3256…)" style="flex:1;max-width:340px" autocomplete="off">` +
@@ -856,7 +858,7 @@ $("srcfilter").onchange = e => { ui.src = e.target.value; renderLeft(); };
 const cf = $("catfilter");
 for (const c of CAT_ORDER) {
   const o = document.createElement("option");
-  o.value = c; o.textContent = DATA?.categories[c].label;
+  o.value = c; o.textContent = CATS[c].label;
   cf.appendChild(o);
 }
 cf.onchange = e => { ui.cat = e.target.value; renderCats(); renderLeft(); };
@@ -1281,8 +1283,8 @@ function renderGsFig() {
   if (!DATA) { $("fig-gs").innerHTML = '<p class="hint">Upload a CSV to see the breakdown.</p>'; return; }
   const { per, months } = stats();
   const sectionParts = (section, colorOffset) => CAT_ORDER
-    .filter(c => DATA.categories[c].section === section)
-    .map(c => ({label: DATA.categories[c].label, kg: per[c].kg / months}))
+    .filter(c => CATS[c].section === section)
+    .map(c => ({label: CATS[c].label, kg: per[c].kg / months}))
     .filter(p => p.kg > 0)
     .sort((a, b) => b.kg - a.kg)
     .map((p, i) => ({...p, color: PAL[(colorOffset + i) % 8]}));
@@ -1366,8 +1368,8 @@ function renderTotal() {
   const { per, months } = stats();
   const gsAnnual = c => per[c] ? per[c].kg / months * 12 : 0;
   const secSegs = section => CAT_ORDER
-    .filter(c => DATA && DATA.categories[c].section === section && gsAnnual(c) > 0)
-    .map((c, i) => ({kg: gsAnnual(c), color: PAL[i % 8], title: DATA.categories[c].label}));
+    .filter(c => DATA && CATS[c].section === section && gsAnnual(c) > 0)
+    .map((c, i) => ({kg: gsAnnual(c), color: PAL[i % 8], title: CATS[c].label}));
   const tp = travelParts();
   const hk = homeKg();
   const size = Math.max(1, +FOOD.size || 1);
@@ -1537,9 +1539,9 @@ function renderChart() {
   // per section: top 3 categories by kg + a remainder bucket
   const groupSeries = (section, colors) => {
     const ranked = Object.entries(byCat)
-      .filter(([c, v]) => v > 0 && DATA.categories[c]?.section === section)
+      .filter(([c, v]) => v > 0 && CATS[c]?.section === section)
       .sort((a, b) => b[1] - a[1]);
-    const series = ranked.slice(0, 3).map(([c], i) => ({key: c, label: DATA.categories[c].label, color: colors[i], group: section}));
+    const series = ranked.slice(0, 3).map(([c], i) => ({key: c, label: CATS[c].label, color: colors[i], group: section}));
     const rest = ranked.slice(3).map(([c]) => c);
     if (rest.length) series.push({key: "__rest_" + section, label: `Remaining ${section.toLowerCase()}`, color: colors[3], group: section, members: rest});
     return series;
