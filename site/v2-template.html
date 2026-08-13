@@ -187,10 +187,10 @@
 </div>
 
 <div class="maintabs">
+  <button id="mtab-gs" class="active">Goods &amp; Services</button>
   <button id="mtab-travel">Travel</button>
   <button id="mtab-home">Home</button>
   <button id="mtab-food">Food</button>
-  <button id="mtab-gs" class="active">Goods &amp; Services</button>
   <button id="mtab-offsets">Offsets</button>
   <button id="mtab-total">Total</button>
 </div>
@@ -355,12 +355,12 @@
 <div class="panes">
   <div id="left">
     <div class="tabs">
-      <button id="tab-txns" class="active">Transactions</button>
-      <button id="tab-merch">Merchant rules</button>
+      <button id="tab-merch" class="active">Merchant rules</button>
+      <button id="tab-txns">Transactions</button>
     </div>
     <div class="toolbar">
       <input type="search" id="search" placeholder="Search merchant / NAICS…">
-      <select id="catfilter"><option value="" id="catall">All transactions</option><option value="__nonexcluded">All categories — non-excluded</option></select>
+      <select id="catfilter"><option value="" id="catall">All merchants</option><option value="__nonexcluded">All categories — non-excluded</option></select>
       <select id="srcfilter">
         <option value="">All sources</option>
         <option value="__low">⚠ Low confidence (to review)</option>
@@ -373,8 +373,8 @@
       <span class="legend"><i></i> to review (vector-only, conf &lt;0.7, or flagged)</span>
       <span class="count" id="count"></span>
     </div>
-    <div id="txnlist"></div>
-    <div id="merchlist" hidden></div>
+    <div id="merchlist"></div>
+    <div id="txnlist" hidden></div>
   </div>
 
   <div id="right">
@@ -839,8 +839,16 @@ $("tab-txns").onclick = () => setTab("txns");
 $("tab-merch").onclick = () => setTab("merch");
 
 function renderLeft() {
-  if (!DATA) return;
-  if ((ui.tab || "txns") === "txns") renderTxns(); else renderMerchants();
+  if (!DATA) {
+    const host = (ui.tab || "merch") === "txns" ? $("txnlist") : $("merchlist");
+    host.innerHTML =
+      `<div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:70px 20px;text-align:center">` +
+      `<label class="filebtn" for="csvfile" style="font-size:1.1rem;padding:13px 30px">Upload Transactions</label>` +
+      `<p class="hint" style="max-width:430px">A CSV export of your bank/credit-card transactions — Merchant and Amount columns required; Date and Category improve results (see the ? in the header). Everything stays in your browser.</p></div>`;
+    $("count").textContent = "";
+    return;
+  }
+  if ((ui.tab || "merch") === "txns") renderTxns(); else renderMerchants();
 }
 
 $("search").oninput = e => { ui.search = e.target.value; renderLeft(); };
@@ -1654,6 +1662,7 @@ renderTravel();
 renderHome();
 renderFood();
 renderOffsets();
+setTab("merch");
 renderAll();
 </script>
 </body>
