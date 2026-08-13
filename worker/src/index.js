@@ -46,7 +46,11 @@ function buildPrompt(items) {
     "- Services: the service's own code (51-81). Restaurants/food/travel/utilities keep their usual codes.\n" +
     "- Health insurance premiums fund healthcare delivery: 622110, not 524114.\n" +
     "- Digital subscriptions: 513210 software/SaaS, 516210 streaming, 518210 cloud.\n" +
-    "- Pure money movement (transfers, card payments, income): null.\n\n" +
+    "- Pure money movement (transfers, card payments, income): null. BUT a payment app " +
+    "(Zelle, Venmo, PayPal, Check) WITH a real statement category is just how a purchase was " +
+    "paid — classify by the category: Zelle + Child Care is 624410, Venmo + Haircut is 812112.\n" +
+    "The statement category says what was bought (strong signal); the merchant name says " +
+    "where or how it was paid (weak signal). When they conflict, trust the category.\n\n" +
     lines.join("\n") +
     '\n\nReturn ONLY a JSON array, one object per item, in order: ' +
     '[{"i": 0, "naics": "722515", "confidence": 0.95}, ...] ' +
