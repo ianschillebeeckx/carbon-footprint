@@ -31,10 +31,48 @@ async function ipAllowed(env, ip) {
   return true;
 }
 
+// ---- vector candidate tier: precomputed index embeddings (web/data/
+// naics_vectors.json, built by scripts/build_worker_vectors.py with the same
+// Workers AI model used for queries) + brute-force cosine in the worker. ----
+let VEC = null;   // {dim, codes, titles, mat: Float32Array} | false when absent
+async function loadVectors(env) {
+  if (VEC !== null) return VEC;
+  try {
+    const res = await env.ASSETS.fetch("https://assets.local/data/naics_vectors.json");
+    if (!res.ok) throw new Error(String(res.status));
+    const d = await res.json();
+    const bin = Uint8Array.from(atob(d.vec_b64), (c) => c.charCodeAt(0));
+    VEC = { dim: d.dim, codes: d.codes, titles: d.titles, mat: new Float32Array(bin.buffer) };
+  } catch (e) {
+    console.log("vectors_unavailable", { error: String(e.message || e).slice(0, 100) });
+    VEC = false;
+  }
+  return VEC;
+}
+
+async function topCandidates(env, queries, k = 10) {
+  const vec = await loadVectors(env);
+  if (!vec) return queries.map(() => null);
+  const out = await env.AI.run("@cf/baai/bge-small-en-v1.5", { text: queries });
+  return out.data.map((q) => {
+    let norm = Math.sqrt(q.reduce((a, x) => a + x * x, 0)) || 1;
+    const scores = new Array(vec.codes.length);
+    for (let r = 0; r < vec.codes.length; r++) {
+      let dot = 0;
+      const off = r * vec.dim;
+      for (let j = 0; j < vec.dim; j++) dot += q[j] * vec.mat[off + j];
+      scores[r] = dot / norm;
+    }
+    return [...scores.keys()].sort((a, b) => scores[b] - scores[a]).slice(0, k)
+      .map((r) => `${vec.codes[r]}=${vec.titles[r]}`).join("; ");
+  });
+}
+
 // Batch prompt mirroring src/cf/classify.py's rules ("map what was bought").
 function buildPrompt(items) {
   const lines = items.map((it, i) =>
-    `${i}. "${it.merchant}"${it.hint ? ` (statement category: ${it.hint})` : ""}`);
+    `${i}. "${it.merchant}"${it.hint ? ` (statement category: ${it.hint})` : ""}` +
+    (it.cands ? `\n   Candidates: ${it.cands}` : ""));
   return (
     "Assign each consumer credit-card merchant below to the single best NAICS code " +
     "for WHAT WAS BOUGHT, not where it was bought. Use 2022-revision codes only " +
@@ -52,7 +90,9 @@ function buildPrompt(items) {
     "(Zelle, Venmo, PayPal, Check) WITH a real statement category is just how a purchase was " +
     "paid — classify by the category: Zelle + Child Care is 624410, Venmo + Haircut is 812112.\n" +
     "The statement category says what was bought (strong signal); the merchant name says " +
-    "where or how it was paid (weak signal). When they conflict, trust the category.\n\n" +
+    "where or how it was paid (weak signal). When they conflict, trust the category.\n" +
+    "Where a merchant has a Candidates list, prefer a code from it when one fits; " +
+    "otherwise use your best NAICS-6 from anywhere.\n\n" +
     lines.join("\n") +
     '\n\nReturn ONLY a JSON array, one object per item, in order: ' +
     '[{"i": 0, "naics": "722515", "confidence": 0.95}, ...] ' +
@@ -138,6 +178,12 @@ async function handle(request, env) {
       }
       for (let i = 0; i < toClassify.length; i += 40) {
         const batch = toClassify.slice(i, i + 40);
+        try {
+          const cands = await topCandidates(env, batch.map((m) => m.hint ? `${m.merchant} · ${m.hint}` : m.merchant));
+          batch.forEach((m, j) => { m.cands = cands[j]; });
+        } catch (e) {
+          console.log("candidates_failed", { error: String(e.message || e).slice(0, 100) });
+        }
         const out = await classifyWithLLM(env, batch);
         for (const r of out) {
           const m = batch[r.i];

@@ -14,6 +14,11 @@ id = "ecce561dbee546d097405fd8531d43ca"
 # scripts/build_web.py, never the built file.
 [assets]
 directory = "../web"
+binding = "ASSETS"
+
+# Workers AI: query embeddings for the vector candidate tier
+[ai]
+binding = "AI"
 
 # Persistent request logs (dashboard: Worker -> Logs). Free tier is ample.
 [observability]
