@@ -94,11 +94,32 @@ function buildPrompt(items) {
     "Where a merchant has a Candidates list, prefer a code from it when one fits; " +
     "otherwise use your best NAICS-6 from anywhere.\n\n" +
     lines.join("\n") +
-    '\n\nReturn ONLY a JSON array, one object per item, in order: ' +
-    '[{"i": 0, "naics": "722515", "confidence": 0.95}, ...] ' +
-    "(naics null for non-purchases; confidence 0-1)."
+    "\n\nFor each numbered item return {i, naics, confidence} — naics null for " +
+    "non-purchases, confidence 0-1."
   );
 }
+
+// Structured output schema: the decoder can only produce this shape.
+const CLASSIFY_SCHEMA = {
+  type: "object",
+  properties: {
+    results: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          i: { type: "integer" },
+          naics: { type: ["string", "null"] },
+          confidence: { type: "number" },
+        },
+        required: ["i", "naics", "confidence"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["results"],
+  additionalProperties: false,
+};
 
 async function classifyWithLLM(env, items) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -112,26 +133,14 @@ async function classifyWithLLM(env, items) {
       model: env.CLASSIFY_MODEL,
       max_tokens: 4000,
       temperature: 0,
+      output_config: { format: { type: "json_schema", schema: CLASSIFY_SCHEMA } },
       messages: [{ role: "user", content: buildPrompt(items) }],
     }),
   });
   if (!res.ok) throw new Error(`anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data = await res.json();
   const text = data.content.find((b) => b.type === "text")?.text || "";
-  const m = text.match(/\[.*\]/s);
-  if (!m) throw new Error("no JSON array in model output");
-  // models drift on long arrays: trailing commas, unquoted keys, single quotes
-  const raw = m[0];
-  try { return JSON.parse(raw); } catch (e1) {
-    const repaired = raw
-      .replace(/,\s*([\]}])/g, "$1")                      // trailing commas
-      .replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":')  // unquoted keys
-      .replace(/'/g, '"');
-    try { return JSON.parse(repaired); } catch (e2) {
-      console.log("llm_parse_failed", { error: String(e1.message).slice(0, 120) });
-      throw new Error("llm output unparseable: " + String(e1.message).slice(0, 120));
-    }
-  }
+  return JSON.parse(text).results;   // schema-guaranteed valid
 }
 
 async function classifyWithRetry(env, items) {
