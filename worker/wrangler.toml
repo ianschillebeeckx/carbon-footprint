@@ -1,0 +1,19 @@
+name = "carbon-footprint-api"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# Shared merchant -> NAICS cache. Create the namespace once:
+#   npx wrangler kv namespace create MERCHANT_CACHE
+# (or dashboard: Storage & Databases -> KV) and paste its id below.
+[[kv_namespaces]]
+binding = "MERCHANT_CACHE"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[vars]
+# Origin allowed to call this API (the Pages deployment; add localhost while developing)
+ALLOWED_ORIGIN = "https://carbon-footprint.pages.dev"
+CLASSIFY_MODEL = "claude-haiku-4-5"
+DAILY_IP_LIMIT = "20"
+
+# Secrets (set via dashboard or `npx wrangler secret put ANTHROPIC_API_KEY`):
+#   ANTHROPIC_API_KEY
