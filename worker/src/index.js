@@ -77,6 +77,16 @@ async function classifyWithLLM(env, items) {
 
 export default {
   async fetch(request, env) {
+    try {
+      return await handle(request, env);
+    } catch (e) {
+      return new Response(JSON.stringify({ error: String(e.message || e).slice(0, 300) }),
+        { status: 500, headers: { ...JSON_HEADERS, ...cors(env) } });
+    }
+  },
+};
+
+async function handle(request, env) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(env) });
 
@@ -93,6 +103,10 @@ export default {
 
     // POST /api/classify {merchants: [{merchant, hint}]} -> {assignments: {key: {naics, confidence, source}}}
     if (url.pathname === "/api/classify" && request.method === "POST") {
+      if (!env.ANTHROPIC_API_KEY) {
+        return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY secret not configured" }),
+          { status: 503, headers: { ...JSON_HEADERS, ...cors(env) } });
+      }
       const ip = request.headers.get("CF-Connecting-IP") || "unknown";
       if (!(await ipAllowed(env, ip))) {
         return new Response(JSON.stringify({ error: "daily limit reached" }),
@@ -128,5 +142,4 @@ export default {
 
     return new Response(JSON.stringify({ error: "not found" }),
       { status: 404, headers: { ...JSON_HEADERS, ...cors(env) } });
-  },
-};
+}
