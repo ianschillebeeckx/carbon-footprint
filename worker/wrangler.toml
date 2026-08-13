@@ -7,7 +7,7 @@ compatibility_date = "2026-08-01"
 # (or dashboard: Storage & Databases -> KV) and paste its id below.
 [[kv_namespaces]]
 binding = "MERCHANT_CACHE"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "ecce561dbee546d097405fd8531d43ca"
 
 # Static frontend (uncomment once web/ lands — the same Worker then serves
 # the app and the API from one origin, no CORS needed):
