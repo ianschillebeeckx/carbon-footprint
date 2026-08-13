@@ -944,11 +944,13 @@ function renderTravelX() {
   const host = $("travelxrows");
   if (!host) return;
   const scan = txnSpendByPrefix([
-    {label: "Gas stations", prefixes: ["457"]},
+    {label: "Gas stations", prefixes: ["4571"]},
     {label: "Airlines", prefixes: ["481"]},
+    {label: "Transit & rail", prefixes: ["4851", "4852", "4854", "4855", "4859", "482", "483"]},
+    {label: "Taxi & rideshare", prefixes: ["4853"]},
   ]);
   if (!scan) return;
-  const [gas, air] = scan;
+  const [gas, air, transit, taxi] = scan;
   const fleetMiles = TRAVEL.vehicles.reduce((a, v) => a + (+v.miles || 0), 0);
   const fleetGal = TRAVEL.vehicles.reduce((a, v) => a + (+v.miles || 0) / Math.max(+v.mpg || 22, 1), 0);
   const mpg = fleetGal > 0 ? fleetMiles / fleetGal : 22;
@@ -959,9 +961,14 @@ function renderTravelX() {
     ? ["short", "medium", "long"].reduce((a, k2) => a + (+airMode["n" + k2] || 0) * TF.airTripMiles[k2], 0)
     : ["short", "medium", "long"].reduce((a, k2) => a + (+airMode[k2] || 0), 0);
   const impliedAirMi = air.mo * 12 / 0.15;
+  const g = TRAVEL.ground;
+  const enteredTransit = g.mode === "simple" ? (+g.publictrans || 0)
+    : ["bus", "transit", "commuter", "intercity"].reduce((a, k2) => a + (+g[k2] || 0), 0);
   host.innerHTML =
     `Gas stations: <b>$${fmt(gas.mo)}/mo</b> ≈ ${fmt(galYr)} gal/yr ≈ <b>${fmt(impliedMi)} mi/yr</b> at your ${mpg.toFixed(0)} MPG — you entered ${fmt(fleetMiles)} mi/yr.<br>` +
-    `Airlines: <b>$${fmt(air.mo)}/mo</b> ≈ <b>${fmt(impliedAirMi)} mi/yr</b> at ~15¢/mi — you entered ${fmt(enteredAir)} mi/yr.`;
+    `Airlines: <b>$${fmt(air.mo)}/mo</b> ≈ <b>${fmt(impliedAirMi)} mi/yr</b> at ~15¢/mi — you entered ${fmt(enteredAir)} mi/yr.<br>` +
+    `Transit & rail: <b>$${fmt(transit.mo)}/mo</b> ≈ <b>${fmt(transit.mo * 12 / 0.25)} mi/yr</b> at ~25¢/mi — you entered ${fmt(enteredTransit)} mi/yr.<br>` +
+    `Taxi & rideshare: <b>$${fmt(taxi.mo)}/mo</b> — not a CoolClimate input; if it's significant, fold ≈${fmt(taxi.mo * 12 / 2)} mi/yr (~$2/mi) into a vehicle's miles.`;
 }
 
 function renderHomeX() {
@@ -971,15 +978,17 @@ function renderHomeX() {
     {label: "Electric", prefixes: ["2211"]},
     {label: "Natural gas", prefixes: ["221210"]},
     {label: "Water & sewer", prefixes: ["2213"]},
+    {label: "Fuel dealers", prefixes: ["4572"]},
   ]);
   if (!scan) return;
-  const [el, ng, wa] = scan;
+  const [el, ng, wa, fu] = scan;
   const impliedKwh = el.mo * 12 / HF.elecDollarsPerKwh;
   const impliedTherms = ng.mo * 12 / HF.gasDollarsPerTherm;
   host.innerHTML =
     `Electric utility: <b>$${fmt(el.mo)}/mo</b> ≈ <b>${fmt(impliedKwh)} kWh/yr</b> at ~$${HF.elecDollarsPerKwh}/kWh — you entered ${fmt(+HOME.elec.kwh || 0)} kWh/yr.<br>` +
     `Natural gas: <b>$${fmt(ng.mo)}/mo</b> ≈ <b>${fmt(impliedTherms)} therms/yr</b> at ~$${HF.gasDollarsPerTherm}/therm — you entered ${fmt(+HOME.gas.therms || 0)} therms/yr.<br>` +
-    `Water & sewer: <b>$${fmt(wa.mo)}/mo</b> (omitted from the footprint — see Home sources note).`;
+    `Water & sewer: <b>$${fmt(wa.mo)}/mo</b> (omitted from the footprint — see Home sources note).` +
+    (fu.mo > 0 ? `<br>Heating oil/propane dealers: <b>$${fmt(fu.mo)}/mo</b> ≈ ${fmt(fu.mo * 12 / HF.oilDollarsPerGallon)} gal/yr — you entered ${fmt(+HOME.oil.gallons || 0)} gal/yr.` : "");
 }
 
 function renderTravel() {
