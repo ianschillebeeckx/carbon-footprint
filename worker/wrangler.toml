@@ -9,12 +9,11 @@ compatibility_date = "2026-08-01"
 binding = "MERCHANT_CACHE"
 id = "ecce561dbee546d097405fd8531d43ca"
 
-# Static frontend (uncomment once web/ lands — the same Worker then serves
-# the app and the API from one origin, no CORS needed):
-# [assets]
-# directory = "../web"
-# Custom domain: after the first deploy, Settings -> Domains & Routes ->
-# add carbon.outis.cc.
+# Static frontend: the same Worker serves web/ and the API from one origin.
+# web/index.html is generated — edit site/v2-template.html and run
+# scripts/build_web.py, never the built file.
+[assets]
+directory = "../web"
 
 [vars]
 # Origin allowed to call this API cross-origin (belt-and-suspenders; the
