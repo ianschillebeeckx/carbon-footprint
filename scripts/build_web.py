@@ -56,13 +56,34 @@ def build() -> None:
     categories = {k: {"section": sec, "label": lbl} for k, (sec, lbl) in CATEGORIES.items()}
 
     # LLMs sometimes emit 2017-vintage codes; the EPA CSV is the crosswalk.
+    # 2017 codes that fan out to multiple 2022 codes get a curated consumer
+    # target (auto-picking the first row once sent Amazon to motorcycle
+    # dealers); unique mappings are automatic.
+    CURATED_2017 = {
+        "454110": "459999",  # e-commerce -> online marketplace (basket-priced)
+        "454390": "459999",  # direct selling -> general merch
+        "453998": "459999",  # misc store retailers -> general merch
+        "515120": "516210",  # TV broadcasting -> streaming/media
+        "519130": "516210",  # internet publishing -> streaming/social media
+        "517312": "517112",  # wireless carriers, 2022 renumbering
+        "517911": "517121",  # telecom resellers
+        "212113": "212114",  # anthracite mining (not exactly consumer-relevant)
+    }
     import csv as _csv
-    remap = dict(classify.NO_FACTOR_REMAP)
+    from collections import defaultdict
+    fan = defaultdict(set)
     with open("data/naics2022_with_2017_emission_factors_1.csv") as fh:
         for row in _csv.DictReader(fh):
             c17, c22 = row["2017 NAICS Code"].strip(), row["2022 NAICS Code"].strip()
-            if c17 and c22 in by_code and c17 not in by_code and c17 not in remap:
-                remap[c17] = c22
+            if c17 and c22 in by_code and c17 not in by_code:
+                fan[c17].add(c22)
+    remap = dict(classify.NO_FACTOR_REMAP)
+    for c17, targets in fan.items():
+        if len(targets) == 1:
+            remap[c17] = next(iter(targets))
+        else:
+            assert c17 in CURATED_2017, f"ambiguous 2017 code {c17} needs a curated target"
+            remap[c17] = CURATED_2017[c17]
 
     runtime = WEB_RUNTIME \
         .replace("__BY_CODE__", json.dumps(by_code, separators=(",", ":"))) \

@@ -41,8 +41,9 @@ function buildPrompt(items) {
     "(apparel mfg is 315250 not 315220; clothing stores 458110 not 448140; streaming 516210).\n" +
     "Rules:\n" +
     "- Goods from a single-category brand: the commodity/manufacturing code (sectors 11-33).\n" +
-    "- Multi-category stores (home centers, pharmacies, department stores, warehouse clubs, " +
-    "online marketplaces): the retail store code.\n" +
+    "- Multi-category stores: the retail store code — online marketplaces (Amazon, Etsy, eBay) " +
+    "459999; department stores 455110; warehouse clubs (Costco) 455211; home centers 444110; " +
+    "pharmacies 456110.\n" +
     "- Services: the service's own code (51-81). Restaurants/food/travel/utilities keep their usual codes.\n" +
     "- Health insurance premiums fund healthcare delivery: 622110, not 524114.\n" +
     "- Digital subscriptions: 513210 software/SaaS, 516210 streaming, 518210 cloud.\n" +
