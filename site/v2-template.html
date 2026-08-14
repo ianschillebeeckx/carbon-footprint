@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Carbon v2 — bottom-up NAICS</title>
+<title>Carbon Ledger</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root {
@@ -24,6 +24,31 @@
   header.top .resetbtn { font: inherit; font-size: 0.78rem; background: none; border: 1px solid var(--line); color: var(--warn); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
   header.top .resetbtn:hover { border-color: var(--warn); background: var(--warnbg); }
   #upload-msg { font-size: 0.78rem; color: var(--muted); }
+  header.top .aboutbtn { font: inherit; font-size: 0.76rem; background: none; border: none; color: var(--leaf); cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 2px; }
+
+  #splash { position: fixed; inset: 0; background: rgba(18, 22, 16, 0.5); backdrop-filter: blur(3px); z-index: 100; display: flex; align-items: flex-start; justify-content: center; padding: 4vh 20px 20px; overflow-y: auto; }
+  #splash[hidden] { display: none; }
+  .spcard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; max-width: 700px; padding: 26px 30px 20px; box-shadow: 0 12px 48px rgba(0,0,0,0.35); }
+  .spcard h2 { margin: 0; font-size: 1.35rem; }
+  .splead { color: var(--muted); font-size: 0.9rem; margin: 6px 0 16px; }
+  .spgoal { display: flex; gap: 10px; margin-bottom: 10px; font-size: 0.85rem; }
+  .spgoal .n { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--chip); color: var(--leaf); font-weight: 700; font-size: 0.78rem; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .spgoal b { display: block; }
+  .spgoal span { color: var(--muted); font-size: 0.8rem; }
+  .spcard h4 { margin: 16px 0 8px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+  .sproutes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 640px) { .sproutes { grid-template-columns: 1fr; } }
+  .sproute { border: 1px solid var(--line); border-radius: 11px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; background: var(--ground); }
+  .sproute.sprec { border-color: var(--leaf); }
+  .sproute b { font-size: 0.87rem; }
+  .sproute b small { color: var(--muted); font-weight: 400; }
+  .sproute p { margin: 0; font-size: 0.78rem; color: var(--muted); flex: 1; }
+  .sproute button { font: inherit; font-size: 0.82rem; border: none; border-radius: 7px; padding: 7px 12px; cursor: pointer; background: var(--chip); color: var(--ink); }
+  .sproute.sprec button { background: var(--leaf); color: #fff; }
+  .sphint { font-size: 0.72rem; color: var(--muted); margin: 14px 0 0; }
+  .sphint a { color: var(--leaf); cursor: pointer; }
+
+  .mrow .t80 { color: var(--leaf); font-size: 0.6rem; margin-right: 5px; vertical-align: 2px; cursor: help; }
 
   #impact { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 20px; border-bottom: 1px solid var(--line); }
   .stat { flex: 1 1 150px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; position: relative; }
@@ -165,8 +190,35 @@
 </style>
 </head>
 <body>
+<div id="splash" hidden>
+  <div class="spcard">
+    <h2>Carbon Ledger</h2>
+    <p class="splead">Your household carbon footprint, built from what you actually do — your spending, your miles, your utility bills, your diet — instead of survey averages.</p>
+    <div class="spgoal"><span class="n">1</span><div><b>See your footprint</b>
+      <span>Tonnes of CO₂e per year across Travel, Home, Food, and Goods &amp; Services, side by side with the ~50-tonne average US household.</span></div></div>
+    <div class="spgoal"><span class="n">2</span><div><b>Understand the stakes</b>
+      <span>Each tonne causes roughly $240 in climate damages, mostly borne by other people — and sustained emissions cause measurable excess deaths (about one death per 4,400 tonnes; Bressler 2021).</span></div></div>
+    <div class="spgoal"><span class="n">3</span><div><b>Find your levers</b>
+      <span>See which categories dominate, what cutting them would change, and what permanently removing the rest would cost (~$600/tonne durable removal).</span></div></div>
+    <h4>Pick a route</h4>
+    <div class="sproutes">
+      <div class="sproute">
+        <b>Quick estimate <small>· ~5 min</small></b>
+        <p>Skip the transactions. Fill in the Travel, Home, and Food tabs from memory — miles driven and flown, electricity and gas, diet. Captures the biggest physical drivers; your goods &amp; services stay uncounted.</p>
+        <button id="sp-quick">Start with Travel</button>
+      </div>
+      <div class="sproute sprec">
+        <b>Complete picture <small>· ~20 min</small></b>
+        <p>Upload a CSV of ~12 months of transactions (a Category column helps). Review the merchant rules until the <span style="color:var(--leaf)">●</span> rows — the top 80% of spending in each category — look right, then fill in Travel, Home, and Food.</p>
+        <button id="sp-full">Go to upload</button>
+      </div>
+    </div>
+    <p class="sphint">Your transactions stay on this device — only merchant names and category hints are sent to a shared classification cache. Reopen this any time via <i>about</i> in the header. <a id="sp-skip">Just explore →</a></p>
+  </div>
+</div>
 <header class="top">
-  <h1>Carbon v2 — per-transaction NAICS</h1>
+  <h1>Carbon Ledger</h1>
+  <button id="about" class="aboutbtn" title="What this tool is and how to start">about</button>
   <span class="window" id="window"></span>
   <span id="upload-msg"></span>
   <button id="reset" class="resetbtn" title="Delete all transactions and every merchant rule">Reset all</button>
@@ -654,6 +706,19 @@ function renderMerchants() {
   const rows = merchantAgg();
   const hintCount = new Map();   // merchant -> number of distinct category hints
   for (const m of rows) hintCount.set(m.merchant, (hintCount.get(m.merchant) || 0) + 1);
+  // ● marks: within each category, the merchants making up the first 80% of
+  // spend — reviewing those covers most of the footprint. Computed over all
+  // rows (rows are already sorted by spend desc), independent of filters.
+  const domCat = t => { if (!t.mix) return t.category;
+    let c = null, w = 0; for (const p of t.mix) if (p.weight > w) { w = p.weight; c = p.category; } return c; };
+  const catTot = new Map(), catAcc = new Map();
+  for (const m of rows) { const c = domCat(m.sample); catTot.set(c, (catTot.get(c) || 0) + Math.max(0, m.total)); }
+  for (const m of rows) {
+    const c = domCat(m.sample);
+    const acc = catAcc.get(c) || 0;
+    m.top80 = c !== "ignored" && m.total > 0 && acc < 0.8 * (catTot.get(c) || 0);
+    catAcc.set(c, acc + Math.max(0, m.total));
+  }
   for (const m of rows) {
     const t = m.sample;
     if (q && !(`${m.merchant} ${t.naics_title} ${m.category_hint}`.toLowerCase().includes(q))) continue;
@@ -671,7 +736,9 @@ function renderMerchants() {
       ? ` · <label class="allcats" title="Apply corrections from this row to ${esc(m.merchant)} in all ${nHints} of its categories (category-specific rules you set stay pinned)"><input type="checkbox"${t.scope === "merchant" ? " checked" : ""}> all cats</label>`
       : "";
     row.innerHTML =
-      `<span class="m"><span class="name">${esc(m.merchant)}</span>` +
+      `<span class="m"><span class="name">` +
+        (m.top80 ? `<span class="t80" title="Top 80% of ${esc(CATS[domCat(t)] ? CATS[domCat(t)].label : "")} spending — reviewing the ● merchants covers most of your footprint">●</span>` : "") +
+        `${esc(m.merchant)}</span>` +
         `<small title="${esc(basketDesc(t))}">${esc(t.naics_title)}${t.basket ? " · 🧺 basket" : ""}${m.category_hint ? " · " + esc(m.category_hint) : ""} · ${srcLabel}${allcats}</small></span>` +
       `<span class="tot">$${fmt(m.total)}<small> · ${m.count}</small></span>` +
       `<span class="kgd" title="${esc(factorTip(t))}">${t.factor != null ? t.factor.toFixed(2) + " kg/$" : "–"}</span>` +
@@ -866,7 +933,7 @@ cf.onchange = e => { ui.cat = e.target.value; renderCats(); renderLeft(); };
 $("reset").onclick = async () => {
   if (!confirm("Delete ALL transactions, EVERY merchant rule (including your corrections), and all Travel/Home/Food/Offsets inputs? This cannot be undone.")) return;
   const res = await fetch("/api/v2/reset", {method: "POST"});
-  if (res.ok) location.reload();
+  if (res.ok) { try { localStorage.removeItem("cf_splash"); } catch (e) {} location.reload(); }
   else alert("Reset failed");
 };
 
@@ -1675,6 +1742,21 @@ renderFood();
 renderOffsets();
 setTab("merch");
 renderAll();
+
+// ---------- first-run splash ----------
+function closeSplash(tab) {
+  $("splash").hidden = true;
+  try { localStorage.setItem("cf_splash", "1"); } catch (e) {}
+  if (tab) setMainTab(tab);
+}
+$("about").onclick = () => { $("splash").hidden = false; };
+$("sp-quick").onclick = () => closeSplash("travel");
+$("sp-full").onclick = () => closeSplash();
+$("sp-skip").onclick = () => closeSplash();
+$("splash").onclick = e => { if (e.target === $("splash")) closeSplash(); };
+let splashSeen = null;
+try { splashSeen = localStorage.getItem("cf_splash"); } catch (e) {}
+if (!DATA && !splashSeen) $("splash").hidden = false;
 </script>
 </body>
 </html>
