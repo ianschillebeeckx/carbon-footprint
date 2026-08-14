@@ -485,10 +485,10 @@ const catMatches = t => !ui.cat ? true
 const ui = { search: "", cat: "", src: "" };
 
 function stats() {
-  if (!DATA) return { per: {}, months: 1, totalKg: 0, totalDollars: 0 };
-  const months = DATA.meta.months;
   const per = {};   // cat -> {dollars, kg}
   for (const c of CAT_ORDER) per[c] = { dollars: 0, kg: 0 };
+  if (!DATA) return { per, months: 1, totalKg: 0, totalDollars: 0 };
+  const months = DATA.meta.months;
   for (const t of DATA.transactions) {
     if (t.naics == null && !t.mix) continue;        // money movement: out of every total
     const spend = -t.amount;                        // refunds net out as negative
