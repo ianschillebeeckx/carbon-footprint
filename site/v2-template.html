@@ -737,7 +737,7 @@ function renderMerchants() {
       : "";
     row.innerHTML =
       `<span class="m"><span class="name">` +
-        (m.top80 ? `<span class="t80" title="Top 80% of ${esc(CATS[domCat(t)] ? CATS[domCat(t)].label : "")} spending — reviewing the ● merchants covers most of your footprint">●</span>` : "") +
+        (m.top80 ? `<span class="t80" title="Top 80% of ${esc((CATS[domCat(t)] ? CATS[domCat(t)].label : "").split(" — ")[0])} spending — reviewing the ● merchants covers most of your footprint">●</span>` : "") +
         `${esc(m.merchant)}</span>` +
         `<small title="${esc(basketDesc(t))}">${esc(t.naics_title)}${t.basket ? " · 🧺 basket" : ""}${m.category_hint ? " · " + esc(m.category_hint) : ""} · ${srcLabel}${allcats}</small></span>` +
       `<span class="tot">$${fmt(m.total)}<small> · ${m.count}</small></span>` +
