@@ -229,7 +229,7 @@
 
 <div id="impact">
   <div class="stat"><div class="k">Footprint</div><div class="v" id="imp-tons">–</div><div class="sub" id="imp-split"></div>
-    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors) plus Home (electricity/gas/oil/construction at CoolClimate factors for your zip) plus Food (your diet at CoolClimate's calorie factors, meat-type detail).">?</button></div>
+    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors) plus Home (electricity by ZIP + provider from EPA eGRID / CEC disclosure data; gas/oil/construction at CoolClimate factors) plus Food (your diet at CoolClimate's calorie factors, meat-type detail).">?</button></div>
   <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
     <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: each tonne of CO₂e causes roughly $240 of discounted future damages — storms, floods, wildfire, crop loss, and other climate harms, mostly borne by other people.">?</button></div>
   <div class="stat"><div class="k">To offset · $600/t (Charm)</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
@@ -339,11 +339,16 @@
   <div class="tcol">
     <div class="tcard">
       <h3>Electricity
-        <button class="info" aria-label="About electricity emissions" data-tip="0.199 kg CO₂e/kWh — the average California grid mix (EPA eGRID 2023, CAMX region) — plus ~9% upstream, ≈0.217 all-in. This average already includes the grid's existing renewables/hydro/nuclear, so it is NOT a 0%-green fossil rate (that would be ~0.4+). 'Green plan bought' is ONLY for voluntary renewable products on top of the default mix — CleanPowerSF SuperGreen, PG&E Solar Choice → 100. Leave it at 0 as a standard-mix customer, however renewable your grid already is: entering the grid's own renewable share would double-count it (it's already inside the 0.199).">?</button>
+        <button class="info" aria-label="About electricity emissions" data-tip="Your factor comes from your ZIP and provider. California providers use the CEC Power Content Label — your provider's actual reported portfolio (market-based), so a CleanPowerSF or 100%-renewable customer gets their real, much lower number — plus mix-weighted upstream fuel-cycle emissions (IPCC AR5): even a 100% renewable plan carries ~30 g/kWh of embodied wind/solar manufacturing. Outside California (no disclosure data): your eGRID subregion's rate; 'standard grid mix' uses the Green-e residual mix, so renewables already claimed by voluntary green-power buyers aren't double-counted. Carbon-free % counts nuclear and large hydro; where a portfolio holds unspecified market power, a low–high band is shown instead of false precision.">?</button>
         <span class="tkg" id="kg-elec"></span></h3>
       <!-- $ mode disabled (no location-dependent $->unit rates); re-enable with the JS blocks:
       <div class="tmode" id="elecmode"><button data-m="kwh">kWh</button><button data-m="dollars">Dollars</button></div> -->
       <div id="elecrows"></div>
+      <div class="tvrow"><label>ZIP:</label>
+        <input id="eleczip" type="text" inputmode="numeric" maxlength="5" style="width:64px" aria-label="Home ZIP code" placeholder="e.g. 94110">
+        <label>Provider:</label><select id="elecsup" aria-label="Electricity provider" style="max-width:240px"></select>
+        <select id="elecprod" aria-label="Electricity plan" style="max-width:180px" hidden></select></div>
+      <p class="hint" id="elecinfo" style="margin:4px 0 0"></p>
     </div>
     <div class="tcard">
       <h3>Natural gas
@@ -374,7 +379,7 @@
     </div>
     <div class="tcard tsum">Home footprint: <b id="kg-home-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
-    <p class="hint">Sources — electricity/gas/oil/construction factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API for zip 94110; electricity updated to <a href="https://www.epa.gov/egrid/summary-data" target="_blank" rel="noopener">EPA eGRID 2023</a> CAMX (0.199 kg CO₂e/kWh average grid mix — location-specific). Water &amp; sewage is deliberately omitted: physically it is ~4.25 kWh per 1,000 gallons (EPA/EPRI) ≈ 25–110 kg CO₂e/yr for typical households — a rounding error (CoolClimate's much larger water figure is expenditure-based and double-counts water heating).</p>
+    <p class="hint">Sources — electricity is ZIP + provider resolved: <a href="https://www.epa.gov/egrid/summary-data" target="_blank" rel="noopener">EPA eGRID 2023</a> subregion rates &amp; grid losses, <a href="https://www.energy.ca.gov/programs-and-topics/programs/power-source-disclosure-program/power-content-label" target="_blank" rel="noopener">CEC 2023 Power Content Labels</a> for California suppliers (market-based), <a href="https://resource-solutions.org/residual-mix/" target="_blank" rel="noopener">Green-e/CRS residual mix</a> for standard-mix customers (avoids double-counting others' green purchases), IPCC AR5 upstream fuel-cycle factors. Gas/oil/construction factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API. Water &amp; sewage is deliberately omitted: physically it is ~4.25 kWh per 1,000 gallons (EPA/EPRI) ≈ 25–110 kg CO₂e/yr for typical households — a rounding error (CoolClimate's much larger water figure is expenditure-based and double-counts water heating).</p>
   </div>
   <aside class="taside"><div class="tcard"><h3>Home breakdown</h3><div id="fig-home"></div></div></aside>
   </div>
@@ -1109,10 +1114,9 @@ function renderTravel() {
 // ---------- Home tab (CoolClimate housing model; factors measured from
 // their API for zip 94110 — grid intensity is location-specific) ----------
 const HF = {
-  // eGRID 2023 CAMX average grid mix (0.199 kg CO2e/kWh) + ~9% upstream
-  // (CoolClimate's ratio). CoolClimate's own 0.217 was the same construct,
-  // a few eGRID vintages older. This is the AVERAGE mix — the grid's
-  // existing renewables are already in it.
+  // Legacy CAMX average (eGRID 2023 + ~9% upstream) — only a placeholder
+  // while data/zip2co2.json loads; the real factor is ZIP+provider-resolved
+  // (see elecResolve below).
   elecPerKwh: 0.199 + 0.018,
   elecDollarsPerKwh: 0.2233,    // their local rate assumption ($1390 -> 6224.8 kWh)
   gasPerTherm: 5.470 + 0.766,
@@ -1122,7 +1126,7 @@ const HF = {
   sqftPerYear: 0.93,
 };
 const HOME = HOME_SAVED || {
-  elec: {mode: "kwh", kwh: 0, dollars: 0, clean: 0},
+  elec: {mode: "kwh", kwh: 0, dollars: 0, zip: "", sel: ""},
   gas: {mode: "therms", therms: 0, dollars: 0},
   oil: {mode: "gallons", gallons: 0, dollars: 0},
   sqft: 0,
@@ -1130,11 +1134,61 @@ const HOME = HOME_SAVED || {
 // $ input modes are disabled — physical units only (no location-dependent
 // $->unit rate support). The commented blocks below restore them.
 HOME.elec.mode = "kwh"; HOME.gas.mode = "therms"; HOME.oil.mode = "gallons";
+// Migration from the green-% slider era: zip/sel are new; `clean` is retired
+// (the provider's disclosed portfolio replaces the hand-entered discount).
+HOME.elec.zip = HOME.elec.zip || "";
+HOME.elec.sel = HOME.elec.sel || "";
+
+// ---------- electricity factor: ZIP (+ provider) -> kg CO2e/kWh ----------
+// Lookup tables precomputed by scripts/build_zip2co2_web.py, which runs the
+// zip2co2/tier2_factors.py resolver (EPA eGRID2023, CEC 2023 Power Content
+// Labels, Green-e residual mix, IPCC AR5 upstream) at build time. All the
+// accounting decisions live there; this is lookups only.
+let Z2 = null;
+fetch("data/zip2co2.json").then(r => r.ok ? r.json() : null).then(d => {
+  if (!d) return;
+  Z2 = d;
+  renderHome(); renderImpact();
+}).catch(() => {});
+
+function elecResolve() {
+  const e = HOME.elec;
+  if (!Z2) return {kg: HF.elecPerKwh, label: "CA-average placeholder", note: "location data loading…", r: null};
+  const z = (e.zip || "").trim();
+  const known = z in Z2.zips;
+  const ent = Z2.entries[known ? Z2.zips[z] : Z2.us];
+  const cands = (known && Z2.zip_sup[z]) || [];
+  const sel = e.sel || "";
+  if (sel.startsWith("i:")) {
+    const r = Z2.sups[+sel.slice(2)];
+    if (r) return {kg: r.kg, r, ent, label: `${r.name} — ${r.prod}`, note: ""};
+  }
+  if (sel.startsWith("id:")) {   // supplier chosen; default product (candidate row if any)
+    const id = sel.slice(3);
+    const c = cands.find(c => Z2.sups[c[0]].id === id);
+    const i = c ? c[0] : (Z2.sup_products[id] || [])[0];
+    const r = Z2.sups[i];
+    if (r) return {kg: r.kg, r, ent, label: `${r.name} — ${r.prod}`, note: ""};
+  }
+  if (sel === "resid") return {kg: ent.resid.kg, r: ent.resid, ent, label: `Standard grid mix (${ent.sub} residual)`, note: ""};
+  if (sel === "loc") return {kg: ent.loc.kg, r: ent.loc, ent, label: `Grid average (${ent.sub})`, note: ""};
+  if (sel === "green100") return {kg: Z2.green100.kg, r: Z2.green100, ent, label: "100% renewable product (unlisted provider)", note: ""};
+  // no explicit choice yet
+  if (cands.length) {
+    const i = (cands.find(c => c[1]) || cands[0])[0];
+    const r = Z2.sups[i];
+    return {kg: r.kg, r, ent, label: `${r.name} — ${r.prod}`,
+            note: "assumed the default provider for this ZIP — pick yours if different"};
+  }
+  if (!known) return {kg: ent.loc.kg, r: ent.loc, ent, label: "US grid average", note: z ? "ZIP not found" : "enter your ZIP for a local factor"};
+  return {kg: ent.resid.kg, r: ent.resid, ent, label: `Standard grid mix (${ent.sub} residual)`,
+          note: "buying certified green power? choose it under Provider"};
+}
 
 function homeKg() {
   const e = HOME.elec, g = HOME.gas, o = HOME.oil;
   const kwh = e.mode === "kwh" ? (+e.kwh || 0) : (+e.dollars || 0) / HF.elecDollarsPerKwh;
-  const elec = kwh * HF.elecPerKwh * (1 - Math.min(Math.max(+e.clean || 0, 0), 100) / 100);
+  const elec = kwh * elecResolve().kg;
   const therms = g.mode === "therms" ? (+g.therms || 0) : (+g.dollars || 0) / HF.gasDollarsPerTherm;
   const gas = therms * HF.gasPerTherm;
   const gallons = o.mode === "gallons" ? (+o.gallons || 0) : (+o.dollars || 0) / HF.oilDollarsPerGallon;
@@ -1151,15 +1205,85 @@ function saveHome() {
   }), 500);
 }
 
+function renderElecPicker(ef) {
+  const e = HOME.elec;
+  if ($("eleczip").value !== e.zip) $("eleczip").value = e.zip;
+  const supSel = $("elecsup"), prodSel = $("elecprod");
+  supSel.innerHTML = ""; prodSel.innerHTML = "";
+  const addOpt = (sel, value, label, selected) => {
+    const o = document.createElement("option");
+    o.value = value; o.textContent = label; o.selected = !!selected;
+    sel.appendChild(o);
+  };
+  if (!Z2) { addOpt(supSel, "", "loading location data…", true); prodSel.hidden = true; $("elecinfo").textContent = ""; return; }
+  const z = (e.zip || "").trim(), known = z in Z2.zips;
+  const cands = (known && Z2.zip_sup[z]) || [];
+  const r = ef.r, curSup = r && r.id ? r.id : null;
+  const candIds = [];
+  for (const [i, def] of cands) {
+    const s = Z2.sups[i];
+    if (candIds.includes(s.id)) continue;
+    candIds.push(s.id);
+    addOpt(supSel, "id:" + s.id, s.name + (def ? " (default here)" : ""), curSup === s.id);
+  }
+  addOpt(supSel, "resid", "Standard grid mix — no green product", !curSup && r === ef.ent.resid);
+  addOpt(supSel, "loc", "Grid average (location-based)", !curSup && r === ef.ent.loc);
+  addOpt(supSel, "green100", "100% renewable product — provider not listed", r === Z2.green100);
+  const og = document.createElement("optgroup");
+  og.label = "All California suppliers (CEC disclosure)";
+  const ids = Object.keys(Z2.sup_products)
+    .sort((a, b) => Z2.sups[Z2.sup_products[a][0]].name.localeCompare(Z2.sups[Z2.sup_products[b][0]].name));
+  for (const id of ids) {
+    if (candIds.includes(id)) continue;
+    const o = document.createElement("option");
+    o.value = "id:" + id;
+    o.textContent = Z2.sups[Z2.sup_products[id][0]].name;
+    o.selected = curSup === id;
+    og.appendChild(o);
+  }
+  supSel.appendChild(og);
+  if (curSup && Z2.sup_products[curSup].length > 1) {
+    prodSel.hidden = false;
+    for (const i of Z2.sup_products[curSup]) addOpt(prodSel, "i:" + i, Z2.sups[i].prod, Z2.sups[i] === r);
+  } else prodSel.hidden = true;
+  $("elecinfo").innerHTML = elecInfoLine(ef);
+}
+
+const MIX_LABELS = {solar: "solar", wind: "wind", large_hydro: "large hydro", small_hydro: "small hydro",
+  geothermal: "geothermal", biomass: "biomass", natural_gas: "natural gas", nuclear: "nuclear",
+  coal: "coal", oil: "oil", other: "other", unspecified: "unspecified"};
+
+function elecInfoLine(ef) {
+  const r = ef.r;
+  if (!r) return esc(ef.note || "");
+  const g = v => Math.round(v * 1000);
+  let s = `<b>${esc(ef.label)}</b> — ${g(r.kg)} g CO₂e/kWh`;
+  if (r.comb != null && r.up != null)
+    s += ` <small>(${g(r.comb)} generation + ${g(r.up)} upstream &amp; embodied)</small>`;
+  if (r.cf != null) {
+    s += r.cf_hi > r.cf_lo + 0.5
+      ? ` · ${Math.round(r.cf_lo)}–${Math.round(r.cf_hi)}% carbon-free <small>(band: ${Math.round(r.unspec || 0)}% is unspecified market power)</small>`
+      : ` · ${Math.round(r.cf)}% carbon-free`;
+    if (r.tier === "2-supplier" && r.phys_cf != null)
+      s += ` <small>(contractual — the wires physically deliver the ~${Math.round(r.phys_cf)}% carbon-free regional mix)</small>`;
+  }
+  if (r.mix)
+    s += `<br>2023 portfolio: ` + Object.entries(r.mix).slice(0, 6)
+      .map(([k, v]) => `${MIX_LABELS[k] || k} ${v}%`).join(" · ");
+  if (ef.note) s += `<br><span style="color:var(--warn)">${esc(ef.note)}</span>`;
+  return s;
+}
+
 function renderHome() {
   const k = homeKg();
   const numRow = (label, value, attrs, unit, note) =>
     `<div class="tvrow"><label>${label}:</label><input type="number" min="0" step="10" value="${value}" ${attrs} aria-label="${label}"><label>${unit}</label>${note ? `<span class="rowkg">${note}</span>` : ""}</div>`;
 
   const e = HOME.elec;
+  const ef = elecResolve();
   $("elecrows").innerHTML =
-    numRow("Electricity", +e.kwh || 0, 'data-h="elec.kwh" step="100"', "kWh/yr", `${(HF.elecPerKwh * 1000).toFixed(0)} g/kWh`) +
-    numRow("Green plan bought", +e.clean || 0, 'data-h="elec.clean" max="100" step="5" style="width:62px"', "% of usage", "0 unless you pay extra for renewable power");
+    numRow("Electricity", +e.kwh || 0, 'data-h="elec.kwh" step="100"', "kWh/yr", `${Math.round(ef.kg * 1000)} g/kWh`);
+  renderElecPicker(ef);
   const g = HOME.gas;
   $("gasrows").innerHTML =
     numRow("Natural gas", +g.therms || 0, 'data-h="gas.therms" step="10"', "therms/yr", `${HF.gasPerTherm.toFixed(1)} kg/therm`);
@@ -1194,6 +1318,13 @@ function renderHome() {
     $(id).querySelectorAll("button").forEach(b => b.onclick = () => { HOME[mode].mode = b.dataset.m; touched(); });
   } */
   $("sqftinput").onchange = () => { HOME.sqft = +$("sqftinput").value || 0; touched(); };
+  $("eleczip").onchange = ev => {
+    HOME.elec.zip = ev.target.value.replace(/\D/g, "").slice(0, 5);
+    HOME.elec.sel = "";      // new ZIP -> re-derive the default provider
+    touched();
+  };
+  $("elecsup").onchange = ev => { HOME.elec.sel = ev.target.value; touched(); };
+  $("elecprod").onchange = ev => { HOME.elec.sel = ev.target.value; touched(); };
 }
 
 // ---------- Food tab (CoolClimate diet model, meat-type detail; factors

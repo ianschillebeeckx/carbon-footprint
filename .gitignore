@@ -12,3 +12,4 @@ site/index.html
 .mm_session*
 *.log
 .DS_Store
+zip2co2/cache/
