@@ -1463,12 +1463,12 @@ const MONTH_COLORS = ["var(--s3)", "var(--s1)", "var(--s2)"];   // min, median, 
 
 function monthProfiles(I) {
   // per month: mean usage kWh by local hour, mean intensity by local hour,
-  // total usage, days covered.
+  // total usage, EXACT emissions (sum of kwh_h x I_h), days covered.
   const out = [];
   for (let m = 0; m < 12; m++) {
     const u = new Array(24).fill(0), un = new Array(24).fill(0);
     const iv = new Array(24).fill(0), ivn = new Array(24).fill(0);
-    let total = 0;
+    let total = 0, em = 0;
     const dayHasUse = new Set();
     for (let d = DOY_2024[m]; d < DOY_2024[m + 1]; d++) {
       for (let h = 0; h < 24; h++) {
@@ -1476,7 +1476,7 @@ function monthProfiles(I) {
         const v = HOURLY.kwh[k];
         if (v > 0) dayHasUse.add(d);
         u[h] += v; un[h]++;
-        if (I && I[k] != null) { iv[h] += I[k]; ivn[h]++; }
+        if (I && I[k] != null) { iv[h] += I[k]; ivn[h]++; em += v * I[k]; }
       }
     }
     for (let h = 0; h < 24; h++) {
@@ -1484,9 +1484,43 @@ function monthProfiles(I) {
       iv[h] = ivn[h] ? iv[h] / ivn[h] : 0;
       total += u[h] * (DOY_2024[m + 1] - DOY_2024[m]);
     }
-    out.push({m, u, i: iv, total, days: dayHasUse.size});
+    out.push({m, u, i: iv, total, em, days: dayHasUse.size});
   }
   return out.filter(p => p.days >= 10);   // partial uploads: skip thin months
+}
+
+// ---- monthly overview (default subplot): per month, your kWh, your exact
+// emissions, and the effective g/kWh (= emissions / kWh — YOUR hour-weighted
+// rate for that month, not the grid's flat mean). Bars normalized per series.
+function monthOverviewSvg(ps, W = 430, H = 190) {
+  const padL = 8, padR = 40, padB = 26, padT = 14;
+  const gw = (W - padL - padR) / 12;
+  const kMax = Math.max(...ps.map(p => p.total)) || 1;
+  const eMax = Math.max(...ps.map(p => p.em)) || 1;
+  const rates = ps.map(p => p.total > 0 ? p.em / p.total : 0);
+  const rMin = Math.min(...rates.filter(v => v > 0)), rMax = Math.max(...rates);
+  const rSpan = (rMax - rMin) || 1;
+  const bh = v => (H - padT - padB) * v;
+  let bars = "", pts = [], ticks = "";
+  const byM = new Map(ps.map(p => [p.m, p]));
+  for (let m = 0; m < 12; m++) {
+    const x = padL + m * gw;
+    const p = byM.get(m);
+    ticks += `<text x="${(x + gw / 2).toFixed(1)}" y="${H - 8}" font-size="8.5" fill="var(--muted)" text-anchor="middle">${MONTHS_ABBR[m][0]}</text>`;
+    if (!p) continue;
+    const kb = bh(p.total / kMax), eb = bh(p.em / eMax);
+    bars += `<rect x="${(x + 1.5).toFixed(1)}" y="${(H - padB - kb).toFixed(1)}" width="${(gw / 2 - 2).toFixed(1)}" height="${kb.toFixed(1)}" fill="var(--chip)" stroke="var(--line)" stroke-width="0.5"><title>${MONTHS_ABBR[m]}: ${fmt(p.total)} kWh</title></rect>`;
+    bars += `<rect x="${(x + gw / 2).toFixed(1)}" y="${(H - padB - eb).toFixed(1)}" width="${(gw / 2 - 2).toFixed(1)}" height="${eb.toFixed(1)}" fill="var(--s1)" opacity="0.75"><title>${MONTHS_ABBR[m]}: ${fmt(p.em)} kg CO₂e</title></rect>`;
+    if (p.total > 0) {
+      const y = padT + (H - padT - padB) * (1 - (p.em / p.total - rMin) / rSpan);
+      pts.push(`${(x + gw / 2).toFixed(1)},${y.toFixed(1)}`);
+    }
+  }
+  const yHi = `<text x="${W - padR + 4}" y="${padT + 8}" font-size="9" fill="var(--s2)">${Math.round(rMax * 1000)}g</text>`;
+  const yLo = `<text x="${W - padR + 4}" y="${H - padB}" font-size="9" fill="var(--s2)">${Math.round(rMin * 1000)}g</text>`;
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Monthly kWh, emissions and effective g/kWh">` +
+    bars + `<polyline points="${pts.join(" ")}" fill="none" stroke="var(--s2)" stroke-width="2"/>` +
+    ticks + yHi + yLo + `</svg>`;
 }
 
 function pickMonths(profiles, mode) {
@@ -1573,29 +1607,48 @@ function renderAdvanced(ef) {
   hourlyIntensity(ef.ba, I => I && renderAdvChart(ef, r, I));
 }
 
-let advRank = "gkwh";   // month-view ranking: "gkwh" (grid intensity) | "kwh" (your usage)
+let advRank = "month";  // subplot: "month" (overview) | "gkwh" | "kwh" (hourly, ranked)
 
 function renderAdvChart(ef, r, I) {
   const chart = $("advchart");
-  const sel = pickMonths(monthProfiles(I), advRank);
-  if (!sel) { chart.innerHTML = `<p class="hint">Month view needs at least 3 months of uploaded data.</p>`; return; }
-  const names = sel.map(p => MONTHS_ABBR[p.m]);
-  const words = advRank === "gkwh"
-    ? ["cleanest grid month", "median grid month", "dirtiest grid month"]
-    : ["lightest-usage month", "median-usage month", "heaviest-usage month"];
-  const legend = words.map((word, k) =>
-    `<span style="white-space:nowrap"><span style="color:${MONTH_COLORS[k]}">▮—</span> ${names[k]} <small>(${word}, ${Math.round(sel[k].ikg * 1000)} g/kWh · your ${fmt(sel[k].total)} kWh)</small></span>`).join(" · ");
-  const rankNote = advRank === "gkwh"
-    ? "Months ranked by the grid's monthly g/kWh"
-    : "Months ranked by your monthly kWh";
-  chart.innerHTML =
+  const profiles = monthProfiles(I);
+  const toggle =
     `<div class="tmode" id="advmode" style="margin:6px 0 4px">` +
-    `<button data-m="gkwh"${advRank === "gkwh" ? ' class="active"' : ""}>Rank by grid g/kWh</button>` +
-    `<button data-m="kwh"${advRank === "kwh" ? ' class="active"' : ""}>Rank by your usage</button></div>` +
-    monthChartSvg(sel) +
-    `<div class="hint" style="max-width:420px;margin-top:2px">${legend}<br>` +
-    `Bars: YOUR mean kWh by hour, layered (not summed). Lines: ${esc(r.ba)} mean g CO₂e/kWh by hour (EIA-930 ${G2.year}). ` +
-    `${rankNote}: median = middle month; min/max = the months whose hour-by-hour shape (usage + grid together) looks LEAST like the median's, one below and one above.</div>`;
+    `<button data-m="month"${advRank === "month" ? ' class="active"' : ""}>By month</button>` +
+    `<button data-m="gkwh"${advRank === "gkwh" ? ' class="active"' : ""}>Hourly · rank by grid g/kWh</button>` +
+    `<button data-m="kwh"${advRank === "kwh" ? ' class="active"' : ""}>Hourly · rank by your usage</button></div>`;
+  let body;
+  if (advRank === "month") {
+    body = monthOverviewSvg(profiles) +
+      `<div class="hint" style="max-width:420px;margin-top:2px">` +
+      `<span style="white-space:nowrap"><span style="color:var(--muted)">▮</span> your kWh</span> · ` +
+      `<span style="white-space:nowrap"><span style="color:var(--s1)">▮</span> your kg CO₂e</span> · ` +
+      `<span style="white-space:nowrap"><span style="color:var(--s2)">—</span> your effective g/kWh (right axis)</span><br>` +
+      `Per calendar month; each bar series is scaled to its own maximum. The g/kWh line is your emissions ÷ your kWh ` +
+      `for that month — hour-weighted by YOUR usage, so it can differ from the grid's flat monthly average. ` +
+      `Where blue overtops gray, that month's hours were dirtier than your yearly mix.</div>`;
+  } else {
+    const sel = pickMonths(profiles, advRank);
+    if (!sel) { chart.innerHTML = toggle + `<p class="hint">Month ranking needs at least 3 months of data.</p>`; wireAdvMode(ef, r, I); return; }
+    const names = sel.map(p => MONTHS_ABBR[p.m]);
+    const words = advRank === "gkwh"
+      ? ["cleanest grid month", "median grid month", "dirtiest grid month"]
+      : ["lightest-usage month", "median-usage month", "heaviest-usage month"];
+    const legend = words.map((word, k) =>
+      `<span style="white-space:nowrap"><span style="color:${MONTH_COLORS[k]}">▮—</span> ${names[k]} <small>(${word}, ${Math.round(sel[k].ikg * 1000)} g/kWh · your ${fmt(sel[k].total)} kWh)</small></span>`).join(" · ");
+    const rankNote = advRank === "gkwh"
+      ? "Months ranked by the grid's monthly g/kWh"
+      : "Months ranked by your monthly kWh";
+    body = monthChartSvg(sel) +
+      `<div class="hint" style="max-width:420px;margin-top:2px">${legend}<br>` +
+      `Bars: YOUR mean kWh by hour, layered (not summed). Lines: ${esc(r.ba)} mean g CO₂e/kWh by hour (EIA-930 ${G2.year}). ` +
+      `${rankNote}: median = middle month; min/max = the months whose hour-by-hour shape (usage + grid together) looks LEAST like the median's, one below and one above.</div>`;
+  }
+  chart.innerHTML = toggle + body;
+  wireAdvMode(ef, r, I);
+}
+
+function wireAdvMode(ef, r, I) {
   $("advmode").querySelectorAll("button").forEach(b => b.onclick = () => {
     advRank = b.dataset.m;
     renderAdvChart(ef, r, I);
