@@ -353,7 +353,7 @@
       <p class="hint" id="elecinfo" style="margin:4px 0 0"></p>
       <details id="elecadv" style="margin-top:10px">
         <summary class="hint" style="cursor:pointer">Advanced: upload your hourly usage</summary>
-        <p class="hint" style="margin:6px 0">Many utilities export interval data (PG&amp;E "Green Button" / Share My Data, etc.). Upload the CSV — columns with a timestamp and kWh (15-minute rows are summed to hours) — and your footprint uses <i>your</i> hours × your grid's hourly intensity instead of the typical-household assumption. The file stays in this browser. Or <a id="advsample" style="color:var(--leaf);cursor:pointer">try the Portland example</a> (an electric-heated home on a hydro grid — winter-peaked usage that misses the grid's dirty late-summer months).</p>
+        <p class="hint" style="margin:6px 0">Many utilities export interval data (PG&amp;E "Green Button" / Share My Data, etc.). Export a <b>full 12 months</b> and upload the CSV — columns with a timestamp and kWh (15-minute rows are summed to hours) — and your footprint uses <i>your</i> hours × your grid's hourly intensity instead of the typical-household assumption. The file stays in this browser. Or <a id="advsample" style="color:var(--leaf);cursor:pointer">try the Portland example</a> (an electric-heated home on a hydro grid — winter-peaked usage that misses the grid's dirty late-summer months).</p>
         <div class="tvrow"><label class="filebtn" for="advfile" style="font-size:0.76rem">Upload hourly CSV</label>
           <input id="advfile" type="file" accept=".csv,text/csv" hidden>
           <button id="advclear" class="tadd" hidden>✕ clear hourly data</button>
@@ -1283,7 +1283,22 @@ function applyHourlyMapping(lines, map, probe) {
   const hours = seen.filter(Boolean).length;
   const total = kwh.reduce((a, b) => a + b, 0);
   if (probe) return {hours};   // date-order probe: just report coverage
-  if (hours < 24 * 30) throw new Error(`only ${hours} distinct hours recognized — need ≥30 days of interval data`);
+  if (hours < 24 * 30) throw new Error(`only ${hours} distinct hours recognized — need a timestamp column and a kWh/usage column`);
+  // Full-year gate: the result is an ANNUAL footprint, so a partial year would
+  // be scaled wrong AND seasonally biased (two winter months of electric heat
+  // ≠ one sixth of a year). A month counts as covered at ≥20 days, so a
+  // mid-month-to-mid-month 12-month export still passes.
+  const mdays = new Array(12).fill(0);
+  for (let m = 0; m < 12; m++)
+    for (let d = DOY_2024[m]; d < DOY_2024[m + 1]; d++)
+      if (seen.slice(d * 24, d * 24 + 24).some(Boolean)) mdays[m]++;
+  const covered = mdays.filter(n => n >= 20).length;
+  if (covered < 12) {
+    const have = mdays.map((n, m) => n >= 20 ? MONTHS_ABBR[m] : null).filter(Boolean);
+    throw new Error(`covers ${covered} month${covered === 1 ? "" : "s"} (${have.join(", ") || "none fully"}) — ` +
+      `a full 12 months is needed: an annual footprint from a partial year would be mis-scaled and seasonally biased. ` +
+      `Most utility portals let you set the export range to the last year.`);
+  }
   if (total < 50) throw new Error(`total is ${total.toFixed(1)} kWh — units look wrong (expected hundreds+ per month)`);
   if (total > 200000) throw new Error(`total is ${Math.round(total).toLocaleString()} kWh — not a residential meter, or units are off`);
   const notes = [];
