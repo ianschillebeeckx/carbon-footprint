@@ -1,0 +1,64 @@
+# eGRID2023 rev2 BA23 sheet: BACO2E annual total output rate (BAC2ERTA lb/MWh
+# -> kg/kWh). Production-based; imports shape-only per make_real_cache.py note.
+ba,ba_name,subregion,egrid_year,kg_co2e_per_kwh,data_quality
+AECI,"Associated Electric Cooperative, Inc.",,2023,0.586136,PUBLISHED
+AVA,Avista Corporation,,2023,0.1649,PUBLISHED
+AVRN,Avangrid Renewables LLC,,2023,0.1677,PUBLISHED
+AZPS,Arizona Public Service Company,,2023,0.661062,PUBLISHED
+BANC,Balancing Authority of Northern California,,2023,0.174212,PUBLISHED
+BPAT,Bonneville Power Administration,,2023,0.09691,PUBLISHED
+CHPD,Public Utility District No. 1 of Chelan County,,2023,0.0,PUBLISHED
+CISO,California Independent System Operator,,2023,0.168124,PUBLISHED
+CPLE,Duke Energy Progress East,,2023,0.219338,PUBLISHED
+CPLW,Duke Energy Progress West,,2023,0.0,PUBLISHED
+DEAA,"Arlington Valley, LLC - AVBA",,2023,0.396393,PUBLISHED
+DOPD,PUD No. 1 of Douglas County,,2023,0.0,PUBLISHED
+DUK,Duke Energy Carolinas,,2023,0.220583,PUBLISHED
+EPE,El Paso Electric Company,,2023,0.458924,PUBLISHED
+ERCO,"Electric Reliability Council of Texas, Inc.",,2023,0.334197,PUBLISHED
+FMPP,Florida Municipal Power Pool,,2023,0.524496,PUBLISHED
+FPC,Duke Energy Florida Inc,,2023,0.441256,PUBLISHED
+FPL,Florida Power & Light Company,,2023,0.271524,PUBLISHED
+GCPD,"Public Utility District No. 2 of Grant County, Washington",,2023,0.0,PUBLISHED
+GRID,"Gridforce Energy Management, LLC",,2023,0.399074,PUBLISHED
+GVL,Gainesville Regional Utilities,,2023,0.719027,PUBLISHED
+GWA,"NaturEner Power Watch, LLC (GWA)",,2023,0.0,PUBLISHED
+HGMA,"New Harquahala Generating Company, LLC - HGBA",,2023,0.378081,PUBLISHED
+HST,City of Homestead,,2023,-0.012069,PUBLISHED
+IID,Imperial Irrigation District,,2023,0.113954,PUBLISHED
+IPCO,Idaho Power Company,,2023,0.102205,PUBLISHED
+ISNE,ISO New England Inc.,,2023,0.247329,PUBLISHED
+JEA,JEA,,2023,0.531531,PUBLISHED
+LDWP,Los Angeles Department of Water and Power,,2023,0.461544,PUBLISHED
+LGEE,LG&E and KU Services Company as agent for Louisville Gas and Electric Company and Kentucky Utilities,,2023,0.865479,PUBLISHED
+MISO,"Midcontinent Independent Transmission System Operator, Inc..",,2023,0.447894,PUBLISHED
+NEVP,Nevada Power Company,,2023,0.320489,PUBLISHED
+NWMT,NorthWestern Energy (NWMT),,2023,0.723353,PUBLISHED
+NYIS,New York Independent System Operator,,2023,0.218024,PUBLISHED
+PACE,PacifiCorp - East,,2023,0.643601,PUBLISHED
+PACW,PacifiCorp - West,,2023,0.140213,PUBLISHED
+PGE,Portland General Electric Company,,2023,0.361123,PUBLISHED
+PJM,"PJM Interconnection, LLC",,2023,0.326317,PUBLISHED
+PNM,Public Service Company of New Mexico,,2023,0.179013,PUBLISHED
+PSCO,Public Service Company of Colorado,,2023,0.365714,PUBLISHED
+PSEI,Puget Sound Energy,,2023,0.291516,PUBLISHED
+SC,South Carolina Public Service Authority,,2023,0.766663,PUBLISHED
+SCEG,South Carolina Electric & Gas Company,,2023,0.339542,PUBLISHED
+SCL,Seattle City Light,,2023,0.000397,PUBLISHED
+SEC,Seminole Electric Cooperative,,2023,0.550516,PUBLISHED
+SEPA,Southeastern Power Administration,,2023,3.6e-05,PUBLISHED
+SOCO,"Southern Company Services, Inc. - Trans",,2023,0.383953,PUBLISHED
+SPA,Southwestern Power Administration,,2023,0.236671,PUBLISHED
+SRP,Salt River Project,,2023,0.250704,PUBLISHED
+SWPP,Southwest Power Pool,,2023,0.397507,PUBLISHED
+TAL,City of Tallahassee,,2023,0.384447,PUBLISHED
+TEC,Tampa Electric Company,,2023,0.388935,PUBLISHED
+TEPC,Tucson Electric Power Company,,2023,0.740746,PUBLISHED
+TIDC,Turlock Irrigation District,,2023,0.350608,PUBLISHED
+TPWR,"City of Tacoma, Department of Public Utilities, Light Division",,2023,0.002655,PUBLISHED
+TVA,Tennessee Valley Authority,,2023,0.292078,PUBLISHED
+WACM,Western Area Power Administration - Rocky Mountain Region,,2023,0.853786,PUBLISHED
+WALC,Western Area Power Administration - Desert Southwest Region,,2023,0.218574,PUBLISHED
+WAUW,Western Area Power Administration UGP West,,2023,0.0,PUBLISHED
+WWA,"NaturEner Wind Watch, LLC",,2023,0.0,PUBLISHED
+YAD,"Alcoa Power Generating, Inc. - Yadkin Division",,2023,0.0,PUBLISHED

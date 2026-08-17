@@ -66,10 +66,10 @@ class Handler(BaseHTTPRequestHandler):
             html = html.replace("/*__FOOD__*/null", FOOD_FILE.read_text() if FOOD_FILE.exists() else "null")
             html = html.replace("/*__OFFSETS__*/null", OFFSETS_FILE.read_text() if OFFSETS_FILE.exists() else "null")
             self._send(200, html.encode(), "text/html; charset=utf-8")
-        elif path == "/data/zip2co2.json":
-            p = Path("web/data/zip2co2.json")
+        elif path == "/data/gridcarbon.json":
+            p = Path("web/data/gridcarbon.json")
             if not p.exists():
-                return self._send(404, {"error": "run scripts/build_zip2co2_web.py"})
+                return self._send(404, {"error": "run scripts/build_gridcarbon_web.py"})
             self._send(200, p.read_bytes(), "application/json")
         elif path == "/api/status":
             self._send(200, {"has_session": fetch.has_session(), "has_data": VALUES_FILE.exists()})

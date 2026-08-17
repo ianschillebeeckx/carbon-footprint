@@ -61,3 +61,15 @@ Instantiate once and reuse - the constructor reads six CSVs.
    worse than not applying it.
 5. `implied_kg_co2e_per_kwh` vs `combustion_kg_per_kwh`. A gap over 30% fires a warning and
    usually means a bad join or a mix/intensity vintage mismatch. Log it and watch the rate.
+
+## Status: superseded for the webapp's electricity factor
+
+The app now uses `zip2co2_2/` (gridcarbon): hourly EIA-930 grid intensity
+weighted by a TMY3 residential load shape, physical grid average, no supplier
+dimension. This module's data remains in use as inputs: `data/zip_utility.csv`
+feeds the zip->BA crosswalk, `cache/eia861/` feeds the utility->BA join, and
+the subregion factors serve as the flat fallback for ZIPs without hourly data
+(via `web/data/zip2co2.json`, still built by `scripts/build_zip2co2_web.py`).
+The CEC Power Content Label parser (`cec_labels.py`) is kept for reference —
+market-based supplier factors were deliberately dropped from the footprint (the
+wires deliver the shared physical mix regardless of plan).

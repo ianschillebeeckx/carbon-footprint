@@ -50,6 +50,9 @@
 
   .mrow .t80 { color: var(--leaf); font-size: 0.6rem; margin-right: 5px; vertical-align: 2px; cursor: help; }
 
+  .hchip { color: var(--leaf); cursor: help; text-decoration: underline dotted; text-underline-offset: 2px; }
+  #hour-pop { position: fixed; display: none; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.18); z-index: 70; }
+
   #impact { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 20px; border-bottom: 1px solid var(--line); }
   .stat { flex: 1 1 150px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; position: relative; }
   .info { width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--line); background: var(--ground); color: var(--muted); font-size: 0.68rem; line-height: 1; cursor: help; padding: 0; flex: none; }
@@ -229,7 +232,7 @@
 
 <div id="impact">
   <div class="stat"><div class="k">Footprint</div><div class="v" id="imp-tons">–</div><div class="sub" id="imp-split"></div>
-    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors) plus Home (electricity by ZIP + provider from EPA eGRID / CEC disclosure data; gas/oil/construction at CoolClimate factors) plus Food (your diet at CoolClimate's calorie factors, meat-type detail).">?</button></div>
+    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors) plus Home (electricity by ZIP: your grid's hourly intensity weighted by when households use power — EIA-930/eGRID/TMY3; gas/oil/construction at CoolClimate factors) plus Food (your diet at CoolClimate's calorie factors, meat-type detail).">?</button></div>
   <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
     <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: each tonne of CO₂e causes roughly $240 of discounted future damages — storms, floods, wildfire, crop loss, and other climate harms, mostly borne by other people.">?</button></div>
   <div class="stat"><div class="k">To offset · $600/t (Charm)</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
@@ -334,20 +337,19 @@
   </div>
 </div>
 
+<div id="hour-pop"></div>
 <div id="pane-home" class="mainpane" hidden>
   <div class="tpane">
   <div class="tcol">
     <div class="tcard">
       <h3>Electricity
-        <button class="info" aria-label="About electricity emissions" data-tip="Your factor comes from your ZIP and provider. California providers use the CEC Power Content Label — your provider's actual reported portfolio (market-based), so a CleanPowerSF or 100%-renewable customer gets their real, much lower number — plus mix-weighted upstream fuel-cycle emissions (IPCC AR5): even a 100% renewable plan carries ~30 g/kWh of embodied wind/solar manufacturing. Outside California (no disclosure data): your eGRID subregion's rate; 'standard grid mix' uses the Green-e residual mix, so renewables already claimed by voluntary green-power buyers aren't double-counted. Carbon-free % counts nuclear and large hydro; where a portfolio holds unspecified market power, a low–high band is shown instead of false precision.">?</button>
+        <button class="info" aria-label="About electricity emissions" data-tip="Grid average for your area, weighted by WHEN households actually use power. Your ZIP maps to a balancing authority (finer than an eGRID region — LADWP is dirtier than the CA average); its 2024 hourly generation mix (EIA-930) gives a CO₂e intensity for every hour of the year, calibrated so the annual level matches EPA's published eGRID rate. That hourly intensity is then weighted by a typical home's hourly usage (OpenEI TMY3 residential load shape) — households use most power in the evening, when solar is gone and gas is ramping, so the factor runs a few percent above the flat annual average. Includes mix-weighted upstream fuel-cycle emissions and ~4% delivery losses. Everyone gets the physical grid average regardless of green-power plan: the wires deliver the shared mix at the hours you use it (a voluntary renewable plan is real procurement your money funds, but it doesn't change what your outlet draws).">?</button>
         <span class="tkg" id="kg-elec"></span></h3>
       <!-- $ mode disabled (no location-dependent $->unit rates); re-enable with the JS blocks:
       <div class="tmode" id="elecmode"><button data-m="kwh">kWh</button><button data-m="dollars">Dollars</button></div> -->
       <div id="elecrows"></div>
       <div class="tvrow"><label>ZIP:</label>
-        <input id="eleczip" type="text" inputmode="numeric" maxlength="5" style="width:64px" aria-label="Home ZIP code" placeholder="e.g. 94110">
-        <label>Provider:</label><select id="elecsup" aria-label="Electricity provider" style="max-width:240px"></select>
-        <select id="elecprod" aria-label="Electricity plan" style="max-width:180px" hidden></select></div>
+        <input id="eleczip" type="text" inputmode="numeric" maxlength="5" style="width:64px" aria-label="Home ZIP code" placeholder="e.g. 94110"></div>
       <p class="hint" id="elecinfo" style="margin:4px 0 0"></p>
     </div>
     <div class="tcard">
@@ -379,7 +381,7 @@
     </div>
     <div class="tcard tsum">Home footprint: <b id="kg-home-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
-    <p class="hint">Sources — electricity is ZIP + provider resolved: <a href="https://www.epa.gov/egrid/summary-data" target="_blank" rel="noopener">EPA eGRID 2023</a> subregion rates &amp; grid losses, <a href="https://www.energy.ca.gov/programs-and-topics/programs/power-source-disclosure-program/power-content-label" target="_blank" rel="noopener">CEC 2023 Power Content Labels</a> for California suppliers (market-based), <a href="https://resource-solutions.org/residual-mix/" target="_blank" rel="noopener">Green-e/CRS residual mix</a> for standard-mix customers (avoids double-counting others' green purchases), IPCC AR5 upstream fuel-cycle factors. Gas/oil/construction factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API. Water &amp; sewage is deliberately omitted: physically it is ~4.25 kWh per 1,000 gallons (EPA/EPRI) ≈ 25–110 kg CO₂e/yr for typical households — a rounding error (CoolClimate's much larger water figure is expenditure-based and double-counts water heating).</p>
+    <p class="hint">Sources — electricity: <a href="https://www.eia.gov/electricity/gridmonitor/" target="_blank" rel="noopener">EIA-930</a> 2024 hourly generation by fuel for your balancing authority, calibrated to <a href="https://www.epa.gov/egrid" target="_blank" rel="noopener">EPA eGRID 2023</a> annual rates, weighted by <a href="https://data.openei.org/submissions/153" target="_blank" rel="noopener">OpenEI TMY3</a> residential hourly load shapes, plus IPCC AR5 upstream fuel-cycle emissions and eGRID delivery losses. Physical grid average — voluntary green-power plans don't change it (the wires deliver the shared mix). Gas/oil/construction factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API. Water &amp; sewage is deliberately omitted: physically it is ~4.25 kWh per 1,000 gallons (EPA/EPRI) ≈ 25–110 kg CO₂e/yr for typical households — a rounding error (CoolClimate's much larger water figure is expenditure-based and double-counts water heating).</p>
   </div>
   <aside class="taside"><div class="tcard"><h3>Home breakdown</h3><div id="fig-home"></div></div></aside>
   </div>
@@ -1364,7 +1366,7 @@ const HF = {
   sqftPerYear: 0.93,
 };
 const HOME = HOME_SAVED || {
-  elec: {mode: "kwh", kwh: 0, dollars: 0, zip: "", sel: ""},
+  elec: {mode: "kwh", kwh: 0, dollars: 0, zip: ""},
   gas: {mode: "therms", therms: 0, dollars: 0},
   oil: {mode: "gallons", gallons: 0, dollars: 0},
   sqft: 0,
@@ -1372,55 +1374,37 @@ const HOME = HOME_SAVED || {
 // $ input modes are disabled — physical units only (no location-dependent
 // $->unit rate support). The commented blocks below restore them.
 HOME.elec.mode = "kwh"; HOME.gas.mode = "therms"; HOME.oil.mode = "gallons";
-// Migration from the green-% slider era: zip/sel are new; `clean` is retired
-// (the provider's disclosed portfolio replaces the hand-entered discount).
+// Migrations: `clean` (green-% slider era) and `sel` (provider-picker era) are
+// retired — the physical grid average needs only the ZIP.
 HOME.elec.zip = HOME.elec.zip || "";
-HOME.elec.sel = HOME.elec.sel || "";
 
-// ---------- electricity factor: ZIP (+ provider) -> kg CO2e/kWh ----------
-// Lookup tables precomputed by scripts/build_zip2co2_web.py, which runs the
-// zip2co2/tier2_factors.py resolver (EPA eGRID2023, CEC 2023 Power Content
-// Labels, Green-e residual mix, IPCC AR5 upstream) at build time. All the
-// accounting decisions live there; this is lookups only.
-let Z2 = null;
-fetch("data/zip2co2.json").then(r => r.ok ? r.json() : null).then(d => {
+// ---------- electricity factor: ZIP -> hourly-weighted grid average ----------
+// data/gridcarbon.json is precomputed by scripts/build_gridcarbon_web.py from
+// the zip2co2_2/gridcarbon library: per balancing authority, EIA-930 2024
+// hourly generation -> hourly CO2e intensity (calibrated to eGRID2023 annual),
+// weighted by an OpenEI TMY3 residential load shape. Physical grid average for
+// everyone — no provider dimension (see the ? tip for why).
+let G2 = null;
+fetch("data/gridcarbon.json").then(r => r.ok ? r.json() : null).then(d => {
   if (!d) return;
-  Z2 = d;
+  G2 = d;
   renderHome(); renderImpact();
 }).catch(() => {});
 
 function elecResolve() {
-  const e = HOME.elec;
-  if (!Z2) return {kg: HF.elecPerKwh, label: "CA-average placeholder", note: "location data loading…", r: null};
-  const z = (e.zip || "").trim();
-  const known = z in Z2.zips;
-  const ent = Z2.entries[known ? Z2.zips[z] : Z2.us];
-  const cands = (known && Z2.zip_sup[z]) || [];
-  const sel = e.sel || "";
-  if (sel.startsWith("i:")) {
-    const r = Z2.sups[+sel.slice(2)];
-    if (r) return {kg: r.kg, r, ent, label: `${r.name} — ${r.prod}`, note: ""};
+  if (!G2) return {kg: HF.elecPerKwh, label: "CA-average placeholder", note: "location data loading…"};
+  const z = (HOME.elec.zip || "").trim();
+  if (z in G2.zips) {
+    const [bi, ui] = G2.zips[z];
+    return {kg: G2.bas[bi].kg, ba: G2.bas[bi], util: G2.utils[ui], note: ""};
   }
-  if (sel.startsWith("id:")) {   // supplier chosen; default product (candidate row if any)
-    const id = sel.slice(3);
-    const c = cands.find(c => Z2.sups[c[0]].id === id);
-    const i = c ? c[0] : (Z2.sup_products[id] || [])[0];
-    const r = Z2.sups[i];
-    if (r) return {kg: r.kg, r, ent, label: `${r.name} — ${r.prod}`, note: ""};
+  if (z in G2.fb_zips) {
+    const e = G2.fb[G2.fb_zips[z]];
+    return {kg: e.kg, sub: e.sub,
+            note: "no hourly data for this area — flat eGRID " + e.sub + " subregion average"};
   }
-  if (sel === "resid") return {kg: ent.resid.kg, r: ent.resid, ent, label: `Standard grid mix (${ent.sub} residual)`, note: ""};
-  if (sel === "loc") return {kg: ent.loc.kg, r: ent.loc, ent, label: `Grid average (${ent.sub})`, note: ""};
-  if (sel === "green100") return {kg: Z2.green100.kg, r: Z2.green100, ent, label: "100% renewable product (unlisted provider)", note: ""};
-  // no explicit choice yet
-  if (cands.length) {
-    const i = (cands.find(c => c[1]) || cands[0])[0];
-    const r = Z2.sups[i];
-    return {kg: r.kg, r, ent, label: `${r.name} — ${r.prod}`,
-            note: "assumed the default provider for this ZIP — pick yours if different"};
-  }
-  if (!known) return {kg: ent.loc.kg, r: ent.loc, ent, label: "US grid average", note: z ? "ZIP not found" : "enter your ZIP for a local factor"};
-  return {kg: ent.resid.kg, r: ent.resid, ent, label: `Standard grid mix (${ent.sub} residual)`,
-          note: "buying certified green power? choose it under Provider"};
+  return {kg: G2.us_kg, note: z ? "ZIP not found — using the US grid average"
+                                : "enter your ZIP for a local factor (US average until then)"};
 }
 
 function homeKg() {
@@ -1441,73 +1425,70 @@ function saveHome() {
   homeSaveTimer = setTimeout(() => localStorage.setItem("cf_home", JSON.stringify(HOME)), 500);
 }
 
-function renderElecPicker(ef) {
-  const e = HOME.elec;
-  if ($("eleczip").value !== e.zip) $("eleczip").value = e.zip;
-  const supSel = $("elecsup"), prodSel = $("elecprod");
-  supSel.innerHTML = ""; prodSel.innerHTML = "";
-  const addOpt = (sel, value, label, selected) => {
-    const o = document.createElement("option");
-    o.value = value; o.textContent = label; o.selected = !!selected;
-    sel.appendChild(o);
-  };
-  if (!Z2) { addOpt(supSel, "", "loading location data…", true); prodSel.hidden = true; $("elecinfo").textContent = ""; return; }
-  const z = (e.zip || "").trim(), known = z in Z2.zips;
-  const cands = (known && Z2.zip_sup[z]) || [];
-  const r = ef.r, curSup = r && r.id ? r.id : null;
-  const candIds = [];
-  for (const [i, def] of cands) {
-    const s = Z2.sups[i];
-    if (candIds.includes(s.id)) continue;
-    candIds.push(s.id);
-    addOpt(supSel, "id:" + s.id, s.name + (def ? " (default here)" : ""), curSup === s.id);
+function renderElecInfo(ef) {
+  if ($("eleczip").value !== HOME.elec.zip) $("eleczip").value = HOME.elec.zip;
+  const g = v => Math.round(v * 1000);
+  let s = "";
+  if (ef.ba) {
+    s = `<b>${esc(ef.ba.name)}</b> <small>(${esc(ef.util)} wires)</small> — ${g(ef.kg)} g CO₂e/kWh`;
+    if (ef.ba.di) {
+      const sign = ef.ba.uplift >= 0 ? "+" : "";
+      s += ` <small>household-hour weighted; flat average ${g(ef.ba.flat)} g (${sign}${ef.ba.uplift}% — evening-heavy home use meets the evening grid)</small>` +
+        ` · <span class="hchip" tabindex="0">24-hour profile</span>`;
+    } else {
+      s += ` <small>flat eGRID average — hourly shape not reliable for this grid</small>`;
+    }
+  } else if (ef.sub) {
+    s = `<b>${esc(ef.sub)} subregion</b> — ${g(ef.kg)} g CO₂e/kWh`;
   }
-  addOpt(supSel, "resid", "Standard grid mix — no green product", !curSup && r === ef.ent.resid);
-  addOpt(supSel, "loc", "Grid average (location-based)", !curSup && r === ef.ent.loc);
-  addOpt(supSel, "green100", "100% renewable product — provider not listed", r === Z2.green100);
-  const og = document.createElement("optgroup");
-  og.label = "All California suppliers (CEC disclosure)";
-  const ids = Object.keys(Z2.sup_products)
-    .sort((a, b) => Z2.sups[Z2.sup_products[a][0]].name.localeCompare(Z2.sups[Z2.sup_products[b][0]].name));
-  for (const id of ids) {
-    if (candIds.includes(id)) continue;
-    const o = document.createElement("option");
-    o.value = "id:" + id;
-    o.textContent = Z2.sups[Z2.sup_products[id][0]].name;
-    o.selected = curSup === id;
-    og.appendChild(o);
-  }
-  supSel.appendChild(og);
-  if (curSup && Z2.sup_products[curSup].length > 1) {
-    prodSel.hidden = false;
-    for (const i of Z2.sup_products[curSup]) addOpt(prodSel, "i:" + i, Z2.sups[i].prod, Z2.sups[i] === r);
-  } else prodSel.hidden = true;
-  $("elecinfo").innerHTML = elecInfoLine(ef);
+  if (ef.note) s += (s ? "<br>" : "") + `<span style="color:var(--warn)">${esc(ef.note)}</span>`;
+  $("elecinfo").innerHTML = s;
+  const chip = $("elecinfo").querySelector(".hchip");
+  if (chip) wireHourPop(chip, ef.ba);
 }
 
-const MIX_LABELS = {solar: "solar", wind: "wind", large_hydro: "large hydro", small_hydro: "small hydro",
-  geothermal: "geothermal", biomass: "biomass", natural_gas: "natural gas", nuclear: "nuclear",
-  coal: "coal", oil: "oil", other: "other", unspecified: "unspecified"};
-
-function elecInfoLine(ef) {
-  const r = ef.r;
-  if (!r) return esc(ef.note || "");
-  const g = v => Math.round(v * 1000);
-  let s = `<b>${esc(ef.label)}</b> — ${g(r.kg)} g CO₂e/kWh`;
-  if (r.comb != null && r.up != null)
-    s += ` <small>(${g(r.comb)} generation + ${g(r.up)} upstream &amp; embodied)</small>`;
-  if (r.cf != null) {
-    s += r.cf_hi > r.cf_lo + 0.5
-      ? ` · ${Math.round(r.cf_lo)}–${Math.round(r.cf_hi)}% carbon-free <small>(band: ${Math.round(r.unspec || 0)}% is unspecified market power)</small>`
-      : ` · ${Math.round(r.cf)}% carbon-free`;
-    if (r.tier === "2-supplier" && r.phys_cf != null)
-      s += ` <small>(contractual — the wires physically deliver the ~${Math.round(r.phys_cf)}% carbon-free regional mix)</small>`;
+// ---- 24-hour tooltip: assumed household usage (bars) vs grid g/kWh (line) ----
+function hourChartSvg(ba) {
+  const W = 340, H = 150, padL = 8, padR = 36, padB = 26, padT = 14;
+  const iw = (W - padL - padR) / 24;
+  const di = ba.di, dw = ba.dw;
+  const wMax = Math.max(...dw);
+  const iMin = Math.min(...di), iMax = Math.max(...di);
+  const iSpan = (iMax - iMin) || 1;
+  let bars = "", pts = [];
+  for (let h = 0; h < 24; h++) {
+    const x = padL + h * iw;
+    const bh = (H - padT - padB) * (dw[h] / wMax);
+    bars += `<rect x="${(x + 1).toFixed(1)}" y="${(H - padB - bh).toFixed(1)}" width="${(iw - 2).toFixed(1)}" height="${bh.toFixed(1)}" fill="var(--chip)" stroke="var(--line)" stroke-width="0.5"/>`;
+    const y = padT + (H - padT - padB) * (1 - (di[h] - iMin) / iSpan);
+    pts.push(`${(x + iw / 2).toFixed(1)},${y.toFixed(1)}`);
   }
-  if (r.mix)
-    s += `<br>2023 portfolio: ` + Object.entries(r.mix).slice(0, 6)
-      .map(([k, v]) => `${MIX_LABELS[k] || k} ${v}%`).join(" · ");
-  if (ef.note) s += `<br><span style="color:var(--warn)">${esc(ef.note)}</span>`;
-  return s;
+  const ticks = [0, 6, 12, 18].map(h =>
+    `<text x="${(padL + h * iw + iw / 2).toFixed(1)}" y="${H - 8}" font-size="9" fill="var(--muted)" text-anchor="middle">${h === 0 ? "12am" : h === 12 ? "12pm" : h < 12 ? h + "am" : (h - 12) + "pm"}</text>`).join("");
+  const yHi = `<text x="${W - padR + 4}" y="${padT + 8}" font-size="9" fill="var(--s2)">${Math.round(iMax * 1000)}g</text>`;
+  const yLo = `<text x="${W - padR + 4}" y="${H - padB}" font-size="9" fill="var(--s2)">${Math.round(iMin * 1000)}g</text>`;
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly household usage and grid carbon intensity">` +
+    bars + `<polyline points="${pts.join(" ")}" fill="none" stroke="var(--s2)" stroke-width="2"/>` +
+    ticks + yHi + yLo + `</svg>`;
+}
+
+function wireHourPop(chip, ba) {
+  const show = () => {
+    const pop = $("hour-pop");
+    pop.innerHTML = hourChartSvg(ba) +
+      `<div style="font-size:0.72rem;color:var(--muted);max-width:330px;margin-top:2px">` +
+      `<span style="color:var(--ink)">▮</span> assumed share of household use by hour (OpenEI TMY3 residential) · ` +
+      `<span style="color:var(--s2)">—</span> grid g CO₂e/kWh by hour (EIA-930 ${G2.year}, ${esc(ba.ba)}, local time, annual mean). ` +
+      `Your factor weights the line by the bars.</div>`;
+    const r = chip.getBoundingClientRect();
+    pop.style.display = "block";
+    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pw - 8)) + "px";
+    pop.style.top = (r.top - ph - 6 > 8 ? r.top - ph - 6 : r.bottom + 6) + "px";
+  };
+  const hide = () => { $("hour-pop").style.display = "none"; };
+  chip.onmouseenter = show; chip.onmouseleave = hide;
+  chip.onfocus = show; chip.onblur = hide;
 }
 
 function renderHome() {
@@ -1519,7 +1500,7 @@ function renderHome() {
   const ef = elecResolve();
   $("elecrows").innerHTML =
     numRow("Electricity", +e.kwh || 0, 'data-h="elec.kwh" step="100"', "kWh/yr", `${Math.round(ef.kg * 1000)} g/kWh`);
-  renderElecPicker(ef);
+  renderElecInfo(ef);
   const g = HOME.gas;
   $("gasrows").innerHTML =
     numRow("Natural gas", +g.therms || 0, 'data-h="gas.therms" step="10"', "therms/yr", `${HF.gasPerTherm.toFixed(1)} kg/therm`);
@@ -1556,11 +1537,8 @@ function renderHome() {
   $("sqftinput").onchange = () => { HOME.sqft = +$("sqftinput").value || 0; touched(); };
   $("eleczip").onchange = ev => {
     HOME.elec.zip = ev.target.value.replace(/\D/g, "").slice(0, 5);
-    HOME.elec.sel = "";      // new ZIP -> re-derive the default provider
     touched();
   };
-  $("elecsup").onchange = ev => { HOME.elec.sel = ev.target.value; touched(); };
-  $("elecprod").onchange = ev => { HOME.elec.sel = ev.target.value; touched(); };
 }
 
 // ---------- Food tab (CoolClimate diet model, meat-type detail; factors

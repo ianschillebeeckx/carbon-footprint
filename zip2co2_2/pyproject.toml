@@ -1,0 +1,9 @@
+[project]
+name = "gridcarbon"
+version = "0.1.0"
+description = "Hourly-resolved residential electricity carbon estimation from ZIP + annual kWh"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "pandas>=2.0", "tzdata"]
+
+[tool.setuptools.package-data]
+gridcarbon = ["data/*.csv", "data/cache/*.gz", "dist/*"]
