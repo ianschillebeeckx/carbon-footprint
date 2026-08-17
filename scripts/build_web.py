@@ -176,11 +176,11 @@ def build() -> None:
     s = sub(s, '''$("reset").onclick = async () => {
   if (!confirm("Delete ALL transactions, EVERY merchant rule (including your corrections), and all Travel/Home/Food/Offsets inputs? This cannot be undone.")) return;
   const res = await fetch("/api/v2/reset", {method: "POST"});
-  if (res.ok) { try { localStorage.removeItem("cf_splash"); } catch (e) {} location.reload(); }
+  if (res.ok) { try { localStorage.removeItem("cf_splash"); localStorage.removeItem("cf_elec_hourly"); } catch (e) {} location.reload(); }
   else alert("Reset failed");
 };''', '''$("reset").onclick = () => {
   if (!confirm("Delete ALL transactions, EVERY merchant rule (including your corrections), and all Travel/Home/Food/Offsets inputs stored in this browser? This cannot be undone.")) return;
-  for (const k of ["cf_data", "cf_rules", "cf_travel", "cf_home", "cf_food", "cf_offsets", "cf_splash"]) localStorage.removeItem(k);
+  for (const k of ["cf_data", "cf_rules", "cf_travel", "cf_home", "cf_food", "cf_offsets", "cf_splash", "cf_elec_hourly"]) localStorage.removeItem(k);
   location.reload();
 };''')
 

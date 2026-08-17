@@ -71,6 +71,15 @@ class Handler(BaseHTTPRequestHandler):
             if not p.exists():
                 return self._send(404, {"error": "run scripts/build_gridcarbon_web.py"})
             self._send(200, p.read_bytes(), "application/json")
+        elif path.startswith("/data/hourly/") or path == "/data/sample_hourly_portland.csv":
+            name = path.rsplit("/", 1)[-1]
+            if not all(c.isalnum() or c in "._-" for c in name) or ".." in name:
+                return self._send(404, {"error": "not found"})
+            p = Path("web/data/hourly" if "/hourly/" in path else "web/data") / name
+            if not p.exists():
+                return self._send(404, {"error": "not found"})
+            self._send(200, p.read_bytes(),
+                       "application/json" if name.endswith(".json") else "text/csv")
         elif path == "/api/status":
             self._send(200, {"has_session": fetch.has_session(), "has_data": VALUES_FILE.exists()})
         elif path == "/api/values":

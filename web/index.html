@@ -351,6 +351,15 @@
       <div class="tvrow"><label>ZIP:</label>
         <input id="eleczip" type="text" inputmode="numeric" maxlength="5" style="width:64px" aria-label="Home ZIP code" placeholder="e.g. 94110"></div>
       <p class="hint" id="elecinfo" style="margin:4px 0 0"></p>
+      <details id="elecadv" style="margin-top:10px">
+        <summary class="hint" style="cursor:pointer">Advanced: upload your hourly usage</summary>
+        <p class="hint" style="margin:6px 0">Many utilities export interval data (PG&amp;E "Green Button" / Share My Data, etc.). Upload the CSV — columns with a timestamp and kWh (15-minute rows are summed to hours) — and your footprint uses <i>your</i> hours × your grid's hourly intensity instead of the typical-household assumption. The file stays in this browser. Or <a id="advsample" style="color:var(--leaf);cursor:pointer">try the Portland example</a> (an electric-heated home on a hydro grid — winter-peaked usage that misses the grid's dirty late-summer months).</p>
+        <div class="tvrow"><label class="filebtn" for="advfile" style="font-size:0.76rem">Upload hourly CSV</label>
+          <input id="advfile" type="file" accept=".csv,text/csv" hidden>
+          <button id="advclear" class="tadd" hidden>✕ clear hourly data</button>
+          <span class="hint" id="advstatus"></span></div>
+        <div id="advchart" style="margin-top:8px"></div>
+      </details>
     </div>
     <div class="tcard">
       <h3>Natural gas
@@ -1177,7 +1186,7 @@ cf.onchange = e => { ui.cat = e.target.value; renderCats(); renderLeft(); };
 
 $("reset").onclick = () => {
   if (!confirm("Delete ALL transactions, EVERY merchant rule (including your corrections), and all Travel/Home/Food/Offsets inputs stored in this browser? This cannot be undone.")) return;
-  for (const k of ["cf_data", "cf_rules", "cf_travel", "cf_home", "cf_food", "cf_offsets", "cf_splash"]) localStorage.removeItem(k);
+  for (const k of ["cf_data", "cf_rules", "cf_travel", "cf_home", "cf_food", "cf_offsets", "cf_splash", "cf_elec_hourly"]) localStorage.removeItem(k);
   location.reload();
 };
 
@@ -1388,6 +1397,7 @@ let G2 = null;
 fetch("data/gridcarbon.json").then(r => r.ok ? r.json() : null).then(d => {
   if (!d) return;
   G2 = d;
+  hourlyRecompute();          // apply a saved hourly upload once BAs are known
   renderHome(); renderImpact();
 }).catch(() => {});
 
@@ -1407,10 +1417,132 @@ function elecResolve() {
                                 : "enter your ZIP for a local factor (US average until then)"};
 }
 
+// ---------- advanced: uploaded hourly usage x hourly grid intensity ----------
+// HOURLY.kwh is an 8784-slot array indexed by local (standard-time) hour of
+// year on the 2024 leap calendar: (doy-1)*24 + hour, month/day/hour taken from
+// the user's timestamps regardless of their year. G2H caches the per-BA hourly
+// intensity files (web/data/hourly/{BA}.json, same indexing, built by
+// scripts/build_gridcarbon_web.py).
+let HOURLY = null;
+try { HOURLY = JSON.parse(localStorage.getItem("cf_elec_hourly") || "null"); } catch (e) {}
+const G2H = {};
+
+const DOY_2024 = (() => {  // cumulative days before each month, leap year
+  const dm = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31], out = [0];
+  for (let m = 0; m < 12; m++) out.push(out[m] + dm[m]);
+  return out;
+})();
+
+function parseHourlyCsv(text) {
+  const lines = text.split(/\r?\n/);
+  const kwh = new Array(8784).fill(0), seen = new Array(8784).fill(false);
+  let used = 0, tsCol = -1, kwhCol = -1, dateCol = -1, timeCol = -1;
+  const tryHeader = cells => {
+    cells.forEach((c, i) => {
+      const s = c.toLowerCase().replace(/"/g, "").trim();
+      if (/^(timestamp|datetime|date.?time|interval start|start date)/.test(s)) tsCol = i;
+      else if (/^date$/.test(s)) dateCol = i;
+      else if (/^(start ?time|time)$/.test(s)) timeCol = i;
+      if (/usage|kwh|consumption|value/.test(s) && kwhCol < 0 && !/cost|unit/.test(s)) kwhCol = i;
+    });
+  };
+  const parseTs = raw => {  // -> [month 1-12, day, hour] or null
+    const m = raw.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2})/) ||        // ISO-ish
+              raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ ,]+(\d{1,2})/);   // US
+    if (!m) return null;
+    const iso = raw[4] === "-" || raw.match(/^\d{4}-/);
+    const mo = iso ? +m[2] : +m[1], d = iso ? +m[3] : +m[2];
+    let h = +m[4];
+    if (/pm/i.test(raw) && h < 12) h += 12;
+    if (/am/i.test(raw) && h === 12) h = 0;
+    return mo >= 1 && mo <= 12 && d >= 1 && d <= 31 && h < 24 ? [mo, d, h] : null;
+  };
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const cells = line.split(",");
+    let ts = null, v = NaN;
+    if (tsCol >= 0) ts = parseTs(cells[tsCol] || "");
+    else if (dateCol >= 0) ts = parseTs((cells[dateCol] || "") + " " + (timeCol >= 0 ? cells[timeCol] : "0"));
+    else ts = parseTs(cells[0] || "");
+    if (ts) {
+      if (kwhCol >= 0) v = parseFloat(String(cells[kwhCol]).replace(/"/g, ""));
+      else for (let i = cells.length - 1; i > 0; i--) {  // last numeric column
+        const x = parseFloat(String(cells[i]).replace(/"/g, ""));
+        if (isFinite(x)) { v = x; break; }
+      }
+    } else if (tsCol < 0 && dateCol < 0) { tryHeader(cells); continue; }
+    if (!ts || !isFinite(v) || v < 0) continue;
+    const idx = (DOY_2024[ts[0] - 1] + ts[1] - 1) * 24 + ts[2];
+    if (idx >= 0 && idx < 8784) { kwh[idx] += v; seen[idx] = true; used++; }
+  }
+  const hours = seen.filter(Boolean).length;
+  if (hours < 24 * 30) throw new Error(`only ${hours} distinct hours found — need a timestamp column and a kWh/usage column`);
+  const total = kwh.reduce((a, b) => a + b, 0);
+  return {kwh, total: Math.round(total * 10) / 10, hours, rows: used};
+}
+
+function hourlyIntensity(ba, cb) {
+  if (G2H[ba.ba]) { cb(G2H[ba.ba]); return; }
+  fetch(`data/hourly/${ba.ba}.json`).then(r => r.ok ? r.json() : null).then(d => {
+    if (d) { G2H[ba.ba] = d.I; cb(d.I); }
+    else cb(null);
+  }).catch(() => cb(null));
+}
+
+// Computed result cache: {ba, eff, kg, total} — refreshed whenever the ZIP's
+// BA or the upload changes; homeKg() reads it synchronously.
+let HOURLY_RES = null;
+function hourlyRecompute() {
+  HOURLY_RES = null;
+  if (!HOURLY || !G2) return;
+  const ef = elecResolve();
+  if (!ef.ba) return;
+  if (!ef.ba.hourly) {   // flat-degraded grid: no hourly intensity exists
+    HOURLY_RES = {ba: ef.ba.ba, eff: ef.ba.kg, kg: HOURLY.total * ef.ba.kg,
+                  total: HOURLY.total, flatOnly: true};
+    renderHome(); renderImpact();
+    return;
+  }
+  hourlyIntensity(ef.ba, I => {
+    if (!I) return;
+    let num = 0, den = 0;
+    for (let i = 0; i < 8784; i++) {
+      if (HOURLY.kwh[i] > 0 && I[i] != null) { num += HOURLY.kwh[i] * I[i]; den += HOURLY.kwh[i]; }
+    }
+    if (den <= 0) return;
+    const eff = num / den;
+    HOURLY_RES = {ba: ef.ba.ba, eff, kg: HOURLY.total * eff, total: HOURLY.total};
+    renderHome(); renderImpact();
+  });
+}
+
+function hourlyStats(ba, I) {
+  // per-local-hour distributions across the year: usage mean/p25/p75 (kWh),
+  // intensity mean/p25/p75 (kg/kWh) — the variance view of the 24h chart.
+  const q = (arr, p) => {
+    const s = [...arr].sort((a, b) => a - b);
+    return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))] : 0;
+  };
+  const dw = [], dwLo = [], dwHi = [], di = [], diLo = [], diHi = [];
+  for (let h = 0; h < 24; h++) {
+    const us = [], iv = [];
+    for (let d = 0; d < 366; d++) {
+      const i = d * 24 + h;
+      if (HOURLY.kwh[i] > 0 || (HOURLY.kwh[i] === 0 && d < 365)) us.push(HOURLY.kwh[i]);
+      if (I && I[i] != null) iv.push(I[i]);
+    }
+    dw.push(us.reduce((a, b) => a + b, 0) / (us.length || 1));
+    dwLo.push(q(us, 0.25)); dwHi.push(q(us, 0.75));
+    if (iv.length) { di.push(iv.reduce((a, b) => a + b, 0) / iv.length); diLo.push(q(iv, 0.25)); diHi.push(q(iv, 0.75)); }
+    else { di.push(0); diLo.push(0); diHi.push(0); }
+  }
+  return {dw, dwLo, dwHi, di, diLo, diHi};
+}
+
 function homeKg() {
   const e = HOME.elec, g = HOME.gas, o = HOME.oil;
   const kwh = e.mode === "kwh" ? (+e.kwh || 0) : (+e.dollars || 0) / HF.elecDollarsPerKwh;
-  const elec = kwh * elecResolve().kg;
+  const elec = HOURLY && HOURLY_RES ? HOURLY_RES.kg : kwh * elecResolve().kg;
   const therms = g.mode === "therms" ? (+g.therms || 0) : (+g.dollars || 0) / HF.gasDollarsPerTherm;
   const gas = therms * HF.gasPerTherm;
   const gallons = o.mode === "gallons" ? (+o.gallons || 0) : (+o.dollars || 0) / HF.oilDollarsPerGallon;
@@ -1449,35 +1581,107 @@ function renderElecInfo(ef) {
   if (chip) wireHourPop(chip, ef.ba);
 }
 
-// ---- 24-hour tooltip: assumed household usage (bars) vs grid g/kWh (line) ----
-function hourChartSvg(ba) {
-  const W = 340, H = 150, padL = 8, padR = 36, padB = 26, padT = 14;
+// ---- 24-hour chart: household usage (bars) vs grid g/kWh (line). ----
+// spec: {di, dw} means only, or + {diLo, diHi, dwLo, dwHi} for p25-p75
+// whiskers per hour on both series (advanced upload view). Scales adapt to
+// whisker extents when present.
+function hourChartSvg(spec, W = 340, H = 150) {
+  const padL = 8, padR = 36, padB = 26, padT = 14;
   const iw = (W - padL - padR) / 24;
-  const di = ba.di, dw = ba.dw;
-  const wMax = Math.max(...dw);
-  const iMin = Math.min(...di), iMax = Math.max(...di);
+  const {di, dw, diLo, diHi, dwLo, dwHi} = spec;
+  const wMax = Math.max(...(dwHi || dw));
+  const iMin = Math.min(...(diLo || di)), iMax = Math.max(...(diHi || di));
   const iSpan = (iMax - iMin) || 1;
-  let bars = "", pts = [];
+  const yI = v => padT + (H - padT - padB) * (1 - (v - iMin) / iSpan);
+  const yW = v => H - padB - (H - padT - padB) * (v / wMax);
+  let bars = "", whW = "", whI = "", pts = [];
   for (let h = 0; h < 24; h++) {
-    const x = padL + h * iw;
-    const bh = (H - padT - padB) * (dw[h] / wMax);
-    bars += `<rect x="${(x + 1).toFixed(1)}" y="${(H - padB - bh).toFixed(1)}" width="${(iw - 2).toFixed(1)}" height="${bh.toFixed(1)}" fill="var(--chip)" stroke="var(--line)" stroke-width="0.5"/>`;
-    const y = padT + (H - padT - padB) * (1 - (di[h] - iMin) / iSpan);
-    pts.push(`${(x + iw / 2).toFixed(1)},${y.toFixed(1)}`);
+    const x = padL + h * iw, cx = x + iw / 2;
+    bars += `<rect x="${(x + 1).toFixed(1)}" y="${yW(dw[h]).toFixed(1)}" width="${(iw - 2).toFixed(1)}" height="${(H - padB - yW(dw[h])).toFixed(1)}" fill="var(--chip)" stroke="var(--line)" stroke-width="0.5"/>`;
+    if (dwLo) whW += `<line x1="${cx.toFixed(1)}" y1="${yW(dwLo[h]).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${yW(dwHi[h]).toFixed(1)}" stroke="var(--muted)" stroke-width="1.2"/>` +
+      `<line x1="${(cx - 2.5).toFixed(1)}" y1="${yW(dwLo[h]).toFixed(1)}" x2="${(cx + 2.5).toFixed(1)}" y2="${yW(dwLo[h]).toFixed(1)}" stroke="var(--muted)" stroke-width="1"/>` +
+      `<line x1="${(cx - 2.5).toFixed(1)}" y1="${yW(dwHi[h]).toFixed(1)}" x2="${(cx + 2.5).toFixed(1)}" y2="${yW(dwHi[h]).toFixed(1)}" stroke="var(--muted)" stroke-width="1"/>`;
+    if (diLo) whI += `<line x1="${cx.toFixed(1)}" y1="${yI(diLo[h]).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${yI(diHi[h]).toFixed(1)}" stroke="var(--s2)" stroke-width="1.4" opacity="0.45"/>`;
+    pts.push(`${cx.toFixed(1)},${yI(di[h]).toFixed(1)}`);
   }
   const ticks = [0, 6, 12, 18].map(h =>
     `<text x="${(padL + h * iw + iw / 2).toFixed(1)}" y="${H - 8}" font-size="9" fill="var(--muted)" text-anchor="middle">${h === 0 ? "12am" : h === 12 ? "12pm" : h < 12 ? h + "am" : (h - 12) + "pm"}</text>`).join("");
   const yHi = `<text x="${W - padR + 4}" y="${padT + 8}" font-size="9" fill="var(--s2)">${Math.round(iMax * 1000)}g</text>`;
   const yLo = `<text x="${W - padR + 4}" y="${H - padB}" font-size="9" fill="var(--s2)">${Math.round(iMin * 1000)}g</text>`;
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly household usage and grid carbon intensity">` +
-    bars + `<polyline points="${pts.join(" ")}" fill="none" stroke="var(--s2)" stroke-width="2"/>` +
+    bars + whW + whI + `<polyline points="${pts.join(" ")}" fill="none" stroke="var(--s2)" stroke-width="2"/>` +
     ticks + yHi + yLo + `</svg>`;
 }
+
+function renderAdvanced(ef) {
+  const st = $("advstatus"), chart = $("advchart");
+  $("advclear").hidden = !HOURLY;
+  if (!HOURLY) { st.textContent = ""; chart.innerHTML = ""; return; }
+  $("elecadv").open = true;
+  if (!HOURLY_RES) {
+    st.textContent = ef.ba ? "computing against " + ef.ba.ba + "…" : "enter your ZIP to apply the upload";
+    chart.innerHTML = "";
+    return;
+  }
+  const r = HOURLY_RES;
+  const modelKg = ef.ba ? ef.ba.kg : ef.kg, flatKg = ef.ba ? ef.ba.flat : ef.kg;
+  const pct = 100 * (r.eff / flatKg - 1);
+  st.innerHTML = `<b>${HOURLY.name ? esc(HOURLY.name) + ": " : ""}${fmt(r.total)} kWh</b> × ${esc(r.ba)} hourly grid → ` +
+    `<b>${fmt(r.kg)} kg CO₂e/yr</b> (${Math.round(r.eff * 1000)} g/kWh effective; flat average ${Math.round(flatKg * 1000)} g, ` +
+    `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%; typical-household model ${Math.round(modelKg * 1000)} g)` +
+    (r.flatOnly ? ` — this grid has no reliable hourly shape, so the flat factor was applied to your total` : "");
+  if (r.flatOnly || !ef.ba || !ef.ba.hourly) { chart.innerHTML = ""; return; }
+  hourlyIntensity(ef.ba, I => {
+    if (!I) return;
+    const s = hourlyStats(ef.ba, I);
+    chart.innerHTML = hourChartSvg(s, 420, 170) +
+      `<div class="hint" style="max-width:410px;margin-top:2px">` +
+      `<span style="color:var(--ink)">▮</span> YOUR mean kWh by hour of day (whiskers: middle half of days) · ` +
+      `<span style="color:var(--s2)">—</span> ${esc(r.ba)} mean g CO₂e/kWh by hour (whiskers: middle half of days, EIA-930 ${G2.year}). ` +
+      `Where your tall bars meet high line segments is where your carbon comes from.</div>`;
+  });
+}
+
+function setHourly(obj) {
+  HOURLY = obj;
+  try {
+    if (obj) localStorage.setItem("cf_elec_hourly", JSON.stringify(obj));
+    else localStorage.removeItem("cf_elec_hourly");
+  } catch (e) {}
+  hourlyRecompute();
+  renderHome(); renderImpact();
+}
+
+$("advfile").onchange = async ev => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  try {
+    const p = parseHourlyCsv(await f.text());
+    setHourly({name: f.name, kwh: p.kwh, total: p.total, hours: p.hours});
+  } catch (err) {
+    $("advstatus").textContent = "Could not parse: " + (err.message || err);
+  }
+  ev.target.value = "";
+};
+$("advsample").onclick = async () => {
+  try {
+    const r = await fetch("data/sample_hourly_portland.csv");
+    const p = parseHourlyCsv(await r.text());
+    if (!(HOME.elec.zip in (G2 ? G2.zips : {}))) {
+      HOME.elec.zip = "97202";   // SE Portland — PGE territory, so the example lands on the right grid
+      saveHome();
+    }
+    setHourly({name: "Portland example (electric heat)", kwh: p.kwh, total: p.total, hours: p.hours});
+  } catch (err) {
+    $("advstatus").textContent = "Sample failed: " + (err.message || err);
+  }
+};
+$("advclear").onclick = () => setHourly(null);
 
 function wireHourPop(chip, ba) {
   const show = () => {
     const pop = $("hour-pop");
-    pop.innerHTML = hourChartSvg(ba) +
+    pop.innerHTML = hourChartSvg({di: ba.di, dw: ba.dw}) +
       `<div style="font-size:0.72rem;color:var(--muted);max-width:330px;margin-top:2px">` +
       `<span style="color:var(--ink)">▮</span> assumed share of household use by hour (OpenEI TMY3 residential) · ` +
       `<span style="color:var(--s2)">—</span> grid g CO₂e/kWh by hour (EIA-930 ${G2.year}, ${esc(ba.ba)}, local time, annual mean). ` +
@@ -1500,9 +1704,16 @@ function renderHome() {
 
   const e = HOME.elec;
   const ef = elecResolve();
-  $("elecrows").innerHTML =
-    numRow("Electricity", +e.kwh || 0, 'data-h="elec.kwh" step="100"', "kWh/yr", `${Math.round(ef.kg * 1000)} g/kWh`);
+  if (HOURLY && HOURLY_RES) {
+    $("elecrows").innerHTML =
+      `<div class="tvrow"><label>Electricity:</label><b style="font-family:var(--mono);font-size:0.85rem">${fmt(HOURLY.total)}</b><label>kWh/yr from your hourly upload</label>` +
+      `<span class="rowkg">${Math.round(HOURLY_RES.eff * 1000)} g/kWh effective</span></div>`;
+  } else {
+    $("elecrows").innerHTML =
+      numRow("Electricity", +e.kwh || 0, 'data-h="elec.kwh" step="100"', "kWh/yr", `${Math.round(ef.kg * 1000)} g/kWh`);
+  }
   renderElecInfo(ef);
+  renderAdvanced(ef);
   const g = HOME.gas;
   $("gasrows").innerHTML =
     numRow("Natural gas", +g.therms || 0, 'data-h="gas.therms" step="10"', "therms/yr", `${HF.gasPerTherm.toFixed(1)} kg/therm`);
@@ -1539,6 +1750,7 @@ function renderHome() {
   $("sqftinput").onchange = () => { HOME.sqft = +$("sqftinput").value || 0; touched(); };
   $("eleczip").onchange = ev => {
     HOME.elec.zip = ev.target.value.replace(/\D/g, "").slice(0, 5);
+    hourlyRecompute();     // new ZIP may mean a new BA for the uploaded hours
     touched();
   };
 }

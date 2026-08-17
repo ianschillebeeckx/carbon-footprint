@@ -70,6 +70,22 @@ def diurnal(df, ba):
     return di.to_numpy(), dw.to_numpy()
 
 
+def hourly_local(df, ba):
+    """8784-value intensity array indexed by LOCAL hour-of-year (standard time,
+    2024 is a leap year) for the advanced upload path: index = (day_of_year-1)*24
+    + local_hour, so a browser can join user interval data by calendar position
+    without timezone libraries. None where the hour wasn't reconstructed."""
+    off = BA_TZ.get(ba, -6)
+    local = df.index + pd.Timedelta(hours=off)
+    idx = (local.dayofyear - 1) * 24 + local.hour
+    out = [None] * 8784
+    vals = df["I_h"].to_numpy()
+    for i, v in zip(idx, vals):
+        if 0 <= i < 8784 and np.isfinite(v):
+            out[i] = round(float(v) * US_LOSS_GROSS_UP, 4)
+    return out
+
+
 def main():
     summary = {r["ba"]: r for r in csv.DictReader(open(GC / "dist" / "summary.csv"))}
     bas, ba_idx = [], {}
@@ -95,7 +111,14 @@ def main():
                 "di": [round(float(x) * US_LOSS_GROSS_UP, 4) for x in di],
                 "dw": [round(float(x), 5) for x in dw],
                 "mo": [round(mo[m] * US_LOSS_GROSS_UP, 4) for m in range(1, 13)],
+                "hourly": True,   # web/data/hourly/{BA}.json exists (advanced upload)
             })
+            hdir = OUT.parent / "hourly"
+            hdir.mkdir(parents=True, exist_ok=True)
+            (hdir / f"{ba}.json").write_text(json.dumps(
+                {"ba": ba, "year": 2024, "note": "kg CO2e/kWh delivered, indexed by "
+                 "local (standard-time) hour of year: (doy-1)*24+hour",
+                 "I": hourly_local(df, ba)}, separators=(",", ":")))
             shaped += 1
         else:
             # Degraded: eGRID level + upstream, flat across hours; no diurnal claim.
