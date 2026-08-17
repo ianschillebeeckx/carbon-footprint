@@ -1725,12 +1725,14 @@ function monthProfiles(I) {
   return out.filter(p => p.days >= 10);   // partial uploads: skip thin months
 }
 
-function pickMonths(profiles) {
+function pickMonths(profiles, mode) {
   if (profiles.length < 3) return null;
-  // Ranked by the GRID's monthly mean g/kWh (not by consumption): min = the
-  // cleanest month, max = the dirtiest, median in between.
+  // Two ranking modes, toggled in the UI: "gkwh" ranks by the GRID's monthly
+  // mean g/kWh (min = cleanest month, max = dirtiest); "kwh" ranks by YOUR
+  // monthly consumption (min = lightest month, max = heaviest).
   for (const p of profiles) p.ikg = p.i.reduce((a, b) => a + b, 0) / 24;
-  const byLevel = [...profiles].sort((a, b) => a.ikg - b.ikg);
+  const level = mode === "kwh" ? (p => p.total) : (p => p.ikg);
+  const byLevel = [...profiles].sort((a, b) => level(a) - level(b));
   const med = byLevel[Math.floor(byLevel.length / 2)];
   const z = a => {
     const mu = a.reduce((x, y) => x + y, 0) / a.length;
@@ -1745,8 +1747,8 @@ function pickMonths(profiles) {
     for (let k = 0; k < pj.length; k++) s += pj[k] * mj[k];
     return s / pj.length;
   };
-  const below = profiles.filter(p => p.ikg < med.ikg && p.m !== med.m);
-  const above = profiles.filter(p => p.ikg > med.ikg && p.m !== med.m);
+  const below = profiles.filter(p => level(p) < level(med) && p.m !== med.m);
+  const above = profiles.filter(p => level(p) > level(med) && p.m !== med.m);
   const pick = arr => arr.length ? arr.reduce((a, b) => corr(a) <= corr(b) ? a : b) : null;
   const lo = pick(below), hi = pick(above);
   if (!lo || !hi) return null;
@@ -1804,17 +1806,35 @@ function renderAdvanced(ef) {
     (r.flatOnly ? ` — this grid has no reliable hourly shape, so the flat factor was applied to your total` : "") +
     (HOURLY.notes && HOURLY.notes.length ? `<br><small>${esc(HOURLY.notes.join(" · "))}</small>` : "");
   if (r.flatOnly || !ef.ba || !ef.ba.hourly) { chart.innerHTML = ""; return; }
-  hourlyIntensity(ef.ba, I => {
-    if (!I) return;
-    const sel = pickMonths(monthProfiles(I));
-    if (!sel) { chart.innerHTML = `<p class="hint">Month view needs at least 3 months of uploaded data.</p>`; return; }
-    const names = sel.map(p => MONTHS_ABBR[p.m]);
-    const legend = [["cleanest", "min"], ["median", "median"], ["dirtiest", "max"]].map(([word, tag], k) =>
-      `<span style="white-space:nowrap"><span style="color:${MONTH_COLORS[k]}">▮—</span> ${names[k]} <small>(${word} grid month, ${Math.round(sel[k].ikg * 1000)} g/kWh · your ${fmt(sel[k].total)} kWh)</small></span>`).join(" · ");
-    chart.innerHTML = monthChartSvg(sel) +
-      `<div class="hint" style="max-width:420px;margin-top:2px">${legend}<br>` +
-      `Bars: YOUR mean kWh by hour, layered (not summed). Lines: ${esc(r.ba)} mean g CO₂e/kWh by hour (EIA-930 ${G2.year}). ` +
-      `Months ranked by the grid's monthly g/kWh: median = middle month; min/max = the months whose hour-by-hour shape (usage + grid together) looks LEAST like the median's, one cleaner and one dirtier.</div>`;
+  hourlyIntensity(ef.ba, I => I && renderAdvChart(ef, r, I));
+}
+
+let advRank = "gkwh";   // month-view ranking: "gkwh" (grid intensity) | "kwh" (your usage)
+
+function renderAdvChart(ef, r, I) {
+  const chart = $("advchart");
+  const sel = pickMonths(monthProfiles(I), advRank);
+  if (!sel) { chart.innerHTML = `<p class="hint">Month view needs at least 3 months of uploaded data.</p>`; return; }
+  const names = sel.map(p => MONTHS_ABBR[p.m]);
+  const words = advRank === "gkwh"
+    ? ["cleanest grid month", "median grid month", "dirtiest grid month"]
+    : ["lightest-usage month", "median-usage month", "heaviest-usage month"];
+  const legend = words.map((word, k) =>
+    `<span style="white-space:nowrap"><span style="color:${MONTH_COLORS[k]}">▮—</span> ${names[k]} <small>(${word}, ${Math.round(sel[k].ikg * 1000)} g/kWh · your ${fmt(sel[k].total)} kWh)</small></span>`).join(" · ");
+  const rankNote = advRank === "gkwh"
+    ? "Months ranked by the grid's monthly g/kWh"
+    : "Months ranked by your monthly kWh";
+  chart.innerHTML =
+    `<div class="tmode" id="advmode" style="margin:6px 0 4px">` +
+    `<button data-m="gkwh"${advRank === "gkwh" ? ' class="active"' : ""}>Rank by grid g/kWh</button>` +
+    `<button data-m="kwh"${advRank === "kwh" ? ' class="active"' : ""}>Rank by your usage</button></div>` +
+    monthChartSvg(sel) +
+    `<div class="hint" style="max-width:420px;margin-top:2px">${legend}<br>` +
+    `Bars: YOUR mean kWh by hour, layered (not summed). Lines: ${esc(r.ba)} mean g CO₂e/kWh by hour (EIA-930 ${G2.year}). ` +
+    `${rankNote}: median = middle month; min/max = the months whose hour-by-hour shape (usage + grid together) looks LEAST like the median's, one below and one above.</div>`;
+  $("advmode").querySelectorAll("button").forEach(b => b.onclick = () => {
+    advRank = b.dataset.m;
+    renderAdvChart(ef, r, I);
   });
 }
 
