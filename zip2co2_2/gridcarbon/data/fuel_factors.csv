@@ -35,3 +35,4 @@ geothermal,38.0,full_lifecycle,20.0,0.0,FALSE,TRUE,TRUE,Vents geogenic CO2 - exc
 biomass,230.0,full_lifecycle,200.0,0.0,FALSE,TRUE,TRUE,"Combustion set to 0 under the biogenic-neutral convention. Gross stack is ~1100 g/kWh. Calling this carbon-free while also charging it 230 g/kWh upstream is internally inconsistent - that is why strict excludes it."
 other,97.0,upstream_only,60.0,400.0,FALSE,FALSE,FALSE,Treated as gas-like
 unspecified,97.0,upstream_only,60.0,428.0,FALSE,FALSE,FALSE,Combustion = CARB default 0.428 tCO2e/MWh for unspecified power
+storage,55.0,full_lifecycle,30.0,0.0,TRUE,TRUE,FALSE,"Battery/pumped-storage discharge. Zero combustion; upstream = solar-like charging mix (CAISO storage charges on midday solar) + round-trip losses + battery embodied. Carbon-free under strict/conventional since the discharge itself emits nothing."

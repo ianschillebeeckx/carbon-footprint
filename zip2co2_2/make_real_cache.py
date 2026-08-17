@@ -45,18 +45,41 @@ from gridcarbon.sources import write_cache  # noqa: E402
 
 YEAR = 2024
 
+# EIA changed the 930 schema mid-2024: Jan-Jun uses the classic fuel set
+# ("Solar", "Hydropower and Pumped Storage"); Jul-Dec splits solar/wind by
+# integrated-battery status (including a typo'd "Solar witho ..." column),
+# breaks out Geothermal and Pumped Storage, and adds Battery/Energy Storage
+# discharge columns. Missing this made H2 solar parse as zero — July noons
+# showed 85% gas, which is how the bug was caught (thanks Ian).
+# All names WITHOUT the " (Adjusted)" suffix; both schemas covered.
 FUEL_COLS = {
-    "Net Generation (MW) from Coal (Adjusted)": "coal",
-    "Net Generation (MW) from Natural Gas (Adjusted)": "natural_gas",
-    "Net Generation (MW) from Nuclear (Adjusted)": "nuclear",
-    "Net Generation (MW) from All Petroleum Products (Adjusted)": "oil",
-    "Net Generation (MW) from Hydropower and Pumped Storage (Adjusted)": "hydro_large",
-    "Net Generation (MW) from Solar (Adjusted)": "solar",
-    "Net Generation (MW) from Wind (Adjusted)": "wind",
-    "Net Generation (MW) from Other Fuel Sources (Adjusted)": "other",
+    "Net Generation (MW) from Coal": "coal",
+    "Net Generation (MW) from Natural Gas": "natural_gas",
+    "Net Generation (MW) from Nuclear": "nuclear",
+    "Net Generation (MW) from All Petroleum Products": "oil",
+    "Net Generation (MW) from Hydropower and Pumped Storage": "hydro_large",
+    "Net Generation (MW) from Hydropower Excluding Pumped Storage": "hydro_large",
+    "Net Generation (MW) from Solar": "solar",
+    "Net Generation (MW) from Solar without Integrated Battery Storage": "solar",
+    "Net Generation (MW) from Solar with Integrated Battery Storage": "solar",
+    "Net Generation (MW) from Solar witho Integrated Battery Storage": "solar",  # EIA's typo, real column
+    "Net Generation (MW) from Wind": "wind",
+    "Net Generation (MW) from Wind without Integrated Battery Storage": "wind",
+    "Net Generation (MW) from Wind with Integrated Battery Storage": "wind",
+    "Net Generation (MW) from Geothermal": "geothermal",
+    # Storage discharge serves load with stored (in CAISO, mostly midday solar)
+    # energy: zero combustion, solar-like upstream + round-trip losses and
+    # battery embodied (fuel_factors.csv "storage" row). Charging hours are
+    # negative and clipped by core.reconstruct.
+    "Net Generation (MW) from Pumped Storage ": "storage",   # note EIA's double space
+    "Net Generation (MW) from Pumped Storage": "storage",
+    "Net Generation (MW) from Battery Storage": "storage",
+    "Net Generation (MW) from Other Energy Storage": "storage",
+    "Net Generation (MW) from Unknown Energy Storage": "storage",
     # Unknown = untracked market purchases; gas-like factor via "other" is closer
     # than dropping the MWh (which would inflate every other fuel's share).
-    "Net Generation (MW) from Unknown Fuel Sources (Adjusted)": "other",
+    "Net Generation (MW) from Other Fuel Sources": "other",
+    "Net Generation (MW) from Unknown Fuel Sources": "other",
 }
 TI_COL = "Total Interchange (MW) (Adjusted)"
 
@@ -158,11 +181,23 @@ BA_UTC_OFFSET = {
 
 def load_eia930():
     frames = []
+    adj = {k + " (Adjusted)": v for k, v in FUEL_COLS.items()}
     for half in ("Jan_Jun", "Jul_Dec"):
         p = os.path.join(CACHE_RAW, f"EIA930_BALANCE_{YEAR}_{half}.csv")
-        usecols = ["Balancing Authority", "UTC Time at End of Hour", TI_COL] + list(FUEL_COLS)
-        df = pd.read_csv(p, usecols=lambda c: c in usecols, thousands=",", low_memory=False)
-        frames.append(df)
+        keep = ["Balancing Authority", "UTC Time at End of Hour", TI_COL] + list(adj)
+        df = pd.read_csv(p, usecols=lambda c: c in keep, thousands=",", low_memory=False)
+        matched = [c for c in df.columns if c in adj]
+        # Canonicalize + SUM columns mapping to the same fuel (solar w/ + w/o
+        # battery, other + unknown, …) — assignment-overwrite here was the bug
+        # that dropped H1's Other Fuel Sources.
+        out = pd.DataFrame({"Balancing Authority": df["Balancing Authority"],
+                            "UTC Time at End of Hour": df["UTC Time at End of Hour"],
+                            TI_COL: pd.to_numeric(df[TI_COL], errors="coerce")})
+        for c in matched:
+            fuel = adj[c]
+            v = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
+            out[fuel] = out[fuel] + v if fuel in out else v
+        frames.append(out)
     df = pd.concat(frames, ignore_index=True)
     df["ts"] = pd.to_datetime(df["UTC Time at End of Hour"], format="%m/%d/%Y %I:%M:%S %p", utc=True)
     return df
@@ -209,13 +244,24 @@ def main():
             skipped.append(ba)
             continue
         g = g.drop_duplicates("ts").set_index("ts").reindex(hours)
-        gen = pd.DataFrame(index=hours)
-        for col, fuel in FUEL_COLS.items():
-            if col in g:
-                v = pd.to_numeric(g[col], errors="coerce")
-                gen[fuel] = v.fillna(0.0) if fuel in gen else v.fillna(0.0) + gen.get(fuel, 0.0)
-        # merge duplicate "other" columns
-        gen = gen.T.groupby(level=0).sum().T
+        fuels = [f for f in set(FUEL_COLS.values()) if f in g.columns]
+        gen = g[fuels].fillna(0.0)
+        # Storage hiding in "Other": some respondents (CISO foremost) never
+        # populate EIA's dedicated battery column — their batteries land in
+        # Other Fuel Sources, cycling negative at noon (charging) and positive
+        # in the evening (discharging). Pricing that at the gas-like Other
+        # factor counts discharged midday solar as gas. Split per local day:
+        # base = max(0, daily min) stays Other (geo/bio/waste baseload); the
+        # excess above base is storage. Flat fossil "other" has cycle≈0 and is
+        # untouched; the split only activates where a daily cycle exists.
+        if "other" in gen.columns:
+            off = BA_UTC_OFFSET.get(ba, -6)
+            day = (gen.index + pd.Timedelta(hours=off)).date
+            other = gen["other"]
+            base = other.groupby(day).transform("min").clip(lower=0.0)
+            cycle = (other - base).clip(lower=0.0)
+            gen["other"] = other.clip(upper=base.where(other > base, other)).clip(lower=0.0)
+            gen["storage"] = gen.get("storage", 0.0) + cycle
         if gen.to_numpy().sum() <= 0:
             skipped.append(ba)
             continue
