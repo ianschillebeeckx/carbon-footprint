@@ -948,7 +948,7 @@ function openSearchEditor(row, m, t) {
   const textSearch = q => {
     const ql = q.toLowerCase().split(/\s+/).filter(Boolean);
     return NAICS_ALL.filter(o => {
-      const hay = `${o.code} ${o.title} ${CATS[o.category] ? CATS[o.category].label : o.category}`.toLowerCase();
+      const hay = `${o.code} ${o.title} ${o.kw || ""} ${CATS[o.category] ? CATS[o.category].label : o.category}`.toLowerCase();
       return ql.every(w => hay.includes(w));
     }).slice(0, 12);
   };

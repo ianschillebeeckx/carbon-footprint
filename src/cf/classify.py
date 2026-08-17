@@ -537,9 +537,11 @@ def basket_options() -> list[dict]:
 def naics_all() -> list[dict]:
     """The FULL index for the advanced search — every EPA/USEEIO commodity,
     not just the curated dropdown subset."""
+    from .naics_prep import ENRICH
     index = json.loads(INDEX_FILE.read_text())
     return [{"code": e["code"], "title": e["title"], "category": e["category"],
-             "factor": e.get("factor"), "basket": bool(e.get("basket"))}
+             "factor": e.get("factor"), "basket": bool(e.get("basket")),
+             **({"kw": ENRICH[e["code"]]} if e["code"] in ENRICH else {})}
             for e in index["entries"]]
 
 
