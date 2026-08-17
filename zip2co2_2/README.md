@@ -148,3 +148,17 @@ Two things this is *not* for:
 TMY3 load shapes cannot capture synoptic covariance (heat wave = high load *and* high intensity
 on the same day) because the synthetic year's hot days don't align with the real intensity
 year's. You get diurnal and seasonal only. ResStock AMY runs fix this.
+
+**The seasonal channel can dominate the diurnal one — and it is only as good as the assumed
+seasonality.** On real 2024 data the single largest deviation from flat-rate accounting is
+*negative* and almost entirely seasonal: PGE (Portland) comes out **−6.0%** with a nearly flat
+diurnal curve (1.05x), because the hydro-backed grid is dirtiest in late summer (~500 g/kWh,
+reservoirs low, gas filling in) and cleanest during spring runoff (~216 g), while Portland
+homes peak in winter heating season and barely use power in the dirty months. The mirror case
+is PNM (+10.7%), where Albuquerque AC load peaks exactly in the dirty summer months (seasonal
+corr +0.72) *on top of* a 1.83x solar-day/fossil-night diurnal swing. The caveat: that
+seasonal load pattern is TMY3's *typical* home, not the user's — an electrically-heated
+Portland house peaks even harder in winter (bigger discount), a gas-heated one less. Passing
+`monthly_kwh` from actual bills replaces the assumed seasonality with the real one; the
+per-month factors are already built (`monthly_kg_per_kwh` in `dist/summary.csv`, `mo` in the
+web dataset).
