@@ -12,7 +12,6 @@ site/index.html
 .mm_session*
 *.log
 .DS_Store
-zip2co2/cache/
 zip2co2_2/cache/
 zip2co2_2/gridcarbon/data/cache/
 zip2co2_2/gridcarbon/dist/profile_*.csv.gz

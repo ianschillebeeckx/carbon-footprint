@@ -18,9 +18,9 @@ from collections import defaultdict
 import openpyxl
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
-ZIP_UTIL = os.path.join(ROOT, "zip2co2", "data", "zip_utility.csv")
-EIA861 = os.path.join(ROOT, "zip2co2", "cache", "eia861", "Sales_Ult_Cust_2023.xlsx")
+ZIP_UTIL = os.path.join(HERE, "gridcarbon", "data", "zip_utility.csv")
+# gitignored; re-download: eia.gov/electricity/data/eia861/archive/zip/f8612023.zip
+EIA861 = os.path.join(HERE, "cache", "eia861", "Sales_Ult_Cust_2023.xlsx")
 OUT = os.path.join(HERE, "gridcarbon", "data", "zip_ba.csv")
 
 

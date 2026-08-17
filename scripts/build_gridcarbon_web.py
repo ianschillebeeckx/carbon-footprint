@@ -17,9 +17,12 @@ ships its hourly shape only if alpha is in [0.70, 1.45], |uplift| <= 12%, and
 >= 90% of hours reconstructed. Otherwise it degrades to the flat eGRID+upstream
 level with no diurnal claim (di=null) — honest, if less interesting.
 
-Fallback layer: ZIPs with no BA mapping (PR/AK/HI, small munis) resolve through
-the v1 zip2co2 eGRID-subregion flat factors, which carry their own subregion
-losses and mix-weighted upstream.
+Fallback layer: ZIPs with no BA mapping (PR/AK/HI, small munis) resolve to a
+flat eGRID-subregion factor computed here: EPA's subregion CO2e rate +
+mix-weighted upstream (fuel_factors.csv) x that subregion's own loss gross-up.
+Inputs (gridcarbon/data): zip_subregion.csv + egrid_subregion_factors.csv,
+both parsed from EPA sources by the retired zip2co2 module's build (see git
+history for the provenance chain; the CSVs carry source comments).
 
 Run:  .venv/bin/python scripts/build_gridcarbon_web.py
 """
@@ -35,8 +38,8 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
 GC = ROOT / "zip2co2_2" / "gridcarbon"
-V1 = ROOT / "zip2co2"
 OUT = ROOT / "web" / "data" / "gridcarbon.json"
+LB_TO_KG = 0.45359237
 
 ALPHA_BAND = (0.70, 1.45)
 UPLIFT_MAX = 12.0        # |%|
@@ -144,16 +147,42 @@ def main():
             utils.append(u)
         zips[r["zip"]] = [ba_idx[r["ba"]], util_idx[u]]
 
-    # ---- v1 subregion fallback for unmapped ZIPs ----
-    v1 = json.loads((ROOT / "web" / "data" / "zip2co2.json").read_text())
-    fb_entries = [{"sub": e["sub"], "kg": e["loc"]["kg"]} for e in v1["entries"]]
-    fb_zips = {z: i for z, i in v1["zips"].items() if z not in zips}
-    us_flat = fb_entries[v1["us"]]["kg"]
+    # ---- eGRID-subregion flat fallback for unmapped ZIPs ----
+    # kg/kWh = subregion CO2e rate + mix-weighted upstream, grossed up by the
+    # subregion's own grid loss (delivered basis, like the BA factors).
+    up_g = {}   # fuel -> upstream g/kWh
+    for r in read_commented(GC / "data" / "fuel_factors.csv"):
+        up_g[r["fuel"]] = float(r["g_co2e_per_kwh"] or 0)
+    egrid_mix_fuel = {"pct_coal": "coal", "pct_natural_gas": "natural_gas", "pct_oil": "oil",
+                      "pct_nuclear": "nuclear", "pct_hydro": "hydro_large", "pct_wind": "wind",
+                      "pct_solar": "solar", "pct_geothermal": "geothermal",
+                      "pct_biomass": "biomass", "pct_other": "other"}
+    sub_kg = {}
+    for r in read_commented(GC / "data" / "egrid_subregion_factors.csv"):
+        comb = float(r["co2e_lb_per_mwh"]) * LB_TO_KG / 1000.0
+        upstream = sum(float(r[c] or 0) / 100.0 * up_g[f] for c, f in egrid_mix_fuel.items()) / 1000.0
+        loss = 1.0 / (1.0 - float(r["grid_gross_loss_pct"]) / 100.0)
+        sub_kg[r["subregion"]] = round((comb + upstream) * loss, 4)
+    fb_entries, fb_idx = [], {}
+    fb_zips = {}
+    for r in read_commented(GC / "data" / "zip_subregion.csv"):
+        if r["zip"] in zips:
+            continue
+        subs = [r[f"subregion_{i}"] for i in (1, 2, 3) if r.get(f"subregion_{i}")]
+        subs = [s for s in subs if s in sub_kg]
+        if not subs:
+            continue
+        key = "+".join(subs)
+        if key not in fb_idx:
+            fb_idx[key] = len(fb_entries)
+            fb_entries.append({"sub": key, "kg": round(sum(sub_kg[s] for s in subs) / len(subs), 4)})
+        fb_zips[r["zip"]] = fb_idx[key]
+    us_flat = sub_kg["US"]
 
     OUT.write_text(json.dumps({
         "year": 2024, "egrid_year": 2023,
         "bas": bas, "zips": zips, "utils": utils,
-        "fb": fb_entries, "fb_zips": fb_zips, "us": v1["us"], "us_kg": us_flat,
+        "fb": fb_entries, "fb_zips": fb_zips, "us_kg": us_flat,
         "sources": "EIA-930 hourly generation 2024; eGRID2023 BA rates (calibration) "
                    "+ 4.2% US grid loss; OpenEI TMY3 residential load shapes; "
                    "IPCC AR5 upstream. Fallback: eGRID2023 subregion.",

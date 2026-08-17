@@ -1365,7 +1365,7 @@ function renderTravel() {
 // their API for zip 94110 — grid intensity is location-specific) ----------
 const HF = {
   // Legacy CAMX average (eGRID 2023 + ~9% upstream) — only a placeholder
-  // while data/zip2co2.json loads; the real factor is ZIP+provider-resolved
+  // while data/gridcarbon.json loads; the real factor is ZIP-resolved
   // (see elecResolve below).
   elecPerKwh: 0.199 + 0.018,
   elecDollarsPerKwh: 0.2233,    // their local rate assumption ($1390 -> 6224.8 kWh)
