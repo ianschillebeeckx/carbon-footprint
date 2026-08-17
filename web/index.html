@@ -1667,10 +1667,8 @@ $("advsample").onclick = async () => {
   try {
     const r = await fetch("data/sample_hourly_portland.csv");
     const p = parseHourlyCsv(await r.text());
-    if (!(HOME.elec.zip in (G2 ? G2.zips : {}))) {
-      HOME.elec.zip = "97202";   // SE Portland — PGE territory, so the example lands on the right grid
-      saveHome();
-    }
+    HOME.elec.zip = "97202";   // SE Portland — the example is a PGE story; always demo on PGE
+    saveHome();
     setHourly({name: "Portland example (electric heat)", kwh: p.kwh, total: p.total, hours: p.hours});
   } catch (err) {
     $("advstatus").textContent = "Sample failed: " + (err.message || err);
