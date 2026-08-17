@@ -153,6 +153,48 @@ async function classifyWithRetry(env, items) {
   }
 }
 
+// ---- interval-CSV column mapper (advanced electricity upload) ----
+// Input: the FIRST ~25 rows of a utility interval export (never the full
+// file). Output: a column mapping the browser applies locally. Deterministic
+// unit/interval math and quality gates stay client-side — the LLM only names
+// columns, units and date order.
+const PARSE_HOURLY_SCHEMA = {
+  type: "object",
+  properties: {
+    ok: { type: "boolean" },
+    reason: { type: ["string", "null"] },
+    header_rows: { type: "integer" },
+    ts_col: { type: ["integer", "null"] },
+    date_col: { type: ["integer", "null"] },
+    time_col: { type: ["integer", "null"] },
+    usage_col: { type: ["integer", "null"] },
+    usage_unit: { type: "string", enum: ["kwh", "wh", "kw", "w"] },
+    date_order: { type: "string", enum: ["mdy", "dmy", "ymd"] },
+  },
+  required: ["ok", "reason", "header_rows", "ts_col", "date_col", "time_col",
+             "usage_col", "usage_unit", "date_order"],
+  additionalProperties: false,
+};
+
+function buildParseHourlyPrompt(sample) {
+  return (
+    "Below are the first rows of a CSV a household downloaded from their electric " +
+    "utility, expected to be interval (hourly or 15-minute) electricity CONSUMPTION.\n" +
+    "Identify, using 0-based comma-split column indexes:\n" +
+    "- ts_col: a combined date+time column (else null and use date_col/time_col)\n" +
+    "- date_col / time_col: separate date and time-of-day columns (null if ts_col)\n" +
+    "- usage_col: the energy/power reading per interval. NOT cost, NOT temperature, " +
+    "NOT meter register/cumulative totals (a register only ever increases; per-interval " +
+    "usage fluctuates).\n" +
+    "- usage_unit: kwh, wh, kw or w — from the header text or magnitudes (a home draws " +
+    "~0.2-3 kW; hourly kWh ~0.1-5; a 15-min kWh ~0.02-1.5).\n" +
+    "- header_rows: how many leading rows are headers/preamble before data starts.\n" +
+    "- date_order: mdy, dmy or ymd for slash-separated dates (judge from values >12 or context).\n" +
+    "If this is not interval electricity usage data (billing summary, gas therms, water), " +
+    "set ok=false with a one-sentence reason.\n\n" + sample
+  );
+}
+
 export default {
   async fetch(request, env) {
     try {
@@ -179,6 +221,41 @@ async function handle(request, env) {
       }));
       console.log("cache_lookup", { asked: keys.length, found: Object.keys(found).length });
       return new Response(JSON.stringify({ found }), { headers: { ...JSON_HEADERS, ...cors(env) } });
+    }
+
+    // POST /api/parse-hourly {sample} -> column mapping (see PARSE_HOURLY_SCHEMA)
+    if (url.pathname === "/api/parse-hourly" && request.method === "POST") {
+      if (!env.ANTHROPIC_API_KEY) {
+        return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY secret not configured" }),
+          { status: 503, headers: { ...JSON_HEADERS, ...cors(env) } });
+      }
+      const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+      if (!(await ipAllowed(env, ip))) {
+        return new Response(JSON.stringify({ error: "daily limit reached" }),
+          { status: 429, headers: { ...JSON_HEADERS, ...cors(env) } });
+      }
+      const { sample = "" } = await request.json();
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+                   "content-type": "application/json" },
+        body: JSON.stringify({
+          model: env.CLASSIFY_MODEL,
+          max_tokens: 500,
+          temperature: 0,
+          output_config: { format: { type: "json_schema", schema: PARSE_HOURLY_SCHEMA } },
+          messages: [{ role: "user", content: buildParseHourlyPrompt(String(sample).slice(0, 8000)) }],
+        }),
+      });
+      if (!res.ok) {
+        console.log("parse_hourly_err", { status: res.status });
+        return new Response(JSON.stringify({ error: "mapper unavailable" }),
+          { status: 502, headers: { ...JSON_HEADERS, ...cors(env) } });
+      }
+      const data = await res.json();
+      const text = data.content.find((b) => b.type === "text")?.text || "{}";
+      console.log("parse_hourly", { ok: JSON.parse(text).ok });
+      return new Response(text, { headers: { ...JSON_HEADERS, ...cors(env) } });
     }
 
     // POST /api/classify {merchants: [{merchant, hint}]} -> {assignments: {key: {naics, confidence, source}}}

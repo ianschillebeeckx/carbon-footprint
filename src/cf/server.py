@@ -109,6 +109,16 @@ class Handler(BaseHTTPRequestHandler):
         if not self._origin_ok():
             return self._send(403, {"error": "forbidden"})
         try:
+            if self.path == "/api/parse-hourly":
+                # Local proxy for the interval-CSV column mapper (worker parity).
+                import os
+                import urllib.request
+                key = os.environ.get("ANTHROPIC_API_KEY")
+                if not key:
+                    return self._send(503, {"error": "set ANTHROPIC_API_KEY for the column mapper"})
+                body = self._json_body()
+                from . import hourly_mapper
+                return self._send(200, hourly_mapper.map_columns(str(body.get("sample", ""))[:8000], key))
             if self.path == "/api/login":
                 body = self._json_body()
                 if body.get("token"):

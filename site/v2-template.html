@@ -20,7 +20,7 @@
   header.top { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 12px 20px 8px; border-bottom: 1px solid var(--line); }
   header.top h1 { font-size: 1.02rem; font-weight: 600; margin: 0; }
   header.top .window { color: var(--muted); font-size: 0.8rem; flex: 1; }
-  header.top label.filebtn { font: inherit; font-size: 0.82rem; background: var(--leaf); color: #fff; border-radius: 7px; padding: 5px 12px; cursor: pointer; }
+  label.filebtn { font: inherit; font-size: 0.82rem; background: var(--leaf); color: #fff; border-radius: 7px; padding: 5px 12px; cursor: pointer; display: inline-block; }
   header.top .resetbtn { font: inherit; font-size: 0.78rem; background: none; border: 1px solid var(--line); color: var(--warn); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
   header.top .resetbtn:hover { border-color: var(--warn); background: var(--warnbg); }
   #upload-msg { font-size: 0.78rem; color: var(--muted); }
@@ -1195,52 +1195,123 @@ const DOY_2024 = (() => {  // cumulative days before each month, leap year
   return out;
 })();
 
-function parseHourlyCsv(text) {
-  const lines = text.split(/\r?\n/);
-  const kwh = new Array(8784).fill(0), seen = new Array(8784).fill(false);
-  let used = 0, tsCol = -1, kwhCol = -1, dateCol = -1, timeCol = -1;
-  const tryHeader = cells => {
+// Parsing is two-layered: a heuristic column detector handles the common
+// exports (Green Button, timestamp+kwh); anything unrecognized falls back to
+// an LLM column-mapper (/api/parse-hourly — only the first ~25 rows are sent,
+// never the full file). Both produce the same mapping object, applied locally:
+//   {header_rows, ts_col | (date_col, time_col), usage_col,
+//    usage_unit: kwh|wh|kw|w, date_order: mdy|dmy|ymd}
+// applyHourlyMapping then converts power units via the modal row interval and
+// runs deterministic quality checks.
+
+function detectHourlyMapping(lines) {
+  let tsCol = -1, kwhCol = -1, dateCol = -1, timeCol = -1, headerRow = -1, unit = "kwh";
+  for (let r = 0; r < Math.min(lines.length, 20); r++) {
+    const cells = lines[r].split(",");
     cells.forEach((c, i) => {
       const s = c.toLowerCase().replace(/"/g, "").trim();
-      if (/^(timestamp|datetime|date.?time|interval start|start date)/.test(s)) tsCol = i;
-      else if (/^date$/.test(s)) dateCol = i;
+      if (/^(timestamp|datetime|date.?time|interval start|start date)/.test(s)) { tsCol = i; headerRow = r; }
+      else if (/^date$/.test(s)) { dateCol = i; headerRow = r; }
       else if (/^(start ?time|time)$/.test(s)) timeCol = i;
-      if (/usage|kwh|consumption|value/.test(s) && kwhCol < 0 && !/cost|unit/.test(s)) kwhCol = i;
+      if (/usage|kwh|consumption|value|energy/.test(s) && kwhCol < 0 && !/cost|unit|per/.test(s)) {
+        kwhCol = i;
+        if (/\bwh\b/.test(s) && !/kwh/.test(s)) unit = "wh";
+      }
     });
-  };
-  const parseTs = raw => {  // -> [month 1-12, day, hour] or null
-    const m = raw.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2})/) ||        // ISO-ish
-              raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ ,]+(\d{1,2})/);   // US
-    if (!m) return null;
-    const iso = raw[4] === "-" || raw.match(/^\d{4}-/);
-    const mo = iso ? +m[2] : +m[1], d = iso ? +m[3] : +m[2];
+    if (tsCol >= 0 || dateCol >= 0) break;
+  }
+  if (tsCol < 0 && dateCol < 0) return null;
+  return {header_rows: headerRow + 1, ts_col: tsCol >= 0 ? tsCol : null,
+          date_col: dateCol >= 0 ? dateCol : null, time_col: timeCol >= 0 ? timeCol : null,
+          usage_col: kwhCol >= 0 ? kwhCol : null, usage_unit: unit, date_order: "mdy"};
+}
+
+function applyHourlyMapping(lines, map) {
+  const parseTs = raw => {  // -> [month, day, hour, minute] or null
+    let m = raw.match(/(\d{4})-(\d{1,2})-(\d{1,2})[T ](\d{1,2})(?::(\d{2}))?/);
+    let mo, d;
+    if (m) { mo = +m[2]; d = +m[3]; }
+    else {
+      m = raw.match(/(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})[ ,]+(\d{1,2})(?::(\d{2}))?/);
+      if (!m) return null;
+      if (map.date_order === "dmy") { d = +m[1]; mo = +m[2]; } else { mo = +m[1]; d = +m[2]; }
+    }
     let h = +m[4];
+    const min = +(m[5] || 0);
     if (/pm/i.test(raw) && h < 12) h += 12;
     if (/am/i.test(raw) && h === 12) h = 0;
-    return mo >= 1 && mo <= 12 && d >= 1 && d <= 31 && h < 24 ? [mo, d, h] : null;
+    return mo >= 1 && mo <= 12 && d >= 1 && d <= 31 && h < 24 ? [mo, d, h, min] : null;
   };
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const cells = line.split(",");
-    let ts = null, v = NaN;
-    if (tsCol >= 0) ts = parseTs(cells[tsCol] || "");
-    else if (dateCol >= 0) ts = parseTs((cells[dateCol] || "") + " " + (timeCol >= 0 ? cells[timeCol] : "0"));
-    else ts = parseTs(cells[0] || "");
-    if (ts) {
-      if (kwhCol >= 0) v = parseFloat(String(cells[kwhCol]).replace(/"/g, ""));
-      else for (let i = cells.length - 1; i > 0; i--) {  // last numeric column
-        const x = parseFloat(String(cells[i]).replace(/"/g, ""));
-        if (isFinite(x)) { v = x; break; }
-      }
-    } else if (tsCol < 0 && dateCol < 0) { tryHeader(cells); continue; }
-    if (!ts || !isFinite(v) || v < 0) continue;
-    const idx = (DOY_2024[ts[0] - 1] + ts[1] - 1) * 24 + ts[2];
-    if (idx >= 0 && idx < 8784) { kwh[idx] += v; seen[idx] = true; used++; }
+  const kwh = new Array(8784).fill(0), seen = new Array(8784).fill(false);
+  let used = 0, dropped = 0, negatives = 0;
+  const stamps = [];
+  const rows = [];
+  for (let r = map.header_rows || 0; r < lines.length; r++) {
+    if (!lines[r].trim()) continue;
+    const cells = lines[r].split(",");
+    const raw = map.ts_col != null ? (cells[map.ts_col] || "")
+      : (cells[map.date_col] || "") + " " + (map.time_col != null ? (cells[map.time_col] || "") : "0");
+    const ts = parseTs(raw);
+    let v = NaN;
+    if (map.usage_col != null) v = parseFloat(String(cells[map.usage_col]).replace(/[",]/g, ""));
+    else for (let i = cells.length - 1; i > 0; i--) {
+      const x = parseFloat(String(cells[i]).replace(/[",]/g, ""));
+      if (isFinite(x)) { v = x; break; }
+    }
+    if (!ts || !isFinite(v)) { dropped++; continue; }
+    if (v < 0) { negatives++; continue; }   // net metering export rows: skipped, noted
+    rows.push([ts, v]);
+    if (stamps.length < 200) stamps.push(ts);
   }
+  // modal interval (minutes) from consecutive stamps — converts power to energy
+  let interval = 60;
+  if (stamps.length > 2) {
+    const deltas = {};
+    for (let i = 1; i < stamps.length; i++) {
+      const dm = (stamps[i][2] * 60 + stamps[i][3]) - (stamps[i - 1][2] * 60 + stamps[i - 1][3]);
+      if (dm > 0 && dm <= 120) deltas[dm] = (deltas[dm] || 0) + 1;
+    }
+    const best = Object.entries(deltas).sort((a, b) => b[1] - a[1])[0];
+    if (best) interval = +best[0];
+  }
+  const unitScale = {kwh: 1, wh: 0.001, kw: interval / 60, w: 0.001 * interval / 60}[map.usage_unit || "kwh"] || 1;
+  for (const [ts, v] of rows) {
+    const idx = (DOY_2024[ts[0] - 1] + ts[1] - 1) * 24 + ts[2];
+    if (idx >= 0 && idx < 8784) { kwh[idx] += v * unitScale; seen[idx] = true; used++; }
+  }
+  // ---- quality gate (deterministic) ----
   const hours = seen.filter(Boolean).length;
-  if (hours < 24 * 30) throw new Error(`only ${hours} distinct hours found — need a timestamp column and a kWh/usage column`);
   const total = kwh.reduce((a, b) => a + b, 0);
-  return {kwh, total: Math.round(total * 10) / 10, hours, rows: used};
+  if (hours < 24 * 30) throw new Error(`only ${hours} distinct hours recognized — need ≥30 days of interval data`);
+  if (total < 50) throw new Error(`total is ${total.toFixed(1)} kWh — units look wrong (expected hundreds+ per month)`);
+  if (total > 200000) throw new Error(`total is ${Math.round(total).toLocaleString()} kWh — not a residential meter, or units are off`);
+  const notes = [];
+  if (interval !== 60) notes.push(`${interval}-min intervals summed to hours`);
+  if (map.usage_unit && map.usage_unit !== "kwh") notes.push(`converted from ${map.usage_unit.toUpperCase()}`);
+  if (negatives > 24) notes.push(`${negatives} export (negative) rows skipped — gross consumption only`);
+  if (dropped > rows.length * 0.1 && dropped > 50) notes.push(`${dropped} unparseable rows skipped`);
+  return {kwh, total: Math.round(total * 10) / 10, hours, rows: used, notes};
+}
+
+async function parseHourlyCsv(text) {
+  const lines = text.split(/\r?\n/);
+  const heur = detectHourlyMapping(lines);
+  if (heur) {
+    try { return applyHourlyMapping(lines, heur); } catch (e) { /* fall through to LLM */ }
+  }
+  // LLM column-mapper: first rows only, never the full file.
+  $("advstatus").textContent = "format not recognized — asking the classifier to identify columns…";
+  const sample = lines.slice(0, 25).map(l => l.slice(0, 300)).join("\n");
+  const res = await fetch("/api/parse-hourly", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({sample}),
+  });
+  if (!res.ok) throw new Error("could not detect a timestamp and kWh column (column-mapping service unavailable)");
+  const map = await res.json();
+  if (!map.ok) throw new Error(map.reason || "the file does not look like interval usage data");
+  const out = applyHourlyMapping(lines, map);
+  out.notes = ["columns identified by LLM" , ...(out.notes || [])];
+  return out;
 }
 
 function hourlyIntensity(ba, cb) {
@@ -1458,7 +1529,8 @@ function renderAdvanced(ef) {
   st.innerHTML = `<b>${HOURLY.name ? esc(HOURLY.name) + ": " : ""}${fmt(r.total)} kWh</b> × ${esc(r.ba)} hourly grid → ` +
     `<b>${fmt(r.kg)} kg CO₂e/yr</b> (${Math.round(r.eff * 1000)} g/kWh effective; flat average ${Math.round(flatKg * 1000)} g, ` +
     `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%; typical-household model ${Math.round(modelKg * 1000)} g)` +
-    (r.flatOnly ? ` — this grid has no reliable hourly shape, so the flat factor was applied to your total` : "");
+    (r.flatOnly ? ` — this grid has no reliable hourly shape, so the flat factor was applied to your total` : "") +
+    (HOURLY.notes && HOURLY.notes.length ? `<br><small>${esc(HOURLY.notes.join(" · "))}</small>` : "");
   if (r.flatOnly || !ef.ba || !ef.ba.hourly) { chart.innerHTML = ""; return; }
   hourlyIntensity(ef.ba, I => {
     if (!I) return;
@@ -1488,8 +1560,8 @@ $("advfile").onchange = async ev => {
   const f = ev.target.files[0];
   if (!f) return;
   try {
-    const p = parseHourlyCsv(await f.text());
-    setHourly({name: f.name, kwh: p.kwh, total: p.total, hours: p.hours});
+    const p = await parseHourlyCsv(await f.text());
+    setHourly({name: f.name, kwh: p.kwh, total: p.total, hours: p.hours, notes: p.notes});
   } catch (err) {
     $("advstatus").textContent = "Could not parse: " + (err.message || err);
   }
@@ -1498,7 +1570,7 @@ $("advfile").onchange = async ev => {
 $("advsample").onclick = async () => {
   try {
     const r = await fetch("data/sample_hourly_portland.csv");
-    const p = parseHourlyCsv(await r.text());
+    const p = await parseHourlyCsv(await r.text());
     HOME.elec.zip = "97202";   // SE Portland — the example is a PGE story; always demo on PGE
     saveHome();
     setHourly({name: "Portland example (electric heat)", kwh: p.kwh, total: p.total, hours: p.hours});
