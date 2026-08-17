@@ -145,7 +145,13 @@ PREFIX_CATEGORY = {
     "485": "excluded",                        # transit/taxi
     "486": "excluded",
     "487": "excluded",
-    "488": "excluded",                        # support (tolls etc.)
+    "488": "excluded",                        # transport support (airport ops — paid via airfare)
+    # Road services consumers buy directly: the Travel tab models fuel burn +
+    # vehicle manufacture from miles, so tolls (488490 covers toll road/bridge
+    # operations) and towing are counted NOWHERE if excluded — they belong
+    # with parking (812930) as vehicle services.
+    "488410": "services_vehicle_service",     # motor vehicle towing
+    "488490": "services_vehicle_service",     # other road support incl. toll operations
     "221": "excluded",                        # utilities
     "531": "excluded",                        # real estate/rent
     "324": "excluded",                        # petroleum
@@ -157,6 +163,8 @@ PREFIX_CATEGORY = {
 # Hand enrichment for retrieval: NAICS code -> extra keywords/example merchants.
 ENRICH = {
     "445110": "grocery store supermarket Safeway Whole Foods Trader Joes food shopping",
+    "488490": "toll road bridge tolls FasTrak EZPass E-ZPass express lanes highway toll booth",
+    "488410": "towing tow truck roadside AAA vehicle recovery",
     "722511": "restaurant dining sit-down dinner bistro",
     "722513": "fast food takeout Chipotle McDonald's burger quick service",
     "722515": "coffee shop cafe Starbucks Blue Bottle Peets espresso bakery snack",

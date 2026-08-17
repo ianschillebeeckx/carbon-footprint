@@ -534,6 +534,15 @@ def basket_options() -> list[dict]:
     return sorted(out, key=lambda o: (o["category"], o["title"]))
 
 
+def naics_all() -> list[dict]:
+    """The FULL index for the advanced search — every EPA/USEEIO commodity,
+    not just the curated dropdown subset."""
+    index = json.loads(INDEX_FILE.read_text())
+    return [{"code": e["code"], "title": e["title"], "category": e["category"],
+             "factor": e.get("factor"), "basket": bool(e.get("basket"))}
+            for e in index["entries"]]
+
+
 def naics_options() -> list[dict]:
     """Curated consumer NAICS subset for the correction dropdown. `basket`
     marks store codes that are re-priced as commodity baskets (picking one

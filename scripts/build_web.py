@@ -102,6 +102,7 @@ def build() -> None:
     s = sub(s, "/*__NAICS_OPTIONS__*/null", json.dumps(classify.naics_options(), separators=(",", ":")))
     s = sub(s, "/*__CAT_DEFAULTS__*/null", json.dumps(classify.default_naics(), separators=(",", ":")))
     s = sub(s, "/*__BASKET_OPTIONS__*/null", json.dumps(classify.basket_options(), separators=(",", ":")))
+    s = sub(s, "/*__NAICS_ALL__*/null", json.dumps(classify.naics_all(), separators=(",", ":")))
 
     s = sub(s, "/*__CATS__*/null", json.dumps(categories, separators=(",", ":")))
 

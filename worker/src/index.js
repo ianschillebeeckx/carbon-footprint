@@ -50,7 +50,7 @@ async function loadVectors(env) {
   return VEC;
 }
 
-async function topCandidates(env, queries, k = 10) {
+async function topCandidatesRaw(env, queries, k = 10) {
   const vec = await loadVectors(env);
   if (!vec) return queries.map(() => null);
   const out = await env.AI.run("@cf/baai/bge-small-en-v1.5", { text: queries });
@@ -64,8 +64,13 @@ async function topCandidates(env, queries, k = 10) {
       scores[r] = dot / norm;
     }
     return [...scores.keys()].sort((a, b) => scores[b] - scores[a]).slice(0, k)
-      .map((r) => `${vec.codes[r]}=${vec.titles[r]}`).join("; ");
+      .map((r) => ({ code: vec.codes[r], title: vec.titles[r], score: Math.round(scores[r] * 1e4) / 1e4 }));
   });
+}
+
+async function topCandidates(env, queries, k = 10) {
+  const raw = await topCandidatesRaw(env, queries, k);
+  return raw.map((cs) => cs ? cs.map((c) => `${c.code}=${c.title}`).join("; ") : null);
 }
 
 // Batch prompt mirroring src/cf/classify.py's rules ("map what was bought").
@@ -221,6 +226,25 @@ async function handle(request, env) {
       }));
       console.log("cache_lookup", { asked: keys.length, found: Object.keys(found).length });
       return new Response(JSON.stringify({ found }), { headers: { ...JSON_HEADERS, ...cors(env) } });
+    }
+
+    // POST /api/candidates {merchant, hint} -> {candidates: [{code,title,score}]}
+    // Vector top-10 for the advanced NAICS search. Cheap (one Workers AI embed)
+    // but still capped per IP under its own generous bucket.
+    if (url.pathname === "/api/candidates" && request.method === "POST") {
+      const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+      const key = `rlc:${ip}:${new Date().toISOString().slice(0, 10)}`;
+      const n = parseInt((await env.MERCHANT_CACHE.get(key)) || "0", 10);
+      if (n >= 300) {
+        return new Response(JSON.stringify({ error: "daily limit reached" }),
+          { status: 429, headers: { ...JSON_HEADERS, ...cors(env) } });
+      }
+      await env.MERCHANT_CACHE.put(key, String(n + 1), { expirationTtl: 90000 });
+      const { merchant = "", hint = "" } = await request.json();
+      const q = hint ? `${merchant} · ${hint}` : merchant;
+      const [cands] = await topCandidatesRaw(env, [String(q).slice(0, 200)]);
+      return new Response(JSON.stringify({ candidates: cands || [] }),
+        { headers: { ...JSON_HEADERS, ...cors(env) } });
     }
 
     // POST /api/parse-hourly {sample} -> column mapping (see PARSE_HOURLY_SCHEMA)

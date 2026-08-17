@@ -470,6 +470,7 @@ const DATA = /*__V2DATA__*/null;
 const NAICS_OPTIONS = /*__NAICS_OPTIONS__*/null;  // [{code,title,category}] curated consumer subset
 const CAT_DEFAULTS = /*__CAT_DEFAULTS__*/null;      // category -> representative NAICS
 const BASKET_OPTIONS = /*__BASKET_OPTIONS__*/null;  // commodities for the basket editor
+const NAICS_ALL = /*__NAICS_ALL__*/null;            // FULL index for the advanced search
 const CATS_STATIC = /*__CATS__*/null;               // canonical category taxonomy (build/server-injected)
 const TRAVEL_SAVED = /*__TRAVEL__*/null;            // persisted travel inputs
 const HOME_SAVED = /*__HOME__*/null;                // persisted home inputs
@@ -637,7 +638,8 @@ function naicsSelect(t) {
     html += `</optgroup>`;
   }
   html += `<option value="__nonpurchase">Non-purchase / ignore</option>`;
-  html += `<option value="__split">Split across industries…</option></select>`;
+  html += `<option value="__split">Split across industries…</option>`;
+  html += `<option value="__search">🔍 Search all industries…</option></select>`;
   return html;
 }
 
@@ -668,7 +670,7 @@ function renderTxns() {
     row.querySelector("select:not(.catsel)").onchange = e => {
       const v = e.target.value;
       if (!v) return;
-      if (v === "__split") { ui.search = t.merchant; $("search").value = t.merchant; setTab("merch"); return; }
+      if (v === "__split" || v === "__search") { ui.search = t.merchant; $("search").value = t.merchant; setTab("merch"); return; }
       postCorrection(t.merchant, t.category_hint, v === "__nonpurchase" ? null : v);
     };
     frag.appendChild(row);
@@ -775,6 +777,7 @@ function renderMerchants() {
       const v = e.target.value;
       if (!v) return;
       if (v === "__split") { openSplitEditor(row, m, t); e.target.value = ""; return; }
+      if (v === "__search") { openSearchEditor(row, m, t); e.target.value = ""; return; }
       postCorrection(m.merchant, m.category_hint, v === "__nonpurchase" ? null : v, null, false, allCatsChecked(row));
     };
     const ok = row.querySelector(".okbtn");
@@ -910,6 +913,67 @@ function openBasketEditor(row, m, t) {
   };
   renderRows(); sums();
   row.after(ed);
+}
+
+
+function openSearchEditor(row, m, t) {
+  const prev = row.nextElementSibling;
+  if (prev && prev.classList.contains("searchedit")) { prev.remove(); return; }
+  document.querySelector(".searchedit")?.remove();
+  document.querySelector(".splitedit")?.remove();
+  const ed = document.createElement("div");
+  ed.className = "splitedit searchedit";
+  ed.innerHTML =
+    `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">` +
+    `<b style="font-size:0.78rem">Search all ${NAICS_ALL.length} industries</b>` +
+    `<input type="text" class="bsq" placeholder="type to search — e.g. toll, cobbler, kayak…" style="flex:1;font:inherit;font-size:0.76rem;border:1px solid var(--line);border-radius:6px;padding:4px 8px;background:var(--card);color:var(--ink)">` +
+    `<button class="spdel" title="Close">✕</button></div>` +
+    `<div class="bslist"></div>`;
+  const list = ed.querySelector(".bslist");
+  const input = ed.querySelector(".bsq");
+  const render = (items, badge) => {
+    list.innerHTML = items.length
+      ? items.map(o =>
+          `<div class="bsi" data-code="${o.code}">${esc(o.title)}${o.basket ? " · 🧺 store basket" : ""}` +
+          `<small>${o.code} · ${esc(CATS[o.category] ? CATS[o.category].label : o.category)}` +
+          `${o.factor != null ? ` · ${o.factor.toFixed(2)} kg/$` : ""}` +
+          `${badge && o.score != null ? ` · vector match ${o.score.toFixed(2)}` : ""}</small></div>`).join("")
+      : `<div class="bsi" style="cursor:default;color:var(--muted)">no match</div>`;
+    list.querySelectorAll(".bsi[data-code]").forEach(el => el.onclick = async () => {
+      const ok = await postCorrection(m.merchant, m.category_hint, el.dataset.code, null, false, allCatsChecked(row));
+      if (ok) ed.remove();
+    });
+  };
+  const byCode = new Map(NAICS_ALL.map(o => [o.code, o]));
+  const textSearch = q => {
+    const ql = q.toLowerCase().split(/\s+/).filter(Boolean);
+    return NAICS_ALL.filter(o => {
+      const hay = `${o.code} ${o.title} ${CATS[o.category] ? CATS[o.category].label : o.category}`.toLowerCase();
+      return ql.every(w => hay.includes(w));
+    }).slice(0, 12);
+  };
+  let vecCands = null;
+  const showDefault = () => {
+    if (input.value.trim()) render(textSearch(input.value), false);
+    else if (vecCands) render(vecCands, true);
+    else list.innerHTML = `<div class="bsi" style="cursor:default;color:var(--muted)">finding similar industries…</div>`;
+  };
+  input.oninput = showDefault;
+  ed.querySelector(".spdel").onclick = () => ed.remove();
+  row.after(ed);
+  input.focus();
+  showDefault();
+  fetch("/api/candidates", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({merchant: m.merchant, hint: m.category_hint})})
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      vecCands = (d && d.candidates ? d.candidates : []).map(c => {
+        const full = byCode.get(c.code);
+        return full ? {...full, score: c.score} : {code: c.code, title: c.title, category: "", score: c.score};
+      });
+      showDefault();
+    })
+    .catch(() => { vecCands = []; showDefault(); });
 }
 
 function setTab(tab) {

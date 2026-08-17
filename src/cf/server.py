@@ -59,6 +59,7 @@ class Handler(BaseHTTPRequestHandler):
             html = html.replace("/*__NAICS_OPTIONS__*/null", json.dumps(classify.naics_options()))
             html = html.replace("/*__CAT_DEFAULTS__*/null", json.dumps(classify.default_naics()))
             html = html.replace("/*__BASKET_OPTIONS__*/null", json.dumps(classify.basket_options()))
+            html = html.replace("/*__NAICS_ALL__*/null", json.dumps(classify.naics_all()))
             idx_cats = json.loads(Path("data/naics_index.json").read_text())["categories"]
             html = html.replace("/*__CATS__*/null", json.dumps(idx_cats))
             html = html.replace("/*__TRAVEL__*/null", TRAVEL_FILE.read_text() if TRAVEL_FILE.exists() else "null")
@@ -109,6 +110,15 @@ class Handler(BaseHTTPRequestHandler):
         if not self._origin_ok():
             return self._send(403, {"error": "forbidden"})
         try:
+            if self.path == "/api/candidates":
+                # Vector top-10 for the advanced NAICS search (local embed index).
+                from . import embed_index
+                body = self._json_body()
+                q = f"{body.get('merchant', '')} · {body.get('hint', '')}".strip(" ·")
+                cands = [{"code": c["code"], "title": c["title"], "category": c["category"],
+                          "factor": c.get("factor"), "score": c["score"]}
+                         for c in embed_index.top_k(q, 10)]
+                return self._send(200, {"candidates": cands})
             if self.path == "/api/parse-hourly":
                 # Local proxy for the interval-CSV column mapper (worker parity).
                 import os
