@@ -1432,8 +1432,10 @@ function renderElecInfo(ef) {
   if (ef.ba) {
     s = `<b>${esc(ef.ba.name)}</b> <small>(${esc(ef.util)} wires)</small> — ${g(ef.kg)} g CO₂e/kWh`;
     if (ef.ba.di) {
+      const why = ef.ba.uplift >= 0.05 ? " — evening-heavy home use meets the evening grid"
+        : ef.ba.uplift <= -0.05 ? " — household hours run slightly cleaner than this grid's average" : "";
       const sign = ef.ba.uplift >= 0 ? "+" : "";
-      s += ` <small>household-hour weighted; flat average ${g(ef.ba.flat)} g (${sign}${ef.ba.uplift}% — evening-heavy home use meets the evening grid)</small>` +
+      s += ` <small>household-hour weighted; flat average ${g(ef.ba.flat)} g (${sign}${ef.ba.uplift}%${why})</small>` +
         ` · <span class="hchip" tabindex="0">24-hour profile</span>`;
     } else {
       s += ` <small>flat eGRID average — hourly shape not reliable for this grid</small>`;
