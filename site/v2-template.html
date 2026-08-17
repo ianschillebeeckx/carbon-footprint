@@ -1215,7 +1215,7 @@ function detectHourlyMapping(lines) {
       else if (/^(start ?time|time)$/.test(s)) timeCol = i;
       if (/usage|kwh|consumption|value|energy/.test(s) && kwhCol < 0 && !/cost|unit|per/.test(s)) {
         kwhCol = i;
-        if (/\bwh\b/.test(s) && !/kwh/.test(s)) unit = "wh";
+        if (/(^|[^k\w])wh\b|_wh\b/.test(s)) unit = "wh";   // "wh"/"energy_wh" but not "kwh"
       }
     });
     if (tsCol >= 0 || dateCol >= 0) break;
@@ -1226,7 +1226,7 @@ function detectHourlyMapping(lines) {
           usage_col: kwhCol >= 0 ? kwhCol : null, usage_unit: unit, date_order: "mdy"};
 }
 
-function applyHourlyMapping(lines, map) {
+function applyHourlyMapping(lines, map, probe) {
   const parseTs = raw => {  // -> [month, day, hour, minute] or null
     let m = raw.match(/(\d{4})-(\d{1,2})-(\d{1,2})[T ](\d{1,2})(?::(\d{2}))?/);
     let mo, d;
@@ -1282,6 +1282,7 @@ function applyHourlyMapping(lines, map) {
   // ---- quality gate (deterministic) ----
   const hours = seen.filter(Boolean).length;
   const total = kwh.reduce((a, b) => a + b, 0);
+  if (probe) return {hours};   // date-order probe: just report coverage
   if (hours < 24 * 30) throw new Error(`only ${hours} distinct hours recognized — need ≥30 days of interval data`);
   if (total < 50) throw new Error(`total is ${total.toFixed(1)} kWh — units look wrong (expected hundreds+ per month)`);
   if (total > 200000) throw new Error(`total is ${Math.round(total).toLocaleString()} kWh — not a residential meter, or units are off`);
@@ -1293,15 +1294,32 @@ function applyHourlyMapping(lines, map) {
   return {kwh, total: Math.round(total * 10) / 10, hours, rows: used, notes};
 }
 
+function fixDateOrder(lines, map) {
+  // The data outranks any date-order guess (heuristic default or LLM prior —
+  // a sample of early-month rows is genuinely ambiguous): probe both orders
+  // and keep whichever recognizes more hours. Ties (all days <= 12) keep the
+  // prior. ymd is unambiguous — skip.
+  if (map.date_order === "ymd") return map;
+  const flipped = {...map, date_order: map.date_order === "dmy" ? "mdy" : "dmy"};
+  const a = applyHourlyMapping(lines, map, true).hours;
+  const b = applyHourlyMapping(lines, flipped, true).hours;
+  return b > a ? flipped : map;
+}
+
 async function parseHourlyCsv(text) {
   const lines = text.split(/\r?\n/);
   const heur = detectHourlyMapping(lines);
   if (heur) {
-    try { return applyHourlyMapping(lines, heur); } catch (e) { /* fall through to LLM */ }
+    try { return applyHourlyMapping(lines, fixDateOrder(lines, heur)); } catch (e) { /* fall through to LLM */ }
   }
-  // LLM column-mapper: first rows only, never the full file.
+  // LLM column-mapper. Sample = the preamble/header region plus rows spread
+  // across the WHOLE file — early rows alone can hide the date order (a file
+  // starting Jan 1 shows only days <= 12) and register-vs-interval patterns.
   $("advstatus").textContent = "format not recognized — asking the classifier to identify columns…";
-  const sample = lines.slice(0, 25).map(l => l.slice(0, 300)).join("\n");
+  const nonEmpty = lines.filter(l => l.trim());
+  const spread = [];
+  for (let k = 0; k < 12; k++) spread.push(nonEmpty[Math.floor(nonEmpty.length * (k + 1) / 13)]);
+  const sample = [...nonEmpty.slice(0, 12), "...", ...spread].map(l => String(l).slice(0, 300)).join("\n");
   const res = await fetch("/api/parse-hourly", {
     method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({sample}),
@@ -1309,8 +1327,8 @@ async function parseHourlyCsv(text) {
   if (!res.ok) throw new Error("could not detect a timestamp and kWh column (column-mapping service unavailable)");
   const map = await res.json();
   if (!map.ok) throw new Error(map.reason || "the file does not look like interval usage data");
-  const out = applyHourlyMapping(lines, map);
-  out.notes = ["columns identified by LLM" , ...(out.notes || [])];
+  const out = applyHourlyMapping(lines, fixDateOrder(lines, map));
+  out.notes = ["columns identified by LLM", ...(out.notes || [])];
   return out;
 }
 
