@@ -57,6 +57,76 @@ python demo.py
 
 **Everything in `data/cache/` is synthetic.** Real values need the refresh.
 
+> **This repo runs on real data.** The synthetic path above is kept for structure tests.
+> The production build is: `make_real_cache.py` (EIA-930 2024 bulk files + eGRID2023 BA23
+> sheet + TMY3 shapes) -> `make_zip_ba.py` (EPA Power Profiler x EIA-861 -> 39k ZIPs) ->
+> `python -m gridcarbon.build --year 2024` -> `../scripts/build_gridcarbon_web.py`.
+
+## Deviations from the library as originally specified
+
+Documented here because each one changes shipped numbers; the *why* lives in code comments
+at the referenced sites.
+
+1. **Imports dropped — production-based intensity** (`gridcarbon/build.py::build_ba`,
+   `use_imports=False`). The original reconstruction valued imports at CARB's 428 g CA-market
+   default and calibrated against eGRID's production-based BA rate. On real 2024 data that
+   mismatch pushed alpha out of its own sanity band for a third of BAs (CISO 0.65, PACW 0.39,
+   BPAT 2.18) — and 428 g is indefensible outside CA (it would price Seattle's BPA-hydro
+   imports as gas). Shipped intensity is in-BA generation only, the same basis as every
+   standard use of eGRID location-based rates. Cost: import-heavy BAs are understated at the
+   level (CISO ~10-15% vs consumption accounting); the import contribution to evening shape
+   is lost (second-order — the in-BA gas ramp carries it).
+
+2. **Mid-2024 EIA-930 schema change handled** (`make_real_cache.py::FUEL_COLS`). Jul-Dec 2024
+   splits Solar/Wind by integrated-battery status (including EIA's typo'd
+   `"Solar witho Integrated Battery Storage (Adjusted)"` column, which is real and carries
+   data), breaks out Geothermal and Pumped Storage, and adds Battery/Energy Storage columns.
+   Missing this zero-filled H2 solar — July noons parsed as 85% gas and flattened the annual
+   diurnal curve. Both schemas map to canonical fuels and are summed.
+
+3. **Storage split out of "Other"** (`make_real_cache.py`, the daily-min split). Some 930
+   respondents — CAISO foremost — never populate the dedicated battery column; their batteries
+   land in "Other Fuel Sources", cycling −5.5 GW at noon (charging) to +4.8 GW winter evenings
+   (discharging). Priced at the gas-like Other factor, evening discharge of stored midday solar
+   counted as gas. Per local day, the excess of Other above its daily minimum is reclassified
+   to a `storage` fuel (0 combustion, 55 g lifecycle in `fuel_factors.csv`); flat fossil Other
+   (waste-coal BAs) has no daily cycle and is untouched. Validation: CISO alpha 0.73 -> 0.97
+   and the diurnal swing widened from 1.15x to 1.46x, with post-battery evenings (~235 g)
+   now visibly cleaner than deep night (~279 g).
+
+4. **TMY3 local-time alignment** (`make_real_cache.py::BA_UTC_OFFSET`). TMY3 hours are local;
+   the cache index is UTC. Unrolled, the residential evening peak rendered (and weighted!) at
+   midday. Load arrays are rolled by the BA's standard-time UTC offset before writing. DST
+   (±1h) is deliberately ignored.
+
+5. **Widened alpha shipping band + degradation policy**
+   (`../scripts/build_gridcarbon_web.py`). The library's (0.80, 1.25) "structural error" band
+   is kept as a warning, but shipping uses [0.70, 1.45] — values in the outer ring are fleet
+   signal (Mountain-West 1970s coal genuinely emits above the 950 g national factor; that is
+   what alpha is *for*), not join errors. A BA ships its hourly shape only if alpha is in
+   band, |uplift| <= 12%, and >= 90% of hours reconstructed; otherwise it degrades to the flat
+   eGRID+upstream level (EPA's measured number — level right, no diurnal claim). A 4.2% US
+   grid-gross-loss factor converts busbar to delivered kWh.
+
+## Alpha validation results (2024 data, 2023 eGRID)
+
+Alpha doubles as a per-BA integrity check: |alpha − 1| measures how far EPA's measured rate
+sits from our bottom-up reconstruction. **37/61 BAs within ±10%, 46/61 within ±20%.** All
+major load centers tight: NYIS 1.00, PJM 1.02, CISO 0.97, ISNE 0.98, FPL 0.96, MISO 1.09,
+ERCO 1.13, SWPP 1.13, LDWP 1.18.
+
+Outliers, by class (all outside the gate degrade to flat eGRID level):
+
+| class | BAs | diagnosis |
+|---|---|---|
+| 930-vs-eGRID plant assignment | PACW 6.18, BPAT 2.97, TEPC 1.62 | The 930 respondent's fuel mix and eGRID's plant-to-BA assignment disagree about which plants belong to the BA (BPA reports ~pure hydro; eGRID's BPAT set includes thermal). No calibration should paper over this. |
+| Biomass accounting | GVL 1.87 | Deerhaven biomass: we count biomass combustion as 0 (biogenic-neutral, per `fuel_factors.csv`); eGRID measures the muni at 0.72 kg/kWh. |
+| Dirty-fleet signal (ships fine) | WACM 1.49, NWMT 1.42, AZPS 1.34, SRP 1.28, EPE 1.28, PACE 1.26 | Mountain-West coal above the national 950 g average — genuine fleet deviation, exactly what alpha absorbs. WACM alone falls outside the gate. |
+| Remaining OTH misjoin | IID 0.41 | Salton Sea geothermal is IID's flat "Other" baseload, priced gas-like; no daily cycle so the storage split (correctly) leaves it alone. A one-line IID other->geothermal remap would fix it; at ~180k residents it ships the flat eGRID level instead. |
+| eGRID degenerate rates | CPLW 0.00, HST −0.03 | eGRID publishes 0.000 (hydro-only) and a negative rate (Homestead accounting oddity); alpha is meaningless and the rate is clipped >= 0 for the flat path. |
+
+Re-run the ranking any time: sort `dist/summary.csv` by `abs(alpha - 1)`.
+
 ## Expectations
 
 The uplift over flat-rate accounting is **a few percent**, not tens of percent. The identity
