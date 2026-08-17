@@ -134,6 +134,27 @@ STATIONS = {
 TMY3_URL = ("https://openei.org/datasets/files/961/pub/"
             "RESIDENTIAL_LOAD_DATA_E_PLUS_OUTPUT/BASE/USA_{st}_TMY3_BASE.csv")
 
+# Standard-time UTC offsets per BA. TMY3 hours are LOCAL time; the cache index
+# is UTC (matching EIA-930), so each load array must be rolled by the offset
+# before writing — position j (UTC) must carry the load of local hour j+offset.
+# Getting this wrong shifts the residential evening peak to midday and silently
+# corrupts the load-intensity covariance. DST (±1h) is ignored; TMY3 is a
+# standard-time construct.
+BA_UTC_OFFSET = {
+    "CISO": -8, "LDWP": -8, "BANC": -8, "IID": -8, "TIDC": -8, "PACW": -8,
+    "BPAT": -8, "PGE": -8, "SCL": -8, "PSEI": -8, "TPWR": -8, "AVA": -8,
+    "CHPD": -8, "DOPD": -8, "GCPD": -8, "AVRN": -8, "GRID": -8, "NEVP": -8,
+    "WAUW": -7, "NWMT": -7, "IPCO": -7, "PACE": -7, "AZPS": -7, "SRP": -7,
+    "TEPC": -7, "WALC": -7, "PNM": -7, "EPE": -7, "PSCO": -7, "WACM": -7,
+    "GWA": -7, "WWA": -7, "DEAA": -7, "HGMA": -7, "GRIF": -7,
+    "ERCO": -6, "SWPP": -6, "MISO": -6, "AECI": -6, "SPA": -6, "EEI": -6,
+    "AEC": -6, "LGEE": -5, "OVEC": -5, "PJM": -5, "NYIS": -5, "ISNE": -5,
+    "NBSO": -5, "SOCO": -5, "TVA": -5, "DUK": -5, "CPLE": -5, "CPLW": -5,
+    "SCEG": -5, "SC": -5, "SCP": -5, "YAD": -5, "SEPA": -5,
+    "FPL": -5, "FPC": -5, "TEC": -5, "JEA": -5, "FMPP": -5, "SEC": -5,
+    "TAL": -5, "GVL": -5, "HST": -5, "NSB": -5,
+}
+
 
 def load_eia930():
     frames = []
@@ -219,10 +240,14 @@ def main():
             station_cache[st] = arr
             print(f"  fetched TMY3 {st} ({len(arr)} hours)")
         arr = station_cache[st]
-        # TMY3 is a non-leap synthetic year (8760). Align by position; leap years
-        # repeat the final day. w_h is a shape — day-off-by-one is immaterial.
+        # TMY3 is a non-leap synthetic year (8760) in LOCAL time. Roll to UTC
+        # alignment (see BA_UTC_OFFSET), then align by position; leap years
+        # repeat the final day. w_h is a shape — day-off-by-one is immaterial,
+        # the hour-of-day alignment is not.
+        off = BA_UTC_OFFSET.get(ba, -6)
+        vals = np.roll(arr, -off)          # off=-8 -> roll right 8: UTC j carries local j-8
         n = len(hours)
-        vals = np.resize(arr, n)
+        vals = np.resize(vals, n)
         write_cache(f"load_{ba}.csv.gz", pd.DataFrame({"load_kwh": vals}, index=hours))
 
     # real egrid_ba_annual.csv
