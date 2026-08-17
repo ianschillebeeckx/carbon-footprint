@@ -75,6 +75,7 @@
   .tcard h3 .tkg { margin-left: auto; font-family: var(--mono); font-size: 0.78rem; text-transform: none; letter-spacing: 0; color: var(--ink); }
   .tvrow { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; font-size: 0.82rem; }
   .tvrow label { color: var(--muted); font-size: 0.76rem; }
+  .tvrow label.filebtn { color: #fff; font-size: 0.82rem; }  /* the source-order tie against .tvrow label turned the upload button grey */
   .tvrow input[type=number] { font-family: var(--mono); font-size: 0.8rem; width: 90px; border: 1px solid var(--line); border-radius: 7px; padding: 5px 7px; background: var(--card); color: var(--ink); }
   .tvrow select { font: inherit; font-size: 0.78rem; border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; background: var(--card); color: var(--ink); }
   .tvrow .rowkg { margin-left: auto; font-family: var(--mono); font-size: 0.74rem; color: var(--muted); white-space: nowrap; }
@@ -354,7 +355,7 @@
       <details id="elecadv" style="margin-top:10px">
         <summary class="hint" style="cursor:pointer">Advanced: upload your hourly usage</summary>
         <p class="hint" style="margin:6px 0">Many utilities export interval data (PG&amp;E "Green Button" / Share My Data, etc.). Export a <b>full 12 months</b> and upload the CSV — columns with a timestamp and kWh (15-minute rows are summed to hours) — and your footprint uses <i>your</i> hours × your grid's hourly intensity instead of the typical-household assumption. The file stays in this browser. Or <a id="advsample" style="color:var(--leaf);cursor:pointer">try the Portland example</a> (an electric-heated home on a hydro grid — winter-peaked usage that misses the grid's dirty late-summer months).</p>
-        <div class="tvrow"><label class="filebtn" for="advfile" style="font-size:0.76rem">Upload hourly CSV</label>
+        <div class="tvrow"><label class="filebtn" for="advfile">Upload hourly CSV</label>
           <input id="advfile" type="file" accept=".csv,text/csv" hidden>
           <button id="advclear" class="tadd" hidden>✕ clear hourly data</button>
           <span class="hint" id="advstatus"></span></div>
