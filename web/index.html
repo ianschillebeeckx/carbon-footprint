@@ -1516,28 +1516,6 @@ function hourlyRecompute() {
   });
 }
 
-function hourlyStats(ba, I) {
-  // per-local-hour distributions across the year: usage mean/p25/p75 (kWh),
-  // intensity mean/p25/p75 (kg/kWh) — the variance view of the 24h chart.
-  const q = (arr, p) => {
-    const s = [...arr].sort((a, b) => a - b);
-    return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))] : 0;
-  };
-  const dw = [], dwLo = [], dwHi = [], di = [], diLo = [], diHi = [];
-  for (let h = 0; h < 24; h++) {
-    const us = [], iv = [];
-    for (let d = 0; d < 366; d++) {
-      const i = d * 24 + h;
-      if (HOURLY.kwh[i] > 0 || (HOURLY.kwh[i] === 0 && d < 365)) us.push(HOURLY.kwh[i]);
-      if (I && I[i] != null) iv.push(I[i]);
-    }
-    dw.push(us.reduce((a, b) => a + b, 0) / (us.length || 1));
-    dwLo.push(q(us, 0.25)); dwHi.push(q(us, 0.75));
-    if (iv.length) { di.push(iv.reduce((a, b) => a + b, 0) / iv.length); diLo.push(q(iv, 0.25)); diHi.push(q(iv, 0.75)); }
-    else { di.push(0); diLo.push(0); diHi.push(0); }
-  }
-  return {dw, dwLo, dwHi, di, diLo, diHi};
-}
 
 function homeKg() {
   const e = HOME.elec, g = HOME.gas, o = HOME.oil;
@@ -1582,35 +1560,122 @@ function renderElecInfo(ef) {
 }
 
 // ---- 24-hour chart: household usage (bars) vs grid g/kWh (line). ----
-// spec: {di, dw} means only, or + {diLo, diHi, dwLo, dwHi} for p25-p75
-// whiskers per hour on both series (advanced upload view). Scales adapt to
-// whisker extents when present.
 function hourChartSvg(spec, W = 340, H = 150) {
   const padL = 8, padR = 36, padB = 26, padT = 14;
   const iw = (W - padL - padR) / 24;
-  const {di, dw, diLo, diHi, dwLo, dwHi} = spec;
-  const wMax = Math.max(...(dwHi || dw));
-  const iMin = Math.min(...(diLo || di)), iMax = Math.max(...(diHi || di));
+  const {di, dw} = spec;
+  const wMax = Math.max(...dw);
+  const iMin = Math.min(...di), iMax = Math.max(...di);
   const iSpan = (iMax - iMin) || 1;
-  const yI = v => padT + (H - padT - padB) * (1 - (v - iMin) / iSpan);
-  const yW = v => H - padB - (H - padT - padB) * (v / wMax);
-  let bars = "", whW = "", whI = "", pts = [];
+  let bars = "", pts = [];
   for (let h = 0; h < 24; h++) {
-    const x = padL + h * iw, cx = x + iw / 2;
-    bars += `<rect x="${(x + 1).toFixed(1)}" y="${yW(dw[h]).toFixed(1)}" width="${(iw - 2).toFixed(1)}" height="${(H - padB - yW(dw[h])).toFixed(1)}" fill="var(--chip)" stroke="var(--line)" stroke-width="0.5"/>`;
-    if (dwLo) whW += `<line x1="${cx.toFixed(1)}" y1="${yW(dwLo[h]).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${yW(dwHi[h]).toFixed(1)}" stroke="var(--muted)" stroke-width="1.2"/>` +
-      `<line x1="${(cx - 2.5).toFixed(1)}" y1="${yW(dwLo[h]).toFixed(1)}" x2="${(cx + 2.5).toFixed(1)}" y2="${yW(dwLo[h]).toFixed(1)}" stroke="var(--muted)" stroke-width="1"/>` +
-      `<line x1="${(cx - 2.5).toFixed(1)}" y1="${yW(dwHi[h]).toFixed(1)}" x2="${(cx + 2.5).toFixed(1)}" y2="${yW(dwHi[h]).toFixed(1)}" stroke="var(--muted)" stroke-width="1"/>`;
-    if (diLo) whI += `<line x1="${cx.toFixed(1)}" y1="${yI(diLo[h]).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${yI(diHi[h]).toFixed(1)}" stroke="var(--s2)" stroke-width="1.4" opacity="0.45"/>`;
-    pts.push(`${cx.toFixed(1)},${yI(di[h]).toFixed(1)}`);
+    const x = padL + h * iw;
+    const bh = (H - padT - padB) * (dw[h] / wMax);
+    bars += `<rect x="${(x + 1).toFixed(1)}" y="${(H - padB - bh).toFixed(1)}" width="${(iw - 2).toFixed(1)}" height="${bh.toFixed(1)}" fill="var(--chip)" stroke="var(--line)" stroke-width="0.5"/>`;
+    const y = padT + (H - padT - padB) * (1 - (di[h] - iMin) / iSpan);
+    pts.push(`${(x + iw / 2).toFixed(1)},${y.toFixed(1)}`);
   }
   const ticks = [0, 6, 12, 18].map(h =>
     `<text x="${(padL + h * iw + iw / 2).toFixed(1)}" y="${H - 8}" font-size="9" fill="var(--muted)" text-anchor="middle">${h === 0 ? "12am" : h === 12 ? "12pm" : h < 12 ? h + "am" : (h - 12) + "pm"}</text>`).join("");
   const yHi = `<text x="${W - padR + 4}" y="${padT + 8}" font-size="9" fill="var(--s2)">${Math.round(iMax * 1000)}g</text>`;
   const yLo = `<text x="${W - padR + 4}" y="${H - padB}" font-size="9" fill="var(--s2)">${Math.round(iMin * 1000)}g</text>`;
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly household usage and grid carbon intensity">` +
-    bars + whW + whI + `<polyline points="${pts.join(" ")}" fill="none" stroke="var(--s2)" stroke-width="2"/>` +
+    bars + `<polyline points="${pts.join(" ")}" fill="none" stroke="var(--s2)" stroke-width="2"/>` +
     ticks + yHi + yLo + `</svg>`;
+}
+
+// ---- month-conditioned view (advanced): min / median / max months, three
+// layered bar sets (usage) + three lines (intensity). The median month is the
+// middle of the usage-level ranking; min and max are the months whose joint
+// usage+intensity diurnal SHAPE correlates least with the median month's —
+// one from below its level, one from above. Level says which side; correlation
+// picks the most-different-looking month on that side.
+const MONTHS_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTH_COLORS = ["var(--s3)", "var(--s1)", "var(--s2)"];   // min, median, max
+
+function monthProfiles(I) {
+  // per month: mean usage kWh by local hour, mean intensity by local hour,
+  // total usage, days covered.
+  const out = [];
+  for (let m = 0; m < 12; m++) {
+    const u = new Array(24).fill(0), un = new Array(24).fill(0);
+    const iv = new Array(24).fill(0), ivn = new Array(24).fill(0);
+    let total = 0;
+    const dayHasUse = new Set();
+    for (let d = DOY_2024[m]; d < DOY_2024[m + 1]; d++) {
+      for (let h = 0; h < 24; h++) {
+        const k = d * 24 + h;
+        const v = HOURLY.kwh[k];
+        if (v > 0) dayHasUse.add(d);
+        u[h] += v; un[h]++;
+        if (I && I[k] != null) { iv[h] += I[k]; ivn[h]++; }
+      }
+    }
+    for (let h = 0; h < 24; h++) {
+      u[h] = un[h] ? u[h] / un[h] : 0;
+      iv[h] = ivn[h] ? iv[h] / ivn[h] : 0;
+      total += u[h] * (DOY_2024[m + 1] - DOY_2024[m]);
+    }
+    out.push({m, u, i: iv, total, days: dayHasUse.size});
+  }
+  return out.filter(p => p.days >= 10);   // partial uploads: skip thin months
+}
+
+function pickMonths(profiles) {
+  if (profiles.length < 3) return null;
+  const byLevel = [...profiles].sort((a, b) => a.total - b.total);
+  const med = byLevel[Math.floor(byLevel.length / 2)];
+  const z = a => {
+    const mu = a.reduce((x, y) => x + y, 0) / a.length;
+    const sd = Math.sqrt(a.reduce((x, y) => x + (y - mu) ** 2, 0) / a.length) || 1;
+    return a.map(v => (v - mu) / sd);
+  };
+  const joint = p => [...z(p.u), ...z(p.i)];
+  const mj = joint(med);
+  const corr = p => {
+    const pj = joint(p);
+    let s = 0;
+    for (let k = 0; k < pj.length; k++) s += pj[k] * mj[k];
+    return s / pj.length;
+  };
+  const below = profiles.filter(p => p.total < med.total && p.m !== med.m);
+  const above = profiles.filter(p => p.total > med.total && p.m !== med.m);
+  const pick = arr => arr.length ? arr.reduce((a, b) => corr(a) <= corr(b) ? a : b) : null;
+  const lo = pick(below), hi = pick(above);
+  if (!lo || !hi) return null;
+  return [lo, med, hi];   // min, median, max
+}
+
+function monthChartSvg(sel, W = 430, H = 190) {
+  const padL = 8, padR = 40, padB = 26, padT = 14;
+  const iw = (W - padL - padR) / 24;
+  const wMax = Math.max(...sel.flatMap(p => p.u)) || 1;
+  const allI = sel.flatMap(p => p.i).filter(v => v > 0);
+  const iMin = Math.min(...allI), iMax = Math.max(...allI);
+  const iSpan = (iMax - iMin) || 1;
+  const yI = v => padT + (H - padT - padB) * (1 - (v - iMin) / iSpan);
+  const hW = v => (H - padT - padB) * (v / wMax);
+  let bars = "", lines = "";
+  for (let h = 0; h < 24; h++) {
+    const x = padL + h * iw;
+    // layered (not summed): tallest first so every month stays visible
+    const order = [0, 1, 2].sort((a, b) => sel[b].u[h] - sel[a].u[h]);
+    for (const k of order) {
+      const bh = hW(sel[k].u[h]);
+      if (bh <= 0) continue;
+      bars += `<rect x="${(x + 1).toFixed(1)}" y="${(H - padB - bh).toFixed(1)}" width="${(iw - 2).toFixed(1)}" height="${bh.toFixed(1)}" fill="${MONTH_COLORS[k]}" opacity="0.42" stroke="none"/>`;
+    }
+  }
+  sel.forEach((p, k) => {
+    const pts = p.i.map((v, h) => `${(padL + h * iw + iw / 2).toFixed(1)},${yI(v).toFixed(1)}`);
+    lines += `<polyline points="${pts.join(" ")}" fill="none" stroke="${MONTH_COLORS[k]}" stroke-width="${k === 1 ? 2.4 : 1.6}"${k === 1 ? "" : ' stroke-dasharray="none" opacity="0.9"'}/>`;
+  });
+  const ticks = [0, 6, 12, 18].map(h =>
+    `<text x="${(padL + h * iw + iw / 2).toFixed(1)}" y="${H - 8}" font-size="9" fill="var(--muted)" text-anchor="middle">${h === 0 ? "12am" : h === 12 ? "12pm" : h < 12 ? h + "am" : (h - 12) + "pm"}</text>`).join("");
+  const yHi = `<text x="${W - padR + 4}" y="${padT + 8}" font-size="9" fill="var(--muted)">${Math.round(iMax * 1000)}g</text>`;
+  const yLo = `<text x="${W - padR + 4}" y="${H - padB}" font-size="9" fill="var(--muted)">${Math.round(iMin * 1000)}g</text>`;
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly usage and grid intensity for min, median and max months">` +
+    bars + lines + ticks + yHi + yLo + `</svg>`;
 }
 
 function renderAdvanced(ef) {
@@ -1633,12 +1698,15 @@ function renderAdvanced(ef) {
   if (r.flatOnly || !ef.ba || !ef.ba.hourly) { chart.innerHTML = ""; return; }
   hourlyIntensity(ef.ba, I => {
     if (!I) return;
-    const s = hourlyStats(ef.ba, I);
-    chart.innerHTML = hourChartSvg(s, 420, 170) +
-      `<div class="hint" style="max-width:410px;margin-top:2px">` +
-      `<span style="color:var(--ink)">▮</span> YOUR mean kWh by hour of day (whiskers: middle half of days) · ` +
-      `<span style="color:var(--s2)">—</span> ${esc(r.ba)} mean g CO₂e/kWh by hour (whiskers: middle half of days, EIA-930 ${G2.year}). ` +
-      `Where your tall bars meet high line segments is where your carbon comes from.</div>`;
+    const sel = pickMonths(monthProfiles(I));
+    if (!sel) { chart.innerHTML = `<p class="hint">Month view needs at least 3 months of uploaded data.</p>`; return; }
+    const names = sel.map(p => MONTHS_ABBR[p.m]);
+    const legend = ["min", "median", "max"].map((tag, k) =>
+      `<span style="white-space:nowrap"><span style="color:${MONTH_COLORS[k]}">▮—</span> ${names[k]} <small>(${tag} month, ${fmt(sel[k].total)} kWh)</small></span>`).join(" · ");
+    chart.innerHTML = monthChartSvg(sel) +
+      `<div class="hint" style="max-width:420px;margin-top:2px">${legend}<br>` +
+      `Bars: YOUR mean kWh by hour, layered (not summed). Lines: ${esc(r.ba)} mean g CO₂e/kWh by hour (EIA-930 ${G2.year}). ` +
+      `Median month = middle of your monthly usage; min/max = the months whose hour-by-hour shape (usage + grid together) looks LEAST like the median month's, one below its usage and one above.</div>`;
   });
 }
 
