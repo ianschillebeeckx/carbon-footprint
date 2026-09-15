@@ -101,8 +101,9 @@ ASSUMPTIONS = [
       "values (see [the measured-factors file](" + REPO + "data/coolclimate_travel_factors.json)). "
       "So CoolClimate entries cite both: the paper for the model, the API "
       "measurement for the value and its vintage. Where the deployed calculator "
-      "disagrees with its own documentation (the bus factor), the deviation is "
-      "flagged on that entry rather than silently patched.",
+      "disagrees with its own documentation, the fix is declared on the entry "
+      "(the bus factor is corrected to 107 g/mile) instead of the bug being "
+      "duplicated or silently patched.",
       sources=(JK2011, CC_API),
       code=("data/coolclimate_travel_factors.json", "data/coolclimate_factors.json")),
 
@@ -240,19 +241,24 @@ ASSUMPTIONS = [
       sources=(JK2011, CC_API),
       code=("data/coolclimate_travel_factors.json",)),
 
-    A("travel.ground_transit", "travel", "Transit factors (and CoolClimate's bus bug)",
-      "Per passenger-mile, measured from the deployed CoolClimate calculator: "
-      "simple \"public transit\" 225 g; detailed mode — transit rail 205 g, "
-      "commuter rail 205 g, intercity rail 233 g, bus **1.3 g**. That bus number "
-      "is what their calculator actually computes and is ~100× below the "
-      "~107 g/mile bus factor in their own data tables — almost certainly an "
-      "implementation bug (no paper publishes 1.3 g), duplicated faithfully "
-      "rather than silently patched. Use the simple mode if you ride buses.",
-      value={"publictrans": 0.2253, "bus": 0.0013, "transit": 0.2054,
+    A("travel.ground_transit", "travel", "Transit factors (CoolClimate's bus bug, fixed)",
+      "Per passenger-mile: simple \"public transit\" 225 g; detailed mode — "
+      "transit rail 205 g, commuter rail 205 g, intercity rail 233 g (all "
+      "measured from the deployed CoolClimate calculator), and bus **107 g**. "
+      "The bus number is this app's one deliberate deviation from the deployed "
+      "calculator: their implementation computes 1.3 g/mile — ~100× below the "
+      "107 g in their own data tables and no published source's value, i.e. a "
+      "bug — so it is corrected here to 0.107 kg CO₂e/passenger-mile, the "
+      "value CoolClimate's tables intend (it traces to the pre-2023 EPA "
+      "Factors Hub bus factor). EPA has since revised bus down to ~71 g with "
+      "newer occupancy data, so 107 g is on the conservative side.",
+      value={"publictrans": 0.2253, "bus": 0.107, "transit": 0.2054,
              "commuter": 0.2054, "intercity": 0.2331},
-      display="205–233 g/pax-mile (bus 1.3 g — their bug)",
-      bias="under",
-      sources=(JK2011, CC_API),
+      display="rail 205–233 g · bus 107 g/pax-mile",
+      bias="over",
+      sources=(JK2011, CC_API,
+               ("EPA GHG Emission Factors Hub (bus, since revised to ~71 g)",
+                "https://www.epa.gov/climateleadership/ghg-emission-factors-hub")),
       code=("data/coolclimate_travel_factors.json", "site/v2-template.html")),
 
     A("travel.air", "travel", "Flight factors, no contrail multiplier",
