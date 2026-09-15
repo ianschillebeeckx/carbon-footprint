@@ -15,6 +15,11 @@ Rules:
   - ``rationale`` is the writeup. Markdown links [text](url) and `code`
     are allowed; keep it honest about direction of bias.
 
+CHANGING A VALUE: edit it here (never as a literal elsewhere), update this
+entry's rationale/sources/bias in the same edit — the page describes current
+factors only, no change history — then run scripts/build_web.py and commit
+the regenerated web/ pages so the deployed methodology never lags the code.
+
 Build: scripts/build_methodology.py renders the page; build_web.py and
 src/cf/server.py inject ``js_values()`` into the app template.
 """
