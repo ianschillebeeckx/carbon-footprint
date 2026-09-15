@@ -100,10 +100,9 @@ ASSUMPTIONS = [
       "updated since the paper, and the paper does not tabulate these exact "
       "values (see [the measured-factors file](" + REPO + "data/coolclimate_travel_factors.json)). "
       "So CoolClimate entries cite both: the paper for the model, the API "
-      "measurement for the value and its vintage. Where the deployed calculator "
-      "is wrong, the fix is declared on the entry (the bus factor is replaced "
-      "with EPA's current figure) instead of the bug being duplicated or "
-      "silently patched.",
+      "measurement for the value and its vintage. Where an entry deviates from "
+      "the calculator (the bus factor), the substitute source is named on that "
+      "entry.",
       sources=(JK2011, CC_API),
       code=("data/coolclimate_travel_factors.json", "data/coolclimate_factors.json")),
 
@@ -241,19 +240,15 @@ ASSUMPTIONS = [
       sources=(JK2011, CC_API),
       code=("data/coolclimate_travel_factors.json",)),
 
-    A("travel.ground_transit", "travel", "Transit factors (CoolClimate's bus bug, fixed)",
+    A("travel.ground_transit", "travel", "Transit factors",
       "Per passenger-mile: simple \"public transit\" 225 g; detailed mode — "
       "transit rail 205 g, commuter rail 205 g, intercity rail 233 g (all "
-      "measured from the deployed CoolClimate calculator), and bus **67 g**. "
-      "The bus number is this app's one deliberate deviation from the deployed "
-      "calculator: their implementation computes 1.3 g/mile — ~100× below the "
-      "107 g in their own data tables and no published source's value, i.e. a "
-      "bug. Rather than restore their stale 107 g (the pre-2023 EPA figure), "
-      "the app uses the current EPA Factors Hub (2025) bus factor: 0.066 kg "
-      "CO₂ + CH₄/N₂O ≈ 0.067 kg CO₂e per passenger-mile at average US "
-      "occupancy. Tailpipe only — unlike the vehicle rows it carries no "
-      "upstream fuel-production uplift (~+25% if added), so bus is slightly "
-      "understated relative to driving.",
+      "measured from the CoolClimate calculator), and bus **67 g** from the "
+      "EPA GHG Factors Hub 2025 (0.066 kg CO₂ + CH₄/N₂O ≈ 0.067 kg CO₂e at "
+      "average US occupancy). "
+      "The bus factor is tailpipe-only — unlike the vehicle rows it carries "
+      "no upstream fuel-production uplift (~+25% if added), so bus is "
+      "slightly understated relative to driving.",
       value={"publictrans": 0.2253, "bus": 0.0666, "transit": 0.2054,
              "commuter": 0.2054, "intercity": 0.2331},
       display="rail 205–233 g · bus 67 g/pax-mile",
