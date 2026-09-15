@@ -14,6 +14,15 @@ purchases carry the goods' footprint, not the store's markup. Serve with
 merchant rules (per category or merchant-wide), see monthly emissions.
 Design rationale: `naics_mapping_design_notes.md`.
 
+Every modeling assumption (factor, threshold, price, policy choice) is
+declared once in `src/cf/assumptions.py`; the app computes with those values
+(injected as `ASSUME`) and `scripts/build_methodology.py` renders the same
+registry into the human-readable methodology page
+(`web/methodology.html`, live at
+[carbon.outis.cc/methodology.html](https://carbon.outis.cc/methodology.html))
+plus the browsable 972-code factor table (`web/naics.html`) — so a number
+can't drift between code and writeup.
+
 **v1** — top-down: aggregates 12 months of spending into the
 [CoolClimate calculator](https://coolclimate.org/calculator)'s Goods &
 Services dollar inputs and shows them beside the embedded calculator.

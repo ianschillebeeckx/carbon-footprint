@@ -55,7 +55,8 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/v2":
             html = V2_TEMPLATE.read_text()
             html = html.replace("/*__V2DATA__*/null", V2_FILE.read_text() if V2_FILE.exists() else "null")
-            from . import classify
+            from . import assumptions, classify
+            html = html.replace("/*__ASSUME__*/null", json.dumps(assumptions.js_values()))
             html = html.replace("/*__NAICS_OPTIONS__*/null", json.dumps(classify.naics_options()))
             html = html.replace("/*__CAT_DEFAULTS__*/null", json.dumps(classify.default_naics()))
             html = html.replace("/*__BASKET_OPTIONS__*/null", json.dumps(classify.basket_options()))
@@ -67,6 +68,11 @@ class Handler(BaseHTTPRequestHandler):
             html = html.replace("/*__FOOD__*/null", FOOD_FILE.read_text() if FOOD_FILE.exists() else "null")
             html = html.replace("/*__OFFSETS__*/null", OFFSETS_FILE.read_text() if OFFSETS_FILE.exists() else "null")
             self._send(200, html.encode(), "text/html; charset=utf-8")
+        elif path in ("/methodology.html", "/naics.html"):
+            p = Path("web") / path.lstrip("/")
+            if not p.exists():
+                return self._send(404, {"error": "run scripts/build_methodology.py"})
+            self._send(200, p.read_bytes(), "text/html; charset=utf-8")
         elif path == "/data/gridcarbon.json":
             p = Path("web/data/gridcarbon.json")
             if not p.exists():

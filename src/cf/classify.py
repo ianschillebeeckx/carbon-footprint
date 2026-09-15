@@ -28,8 +28,8 @@ LLM_SPEND_COVERAGE = 0.70   # merchants covering this share of |spend| get the L
 LLM_BATCH_SIZE = 40
 
 # EPA factors are per 2022 USD; deflate nominal spend before multiplying.
-# CPI-U all-items; 2022-23 exact from BLS, later years chained estimates.
-CPI_DEFLATOR = {2022: 1.000, 2023: 0.960, 2024: 0.933, 2025: 0.909, 2026: 0.882}
+# Values declared in the assumptions registry (methodology page renders them).
+from .assumptions import CPI_DEFLATOR  # noqa: E402
 
 
 def deflator_for(date_str: str) -> float:

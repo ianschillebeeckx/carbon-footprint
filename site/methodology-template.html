@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Carbon Ledger — Methodology</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --ground:#F7F8F5; --card:#FFFFFF; --ink:#262B21; --muted:#6C7465; --leaf:#3E7C3A;
+    --chip:#E6EEE1; --line:#D9DED2; --warn:#A15C00; --warnbg:#F6EDDD;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ground:#161A15; --card:#1E241D; --ink:#E4E8DD; --muted:#98A18F; --leaf:#7DB979;
+            --chip:#263124; --line:#333B31; --warn:#D9A45B; --warnbg:#2E2718; }
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--ground); color: var(--ink); font-family: "Avenir Next", Seravek, system-ui, sans-serif; line-height: 1.55; margin: 0; padding: 0 16px; }
+  main { max-width: 780px; margin: 0 auto 80px; }
+  header.top { max-width: 780px; margin: 0 auto; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 14px 0 10px; border-bottom: 1px solid var(--line); }
+  header.top h1 { font-size: 1.02rem; font-weight: 600; margin: 0; }
+  header.top a { color: var(--leaf); font-size: 0.8rem; text-underline-offset: 2px; }
+  a { color: var(--leaf); }
+  .lead { color: var(--muted); font-size: 0.92rem; margin: 18px 0 6px; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.82rem; margin: 10px 0 6px; }
+  nav.toc a { text-decoration: none; }
+  h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; margin: 34px 0 4px; scroll-margin-top: 16px; }
+  .secintro { color: var(--muted); font-size: 0.88rem; margin: 4px 0 12px; }
+  article.a { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0; scroll-margin-top: 16px; }
+  article.a:target { border-color: var(--leaf); }
+  article.a h3 { font-size: 0.95rem; margin: 0 0 4px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  article.a h3 a.anchor { color: var(--muted); text-decoration: none; font-weight: 400; }
+  .val { font-family: var(--mono); font-size: 0.78rem; background: var(--chip); border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
+  .bias { font-size: 0.7rem; border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
+  .b-under { background: var(--warnbg); color: var(--warn); }
+  .b-over { background: var(--chip); color: var(--leaf); }
+  .b-neutral, .b-varies { background: var(--chip); color: var(--muted); }
+  article.a p.r { margin: 6px 0; font-size: 0.88rem; }
+  p.meta { margin: 8px 0 0; font-size: 0.76rem; color: var(--muted); }
+  p.meta a { color: var(--leaf); }
+  code { font-family: var(--mono); font-size: 0.85em; background: var(--chip); border-radius: 4px; padding: 0 4px; }
+  footer { max-width: 780px; margin: 40px auto 30px; color: var(--muted); font-size: 0.76rem; border-top: 1px solid var(--line); padding-top: 12px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.76rem; color: var(--muted); align-items: center; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Carbon Ledger — Methodology</h1>
+  <a href="index.html">← back to the app</a>
+  <a href="naics.html">industry table</a>
+  <a href="https://github.com/ianschillebeeckx/carbon-footprint" target="_blank" rel="noopener">source on GitHub</a>
+</header>
+<main>
+<p class="lead">Every number in Carbon Ledger traces back to a named assumption below. This page and the
+app are generated from the <em>same</em> registry
+(<a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/src/cf/assumptions.py" target="_blank" rel="noopener"><code>src/cf/assumptions.py</code></a>)
+— the app computes with these exact values, so the writeup can't drift from the code. Each entry states
+the value, why it was chosen, what it likely gets wrong, and where the data comes from; the code links
+point at the lines that consume it.</p>
+<div class="legend"><b>Bias tags</b> — the honest direction of error for <i>your</i> footprint:
+  <span class="bias b-under">understates</span>
+  <span class="bias b-over">overstates</span>
+  <span class="bias b-neutral">neutral</span>
+  <span class="bias b-varies">varies</span>
+</div>
+<nav class="toc">
+  <a href="#method">Method</a>
+  <a href="#gs">Goods &amp; Services</a>
+  <a href="#travel">Travel</a>
+  <a href="#electricity">Electricity</a>
+  <a href="#home">Home</a>
+  <a href="#food">Food</a>
+  <a href="#offsets">Offsets</a>
+  <a href="#impact">Damages &amp; benchmark</a>
+  <a href="#data">Data handling</a>
+</nav>
+
+<h2 id="method">Cross-cutting method</h2>
+<p class="secintro">Choices that apply everywhere: what "CO₂e" means here, how a spending window
+becomes an annual rate, and how review effort is triaged.</p>
+<!--SECTION:method-->
+
+<h2 id="gs">Goods &amp; Services</h2>
+<p class="secintro">Spend-based accounting: each transaction is classified to a NAICS industry and its
+2022-dollar spend is multiplied by that industry's economy-wide carbon intensity. Powerful because a
+bank export covers everything you buy; blunt because a dollar is a dollar — the model can't see brands
+or your specific cart. The full factor table is browsable at <a href="naics.html">the industry
+table</a>.</p>
+<!--SECTION:gs-->
+
+<h2 id="travel">Travel</h2>
+<p class="secintro">Physical models: miles and MPG rather than dollars. Vehicle and transit factors
+follow the CoolClimate household calculator (measured directly from their API so the app reproduces
+their model exactly, bugs included); air follows EPA per-haul factors.</p>
+<!--SECTION:travel-->
+
+<h2 id="electricity">Home — electricity</h2>
+<p class="secintro">The most engineered corner of the app: your ZIP's grid, hour by hour, weighted by
+when households actually use power. The design decision underneath everything else is the first entry —
+everyone gets the physical grid average. The full technical writeup with validation tables lives in the
+<a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/zip2co2_2/README.md"
+target="_blank" rel="noopener">gridcarbon README</a>.</p>
+<!--SECTION:electricity-->
+
+<h2 id="home">Home — gas, oil, structure</h2>
+<p class="secintro">The non-electric home: combustion fuels at CoolClimate factors, the building
+itself amortized, and one deliberate omission.</p>
+<!--SECTION:home-->
+
+<h2 id="food">Food</h2>
+<p class="secintro">Diet-based, not spend-based: what you eat drives the number, and your grocery and
+restaurant spending serves only as a cross-check. Food transactions are excluded from Goods &amp;
+Services so nothing is counted twice.</p>
+<!--SECTION:food-->
+
+<h2 id="offsets">Offsets &amp; credits</h2>
+<p class="secintro">Subtractions, all softer than the emissions they offset: purchased removal at face
+value, and EPA avoidance equivalencies for recycling and compost.</p>
+<!--SECTION:offsets-->
+
+<h2 id="impact">Damages, deaths &amp; benchmark</h2>
+<p class="secintro">The "so what" numbers on the impact cards: what your emissions cost other people,
+what they do to mortality, and what the average US household looks like next to yours.</p>
+<!--SECTION:impact-->
+
+<h2 id="data">Data handling</h2>
+<p class="secintro">Not a carbon assumption, but a promise worth documenting in the same register.</p>
+<!--SECTION:data-->
+
+</main>
+<footer>Generated from <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/src/cf/assumptions.py" target="_blank" rel="noopener">src/cf/assumptions.py</a>
+by <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/build_methodology.py" target="_blank" rel="noopener">scripts/build_methodology.py</a>.
+Found something wrong? <a href="https://github.com/ianschillebeeckx/carbon-footprint/issues" target="_blank" rel="noopener">Open an issue</a>.</footer>
+</body>
+</html>

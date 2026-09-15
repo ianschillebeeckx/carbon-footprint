@@ -201,9 +201,9 @@
     <div class="spgoal"><span class="n">1</span><div><b>See your footprint</b>
       <span>Tonnes of CO₂e per year across Travel, Home, Food, and Goods &amp; Services, side by side with the ~50-tonne average US household.</span></div></div>
     <div class="spgoal"><span class="n">2</span><div><b>Understand the stakes</b>
-      <span>Each tonne causes roughly $240 in climate damages, mostly borne by other people — and sustained emissions cause measurable excess deaths (about one death per 4,400 tonnes; Bressler 2021).</span></div></div>
+      <span>Each tonne causes roughly <span id="sp-scc">$240</span> in climate damages, mostly borne by other people — and sustained emissions cause measurable excess deaths (about one death per <span id="sp-deaths">4,400</span> tonnes; Bressler 2021).</span></div></div>
     <div class="spgoal"><span class="n">3</span><div><b>Find your levers</b>
-      <span>See which categories dominate, what cutting them would change, and what permanently removing the rest would cost (~$600/tonne durable removal).</span></div></div>
+      <span>See which categories dominate, what cutting them would change, and what permanently removing the rest would cost (~<span id="sp-removal">$600</span>/tonne durable removal).</span></div></div>
     <h4>Pick a route</h4>
     <div class="sproutes">
       <div class="sproute">
@@ -217,12 +217,13 @@
         <button id="sp-full">Go to upload</button>
       </div>
     </div>
-    <p class="sphint">Your transactions stay on this device — only merchant names and category hints are sent to a shared classification cache. Reopen this any time via <i>about</i> in the header. <a id="sp-skip">Just explore →</a></p>
+    <p class="sphint">Your transactions stay on this device — only merchant names and category hints are sent to a shared classification cache. Every number's rationale and source is on the <a href="methodology.html" target="_blank" rel="noopener">methodology page</a>. Reopen this any time via <i>about</i> in the header. <a id="sp-skip">Just explore →</a></p>
   </div>
 </div>
 <header class="top">
   <h1>Carbon Ledger</h1>
   <button id="about" class="aboutbtn" title="What this tool is and how to start">about</button>
+  <a class="aboutbtn mlink" href="methodology.html" title="Every assumption: value, rationale, source">methodology</a>
   <span class="window" id="window"></span>
   <span id="upload-msg"></span>
   <button id="reset" class="resetbtn" title="Delete all transactions and every merchant rule">Reset all</button>
@@ -233,13 +234,13 @@
 
 <div id="impact">
   <div class="stat"><div class="k">Footprint</div><div class="v" id="imp-tons">–</div><div class="sub" id="imp-split"></div>
-    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (each transaction's CPI-deflated spending times the EPA/USEEIO carbon intensity of its NAICS industry, annualized from the uploaded window) plus Travel (vehicles/transit at CoolClimate factors; air at EPA well-to-wake per-haul factors) plus Home (electricity by ZIP: your grid's hourly intensity weighted by when households use power — EIA-930/eGRID/TMY3; gas/oil/construction at CoolClimate factors) plus Food (your diet at CoolClimate's calorie factors, meat-type detail).">?</button></div>
-  <div class="stat"><div class="k">Climate damages · $240/t</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
-    <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: each tonne of CO₂e causes roughly $240 of discounted future damages — storms, floods, wildfire, crop loss, and other climate harms, mostly borne by other people.">?</button></div>
-  <div class="stat"><div class="k">To offset · $600/t (Charm)</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
-    <button class="info" aria-label="About this number" data-tip="What permanently removing this much carbon would cost via Charm Industrial (agricultural waste converted to bio-oil and injected into geologic storage, ~$600/tonne). The percentage is the effective surcharge on your goods &amp; services spending if every purchase paid for its own removal.">?</button></div>
-  <div class="stat"><div class="k">Excess deaths · 50 yrs</div><div class="v" id="imp-deaths">–</div><div class="sub">Bressler mortality cost, horizon 2100</div>
-    <button class="info" aria-label="About this number" data-tip="Excess global deaths these emissions would cause if sustained for 50 years, counting deaths through 2100. Closed-form fit calibrated to Bressler (2021, Nature Communications): 2.26×10⁻⁴ deaths per tonne of CO₂. A micromort is a one-in-a-million chance of death.">?</button></div>
+    <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (spending × EPA industry carbon intensity) + Travel + Home + Food (physical models). Every factor's rationale and source is on the methodology page (link in the header).">?</button></div>
+  <div class="stat"><div class="k" id="imp-damage-k">Climate damages</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
+    <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: discounted future damages — storms, floods, wildfire, crop loss — mostly borne by other people. EPA's central estimate; see methodology.">?</button></div>
+  <div class="stat"><div class="k" id="imp-offset-k">To offset</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
+    <button class="info" aria-label="About this number" data-tip="What permanently removing this much carbon would cost at a real durable-removal price (Charm Industrial bio-oil sequestration). The percentage is the surcharge on your G&amp;S spending if every purchase paid for its own removal.">?</button></div>
+  <div class="stat"><div class="k" id="imp-deaths-k">Excess deaths</div><div class="v" id="imp-deaths">–</div><div class="sub">Bressler mortality cost, horizon 2100</div>
+    <button class="info" aria-label="About this number" data-tip="Excess global deaths if this rate is sustained, counting deaths through 2100 — calibrated to Bressler (2021). A micromort is a one-in-a-million chance of death. See methodology.">?</button></div>
 </div>
 
 <div class="maintabs">
@@ -256,14 +257,14 @@
   <div class="tcol">
     <div class="tcard">
       <h3>Offset purchases
-        <button class="info" aria-label="About offsets" data-tip="Enter what you pay per year for carbon removal or offsets, and the provider's price per tonne — tons offset = dollars ÷ price. Assign each purchase to the section (Travel/Home/Food/Goods/Services) whose emissions you consider it covering; the Total tab and impact cards subtract it. Quality varies enormously: durable removal (Charm bio-oil ~$600/t, Climeworks DAC ~$1000/t) permanently stores carbon; cheap avoidance credits ($5–20/t) often don't hold up — price is a decent proxy for permanence.">?</button>
+        <button class="info" aria-label="About offsets" data-tip="Enter what you pay per year and the provider's price per tonne — tons offset = dollars ÷ price, subtracted from the section you assign. Quality varies enormously: price is a decent proxy for permanence (durable removal ~$600–1,000/t; cheap avoidance credits often don't hold up). See methodology.">?</button>
         <span class="tkg" id="kg-offsets"></span></h3>
       <div id="offsetrows"></div>
       <button class="tadd" id="offsetadd">+ purchase</button>
     </div>
     <div class="tcard">
       <h3>Recycling &amp; compost
-        <button class="info" aria-label="About recycling and compost" data-tip="Avoided-emission credits, not purchases. Recycling: EPA's equivalency of ~2.9 t CO₂e avoided per ton of mixed recyclables vs landfilling (materials offset virgin production, so it's credited against Goods by default — switch to Food if your bin is mostly food packaging). Compost: EPA WARM ~0.6 t CO₂e per ton of food scraps diverted from landfill (avoided methane; credited against Food). Estimating lbs/week: US average recycling ≈ 8 lbs/person/wk (EPA); a 13-gal bag of mixed recycling ≈ 8–10 lbs; a full 64-gal cart ≈ 25–40 lbs. A full countertop compost pail ≈ 3–5 lbs; composting all food scraps ≈ 4–7 lbs/person/wk. These are avoidance estimates — softer than paid removal, and your curbside program's actual fate of materials varies.">?</button>
+        <button class="info" aria-label="About recycling and compost" data-tip="Avoided-emission credits (EPA equivalencies / WARM), softer than paid removal. Estimating lbs/week: US average recycling ≈ 8 lbs/person/wk; a 13-gal bag ≈ 8–10 lbs; a full 64-gal cart ≈ 25–40 lbs. A full countertop compost pail ≈ 3–5 lbs; all food scraps ≈ 4–7 lbs/person/wk. Factors and caveats: see methodology.">?</button>
         <span class="tkg" id="kg-recycle"></span></h3>
       <div class="tvrow"><label>Recycling (paper, plastic, glass, metal):</label>
         <input type="number" min="0" step="1" id="recyclelbs" style="width:66px" aria-label="Recycling pounds per week"><label>lbs/wk →</label>
@@ -289,7 +290,7 @@
   <div class="tcol" style="max-width:860px">
     <div class="tcard">
       <h3>Your footprint by section
-        <button class="info" aria-label="About this figure" data-tip="Each bar stacks that section's components (hover a segment for its share). The amber tick is the average US household (CoolClimate national defaults) — 49.9 t/yr total: travel 15.7, home 12.2, food 7.0, goods 7.9, services 7.0. Green boxes left of the zero line are your offsets, drawn negative against the section they're assigned to.">?</button>
+        <button class="info" aria-label="About this figure" data-tip="Each bar stacks that section's components (hover a segment for its share). The amber tick is the average US household — 49.9 t/yr (CoolClimate national defaults; per-section values on the methodology page). Green boxes left of the zero line are your offsets, drawn negative against the section they're assigned to.">?</button>
         <span class="tkg" id="total-tons"></span></h3>
       <div id="fig-total"></div>
       <p class="hint" style="margin-bottom:0">Amber tick = average US household (CoolClimate national defaults). Goods &amp; Services come from your classified transactions; Travel/Home/Food from your inputs on those tabs.</p>
@@ -302,14 +303,14 @@
   <div class="tcol">
     <div class="tcard" id="tc-vehicles">
       <h3>Vehicles
-        <button class="info" aria-label="About vehicle emissions" data-tip="CoolClimate's vehicle model, measured from their calculator API: gasoline 8.87 kg CO₂e/gallon tailpipe + 2.31 upstream (diesel 11.30 + 2.36); fuel burn = miles ÷ MPG. Vehicle manufacturing adds 0.056 kg/mile regardless of fuel. Their model counts electric vehicles' fuel as zero (grid electricity is not added anywhere) — duplicated as-is.">?</button>
+        <button class="info" aria-label="About vehicle emissions" data-tip="CoolClimate's vehicle model: fuel burn (miles ÷ MPG) × tailpipe + upstream factors, plus manufacturing per mile. Caveat: EVs count zero fuel and their charging isn't added — add EV kWh to Home electricity yourself. Factors on the methodology page.">?</button>
         <span class="tkg" id="kg-vehicles"></span></h3>
       <div id="vehrows"></div>
       <button class="tadd" id="vehadd">+ vehicle</button>
     </div>
     <div class="tcard" id="tc-ground">
       <h3>Public transit
-        <button class="info" aria-label="About transit emissions" data-tip="CoolClimate per-mile factors (measured): simple public-transit 225 g/mile; advanced — transit rail 205, commuter rail 205, intercity rail 233, bus 1.3 g/mile. That bus number is CoolClimate's own model output and is ~100× lower than their published 107 g/mile constant — almost certainly their bug, duplicated faithfully.">?</button>
+        <button class="info" aria-label="About transit emissions" data-tip="CoolClimate per-mile factors: simple public-transit 225 g/mile; rail modes 205–233 g/mile. Their detailed bus factor is ~100× too low (their bug, duplicated faithfully) — use simple mode if you ride buses. See methodology.">?</button>
         <span class="tkg" id="kg-ground"></span></h3>
       <div class="tmode" id="groundmode">
         <button data-m="simple">Total miles</button><button data-m="advanced">By mode</button>
@@ -318,7 +319,7 @@
     </div>
     <div class="tcard" id="tc-air">
       <h3>Air travel
-        <button class="info" aria-label="About air emissions" data-tip="EPA per-haul factors (well-to-wake): short-haul 250, medium 156, long 197 g CO₂e per passenger-mile — the EPA GHG Emission Factors Hub 2025 combustion factors plus ~21% upstream fuel production. Hauls are one-way segment lengths. Round-trip mode assumes typical trips of 400 / 2,000 / 6,000 miles round trip (→ ~100 / 312 / 1,182 kg each); use Miles mode for exact distances. Deliberately excludes contrail/non-CO₂ effects, which would multiply air by roughly 1.7–2×.">?</button>
+        <button class="info" aria-label="About air emissions" data-tip="EPA per-haul well-to-wake factors per passenger-mile; round-trip mode assumes typical trip lengths (use Miles mode for exact distances). Deliberately excludes contrail/non-CO₂ effects, which would multiply air by ~1.7–2× — this is a floor. Factors on the methodology page.">?</button>
         <span class="tkg" id="kg-air"></span></h3>
       <div class="tmode" id="airmode">
         <button data-m="haul">Miles</button><button data-m="flights">Round trips</button>
@@ -327,12 +328,12 @@
     </div>
     <div class="tcard">
       <h3>Cross-check from your transactions
-        <button class="info" aria-label="About the travel cross-check" data-tip="Gas-station (NAICS 457) and airline (481) transactions from your upload — excluded from Goods &amp; Services because their emissions belong here. Gallons assume ~$4.50/gal; implied vehicle miles use your fleet's mileage-weighted MPG; airline miles assume a typical ~15¢ per mile economy fare. Rough yardsticks, not accounting.">?</button></h3>
+        <button class="info" aria-label="About the travel cross-check" data-tip="Gas-station and airline transactions from your upload — excluded from Goods &amp; Services because their emissions belong here. Spend is converted to implied miles at assumed prices (methodology page). Rough yardsticks, not accounting.">?</button></h3>
       <div id="travelxrows" class="hint">Upload a transactions CSV to see fuel and airline spend.</div>
     </div>
     <div class="tcard tsum">Travel footprint: <b id="kg-travel-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
-    <p class="hint">Sources — Air: <a href="https://www.epa.gov/climateleadership/ghg-emission-factors-hub" target="_blank" rel="noopener">EPA GHG Emission Factors Hub (2025)</a> per-haul passenger-mile factors, plus ~21% well-to-tank fuel-production uplift per the <a href="https://theicct.org/wp-content/uploads/2021/08/update-well-to-wake-co2-aug21-1.pdf" target="_blank" rel="noopener">ICCT well-to-wake analysis</a> (CORSIA baseline 89 vs 73.2 gCO₂e/MJ); excludes contrail/non-CO₂ effects. Vehicles &amp; transit: <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator factors, measured from their API (see data/coolclimate_travel_factors.json).</p>
+    <p class="hint">Every factor, rationale, and source: <a href="methodology.html#travel" target="_blank" rel="noopener">methodology — travel</a>.</p>
   </div>
   <aside class="taside"><div class="tcard"><h3>Travel breakdown</h3><div id="fig-travel"></div></div></aside>
   </div>
@@ -344,7 +345,7 @@
   <div class="tcol">
     <div class="tcard">
       <h3>Electricity
-        <button class="info" aria-label="About electricity emissions" data-tip="Grid average for your area, weighted by WHEN households actually use power. Your ZIP maps to a balancing authority (finer than an eGRID region — LADWP is dirtier than the CA average); its 2024 hourly generation mix (EIA-930) gives a CO₂e intensity for every hour of the year, calibrated so the annual level matches EPA's published eGRID rate. That hourly intensity is then weighted by a typical home's hourly usage (OpenEI TMY3 residential load shape) — households use most power in the evening, when solar is gone and gas is ramping, so the factor usually runs a few percent above the flat annual average. The weighting carries a season too, and it can point the other way: Portland's hydro-backed grid is dirtiest in late summer (reservoirs low, gas filling in) and cleanest during spring runoff, while homes there peak in winter — worth about −6% vs flat. Caveat: that seasonal pattern is a typical home's, not your bills — electric heating vs gas changes it. Includes mix-weighted upstream fuel-cycle emissions and ~4% delivery losses. Everyone gets the physical grid average regardless of green-power plan: the wires deliver the shared mix at the hours you use it (a voluntary renewable plan is real procurement your money funds, but it doesn't change what your outlet draws).">?</button>
+        <button class="info" aria-label="About electricity emissions" data-tip="Physical grid average for your ZIP's balancing authority, weighted by WHEN households actually use power (hourly 2024 grid mix, calibrated to EPA's eGRID rate). Green-power plans don't change it — the wires deliver the shared mix at the hours you use it. The assumed usage pattern is a typical home's; upload your utility's hourly CSV below to use your actual meter. Full method, caveats, and sources: methodology page.">?</button>
         <span class="tkg" id="kg-elec"></span></h3>
       <!-- $ mode disabled (no location-dependent $->unit rates); re-enable with the JS blocks:
       <div class="tmode" id="elecmode"><button data-m="kwh">kWh</button><button data-m="dollars">Dollars</button></div> -->
@@ -386,12 +387,12 @@
     </div>
     <div class="tcard">
       <h3>Cross-check from your transactions
-        <button class="info" aria-label="About the home cross-check" data-tip="Utility transactions from your upload (NAICS 2211 electric, 221210 natural gas, 2213 water/sewer) — they carry no G&amp;S emissions; their footprint is computed here from the physical usage you enter. kWh and therms are implied at ~$0.223/kWh and ~$2.02/therm (CoolClimate's rate assumptions) to compare against your inputs.">?</button></h3>
+        <button class="info" aria-label="About the home cross-check" data-tip="Utility transactions from your upload — they carry no G&amp;S emissions; their footprint is computed here from the physical usage you enter. Spend is converted to implied kWh/therms at assumed rates (methodology page) to compare against your inputs.">?</button></h3>
       <div id="homexrows" class="hint">Upload a transactions CSV to see utility spend.</div>
     </div>
     <div class="tcard tsum">Home footprint: <b id="kg-home-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; included in the impact totals above. Inputs save automatically.</span></div>
-    <p class="hint">Sources — electricity: <a href="https://www.eia.gov/electricity/gridmonitor/" target="_blank" rel="noopener">EIA-930</a> 2024 hourly generation by fuel for your balancing authority, calibrated to <a href="https://www.epa.gov/egrid" target="_blank" rel="noopener">EPA eGRID 2023</a> annual rates, weighted by <a href="https://data.openei.org/submissions/153" target="_blank" rel="noopener">OpenEI TMY3</a> residential hourly load shapes, plus IPCC AR5 upstream fuel-cycle emissions and eGRID delivery losses. Physical grid average — voluntary green-power plans don't change it (the wires deliver the shared mix). Gas/oil/construction factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API. Water &amp; sewage is deliberately omitted: physically it is ~4.25 kWh per 1,000 gallons (EPA/EPRI) ≈ 25–110 kg CO₂e/yr for typical households — a rounding error (CoolClimate's much larger water figure is expenditure-based and double-counts water heating).</p>
+    <p class="hint">Every factor, rationale, and source (incl. why water is omitted): <a href="methodology.html#electricity" target="_blank" rel="noopener">methodology — home</a>.</p>
   </div>
   <aside class="taside"><div class="tcard"><h3>Home breakdown</h3><div id="fig-home"></div></div></aside>
   </div>
@@ -401,7 +402,7 @@
   <div class="tcol">
     <div class="tcard">
       <h3>Diet — servings per person, per week
-        <button class="info" aria-label="About diet emissions" data-tip="CoolClimate's food model at full meat detail. Servings convert to calories with their own constants (beef/pork 213 cal per serving; poultry/fish/other meat 204; dairy 120; fruits and vegetables 70 each; grains 150; other 200), then calories carry measured factors (kg CO₂e per cal/day over a year): beef &amp; pork 2.22, fish 2.08, poultry 1.56, other meat 0.82, dairy 1.46, fruits/vegetables 1.22 (CoolClimate models them jointly — the split rows share it), other food 0.82, grains 0.53. US-average defaults prefilled; the cal/day annotation should land near ~2,300 per person if the servings are realistic. Beans, lentils, tofu, and nuts go under meat alternatives — CoolClimate's own scope for that group. Its blended factor charges pure legumes conservatively (literature says ~2–4× lower than the 0.46 kg/serving shown), so a beef→beans swap is at least as good as displayed. Beef→poultry/beans swaps are the biggest levers.">?</button>
+        <button class="info" aria-label="About diet emissions" data-tip="CoolClimate's food model: servings → calories → CO₂e (per-row factors shown inline). US-average defaults prefilled; the cal/day readout should land near ~2,300/person if servings are realistic. Legumes/tofu/nuts go under alt meat, charged conservatively — a beef→beans swap is at least as good as displayed. Beef→poultry/beans are the biggest levers. Factors and sources: methodology page.">?</button>
         <span class="tkg" id="kg-food-diet"></span></h3>
       <div class="tvrow"><label>People in household:</label>
         <input type="number" min="1" max="12" step="1" id="foodsize" style="width:62px" aria-label="People in household"></div>
@@ -409,13 +410,13 @@
     </div>
     <div class="tcard">
       <h3>Cross-check from your transactions
-        <button class="info" aria-label="About the transactions cross-check" data-tip="Your already-classified grocery (NAICS 445/311/312) and restaurant (722) transactions, deflated to 2022 USD. Groceries use the design note's commodity composite ~0.60 kg CO₂e/$ (a diet-mix assumption — spend can't see what's in the cart); restaurants use their USEEIO factor (~0.23–0.36 kg/$, mostly the service, diet-blind). If this disagrees strongly with your diet estimate above, the gap usually means lots of dining out (undercounted here) or premium groceries (overcounted).">?</button>
+        <button class="info" aria-label="About the transactions cross-check" data-tip="Your grocery and restaurant transactions (2022 USD) at spend-based composites — diet-blind, so a strong disagreement with the diet estimate usually means heavy dining out (undercounted here) or premium groceries (overcounted). Composites on the methodology page.">?</button>
         <span class="tkg" id="kg-food-txn"></span></h3>
       <div id="foodxrows" class="hint"></div>
     </div>
     <div class="tcard tsum">Food footprint (diet-based): <b id="kg-food-total">–</b>
       <span class="hint" style="display:block;margin-top:4px">Annual; the diet estimate is what's included in the impact totals above. Inputs save automatically.</span></div>
-    <p class="hint">Sources — diet factors measured from the <a href="https://coolclimate.berkeley.edu/calculator" target="_blank" rel="noopener">CoolClimate Network</a> household-calculator API (linear in calories; meat-type detail enabled). Transactions cross-check: grocery composite per the project's NAICS mapping notes (§3), restaurant factors from EPA/USEEIO.</p>
+    <p class="hint">Every factor, rationale, and source: <a href="methodology.html#food" target="_blank" rel="noopener">methodology — food</a>.</p>
   </div>
   <aside class="taside"><div class="tcard"><h3>Food breakdown</h3><div id="fig-food"></div></div></aside>
   </div>
@@ -448,7 +449,7 @@
 
   <div id="right">
     <div id="catlist"></div>
-    <p class="hint">$/mo is nominal spend, refunds netted out. kg is computed on spend deflated to 2022 USD (CPI), times each transaction's NAICS factor (bottom-up USEEIO, purchaser price with margins), so the shown kg/$ blends in the deflator. Click a category to filter. Corrections apply to all transactions of the same merchant and are saved in this browser.</p>
+    <p class="hint">$/mo is nominal spend, refunds netted out. kg is computed on spend deflated to 2022 USD (CPI), times each transaction's NAICS factor (bottom-up USEEIO, purchaser price with margins), so the shown kg/$ blends in the deflator. Click a category to filter. Corrections apply to all transactions of the same merchant and are saved in this browser. Factors, rules, and sources: <a href="methodology.html#gs" target="_blank" rel="noopener">methodology — goods &amp; services</a>.</p>
   </div>
 
   <div id="chartpane">
@@ -712,6 +713,10 @@ async function webUpload(text) {
 }
 // ---- end web runtime ----
 
+// Every scalar assumption the app computes with, keyed by id — declared in
+// src/cf/assumptions.py (single source; the methodology page renders the
+// same registry). Injected by the server / build_web.py.
+const ASSUME = {"method.cpi_deflator":{"2022":1.0,"2023":0.96,"2024":0.933,"2025":0.909,"2026":0.882},"method.top80_review":0.8,"method.lowconf":0.7,"travel.vehicle_fuel":{"1":{"label":"Gasoline","d":8.874,"u":2.307},"2":{"label":"Diesel","d":11.304,"u":2.36},"3":{"label":"Electric","d":0,"u":0}},"travel.vehicle_manufacture":0.056,"travel.ground_transit":{"publictrans":0.2253,"bus":0.0013,"transit":0.2054,"commuter":0.2054,"intercity":0.2331},"travel.air":{"short":0.25,"medium":0.156,"long":0.197},"travel.air_trip_miles":{"short":400,"medium":2000,"long":6000},"travel.crosscheck_rates":{"gas_per_gal":4.5,"air_per_mile":0.15,"transit_per_mile":0.25,"taxi_per_mile":2},"elec.alpha_calibration":{"band_lo":0.7,"band_hi":1.45},"elec.delivery_loss":0.042,"elec.ship_gate":{"uplift_max_pct":12.0,"coverage_min":0.9},"elec.hourly_upload":{"min_days_per_month":20,"min_kwh":50,"max_kwh":200000},"home.gas":{"d":5.47,"u":0.766},"home.oil":{"d":11.793,"u":3.066},"home.construction":0.93,"home.crosscheck_rates":{"kwh":0.2233,"therm":2.015,"oil_gal":3.0},"food.model":{"beefpork":{"label":"Beef, pork, lamb, veal","f":2.2228,"cps":213,"def":7.4},"poultry":{"label":"Poultry & eggs","f":1.5585,"cps":204,"def":5.2},"fish":{"label":"Fish & seafood","f":2.0841,"cps":204,"def":2.3},"meatother":{"label":"Alt meat (legumes, tofu, nuts)","f":0.8176,"cps":204,"def":1.8},"dairy":{"label":"Dairy","f":1.46,"cps":120,"def":15.3},"fruits":{"label":"Fruits","f":1.2228,"cps":70,"def":12.4},"veggies":{"label":"Vegetables","f":1.2228,"cps":70,"def":12.4},"cereals":{"label":"Grains & baked goods","f":0.5292,"cps":150,"def":28.6},"otherfood":{"label":"Snacks, drinks, etc.","f":0.8176,"cps":200,"def":23.6}},"food.crosscheck_grocery":0.6,"offsets.removal_price":600,"offsets.recycle":2.9,"offsets.compost":0.6,"impact.scc":240,"impact.mortality":{"umort_per_t":226.0,"decay":0.04028,"horizon_years":50},"impact.us_benchmark":{"travel":15718,"home":12219,"food":7002,"goods":7920,"services":7032}};
 const DATA = JSON.parse(localStorage.getItem("cf_data") || "null");
 const NAICS_OPTIONS = [{"code":"221210","title":"Natural Gas Distribution","category":"excluded","basket":false},{"code":"221310","title":"Water Supply and Irrigation Systems","category":"excluded","basket":false},{"code":"236118","title":"Residential Remodelers","category":"services_household_maintenance_repair","basket":false},{"code":"238210","title":"Electrical Contractors and Other Wiring Installation Contractors","category":"services_household_maintenance_repair","basket":false},{"code":"238220","title":"Plumbing, Heating, and Air-Conditioning Contractors","category":"services_household_maintenance_repair","basket":false},{"code":"314120","title":"Curtain and Linen Mills","category":"goods_furniture_appliances","basket":false},{"code":"315250","title":"Cut and Sew Apparel Manufacturing (except Contractors)","category":"goods_clothing","basket":false},{"code":"316210","title":"Footwear Manufacturing","category":"goods_clothing","basket":false},{"code":"323117","title":"Books Printing","category":"goods_paper_office_reading","basket":false},{"code":"325412","title":"Pharmaceutical Preparation Manufacturing","category":"goods_medical","basket":false},{"code":"325611","title":"Soap and Other Detergent Manufacturing","category":"goods_personal_care_cleaning","basket":false},{"code":"325620","title":"Toilet Preparation Manufacturing","category":"goods_personal_care_cleaning","basket":false},{"code":"332216","title":"Saw Blade and Handtool Manufacturing","category":"excluded","basket":false},{"code":"334111","title":"Electronic Computer Manufacturing","category":"goods_furniture_appliances","basket":false},{"code":"334310","title":"Audio and Video Equipment Manufacturing","category":"goods_furniture_appliances","basket":false},{"code":"335220","title":"Major Household Appliance Manufacturing","category":"goods_furniture_appliances","basket":false},{"code":"337121","title":"Upholstered Household Furniture Manufacturing","category":"goods_furniture_appliances","basket":false},{"code":"337122","title":"Nonupholstered Wood Household Furniture Manufacturing","category":"goods_furniture_appliances","basket":false},{"code":"339910","title":"Jewelry and Silverware Manufacturing","category":"goods_clothing","basket":false},{"code":"339920","title":"Sporting and Athletic Goods Manufacturing","category":"goods_entertainment","basket":false},{"code":"339930","title":"Doll, Toy, and Game Manufacturing","category":"goods_entertainment","basket":false},{"code":"441330","title":"Automotive Parts and Accessories Retailers","category":"goods_auto_parts","basket":true},{"code":"449110","title":"Furniture Retailers","category":"goods_furniture_appliances","basket":true},{"code":"449121","title":"Floor Covering Retailers","category":"goods_furniture_appliances","basket":true},{"code":"449210","title":"Electronics and Appliance Retailers","category":"goods_furniture_appliances","basket":true},{"code":"444110","title":"Home Centers","category":"goods_furniture_appliances","basket":true},{"code":"444140","title":"Hardware Retailers","category":"goods_furniture_appliances","basket":true},{"code":"444230","title":"Outdoor Power Equipment Retailers","category":"goods_furniture_appliances","basket":true},{"code":"445110","title":"Supermarkets and Other Grocery Retailers (except Convenience Retailers)","category":"excluded","basket":false},{"code":"445320","title":"Beer, Wine, and Liquor Retailers","category":"excluded","basket":false},{"code":"456110","title":"Pharmacies and Drug Retailers","category":"goods_medical","basket":true},{"code":"456120","title":"Cosmetics, Beauty Supplies, and Perfume Retailers","category":"goods_personal_care_cleaning","basket":true},{"code":"456130","title":"Optical Goods Retailers","category":"goods_medical","basket":true},{"code":"457110","title":"Gasoline Stations with Convenience Stores","category":"excluded","basket":false},{"code":"458110","title":"Clothing and Clothing Accessories Retailers","category":"goods_clothing","basket":true},{"code":"458210","title":"Shoe Retailers","category":"goods_clothing","basket":true},{"code":"458310","title":"Jewelry Retailers","category":"goods_clothing","basket":true},{"code":"459110","title":"Sporting Goods Retailers","category":"goods_entertainment","basket":true},{"code":"459120","title":"Hobby, Toy, and Game Retailers","category":"goods_entertainment","basket":true},{"code":"459140","title":"Musical Instrument and Supplies Retailers","category":"goods_entertainment","basket":true},{"code":"459210","title":"Book Retailers and News Dealers","category":"goods_paper_office_reading","basket":true},{"code":"455110","title":"Department Stores","category":"goods_other","basket":true},{"code":"455211","title":"Warehouse Clubs and Supercenters","category":"goods_other","basket":true},{"code":"459410","title":"Office Supplies and Stationery Retailers","category":"goods_paper_office_reading","basket":true},{"code":"459510","title":"Used Merchandise Retailers","category":"goods_entertainment","basket":false},{"code":"459999","title":"All Other Miscellaneous Retailers","category":"goods_other","basket":true},{"code":"481111","title":"Scheduled Passenger Air Transportation","category":"excluded","basket":false},{"code":"485310","title":"Taxi and Ridesharing Services","category":"excluded","basket":false},{"code":"488410","title":"Motor Vehicle Towing","category":"services_vehicle_service","basket":false},{"code":"488490","title":"Other Support Activities for Road Transportation","category":"services_vehicle_service","basket":false},{"code":"491110","title":"Postal Service","category":"services_information_communication","basket":false},{"code":"492110","title":"Couriers and Express Delivery Services","category":"services_information_communication","basket":false},{"code":"513210","title":"Software Publishers","category":"digital_subscriptions","basket":false},{"code":"516210","title":"Media Streaming Distribution Services, Social Networks, and Other Media Networks and Content Providers","category":"digital_subscriptions","basket":false},{"code":"517111","title":"Wired Telecommunications Carriers","category":"services_information_communication","basket":false},{"code":"517112","title":"Wireless Telecommunications Carriers (except Satellite)","category":"services_information_communication","basket":false},{"code":"518210","title":"Computing Infrastructure Providers, Data Processing, Web Hosting, and Related Services","category":"digital_subscriptions","basket":false},{"code":"522110","title":"Commercial Banking","category":"services_personal_business_finance","basket":false},{"code":"524113","title":"Direct Life Insurance Carriers","category":"services_personal_business_finance","basket":false},{"code":"524114","title":"Direct Health and Medical Insurance Carriers","category":"services_personal_business_finance","basket":false},{"code":"524126","title":"Direct Property and Casualty Insurance Carriers","category":"services_personal_business_finance","basket":false},{"code":"531110","title":"Lessors of Residential Buildings and Dwellings","category":"excluded","basket":false},{"code":"541110","title":"Offices of Lawyers","category":"services_personal_business_finance","basket":false},{"code":"541211","title":"Offices of Certified Public Accountants","category":"services_personal_business_finance","basket":false},{"code":"561720","title":"Janitorial Services","category":"services_household_maintenance_repair","basket":false},{"code":"561730","title":"Landscaping Services","category":"services_household_maintenance_repair","basket":false},{"code":"561740","title":"Carpet and Upholstery Cleaning Services","category":"services_household_maintenance_repair","basket":false},{"code":"562111","title":"Solid Waste Collection","category":"excluded","basket":false},{"code":"611110","title":"Elementary and Secondary Schools","category":"services_education","basket":false},{"code":"611310","title":"Colleges, Universities, and Professional Schools","category":"services_education","basket":false},{"code":"611610","title":"Fine Arts Schools","category":"services_education","basket":false},{"code":"611620","title":"Sports and Recreation Instruction","category":"services_education","basket":false},{"code":"621111","title":"Offices of Physicians (except Mental Health Specialists)","category":"services_health_care","basket":false},{"code":"621210","title":"Offices of Dentists","category":"services_health_care","basket":false},{"code":"621310","title":"Offices of Chiropractors","category":"services_health_care","basket":false},{"code":"621330","title":"Offices of Mental Health Practitioners (except Physicians)","category":"services_health_care","basket":false},{"code":"621399","title":"Offices of All Other Miscellaneous Health Practitioners","category":"services_health_care","basket":false},{"code":"622110","title":"General Medical and Surgical Hospitals","category":"services_health_care","basket":false},{"code":"624410","title":"Child Care Services","category":"services_education","basket":false},{"code":"713910","title":"Golf Courses and Country Clubs","category":"services_other","basket":false},{"code":"713930","title":"Marinas","category":"services_other","basket":false},{"code":"713940","title":"Fitness and Recreational Sports Centers","category":"services_other","basket":false},{"code":"721110","title":"Hotels (except Casino Hotels) and Motels","category":"services_other","basket":false},{"code":"722410","title":"Drinking Places (Alcoholic Beverages)","category":"excluded","basket":false},{"code":"722511","title":"Full-Service Restaurants","category":"excluded","basket":false},{"code":"722513","title":"Limited-Service Restaurants","category":"excluded","basket":false},{"code":"722515","title":"Snack and Nonalcoholic Beverage Bars","category":"excluded","basket":false},{"code":"811111","title":"General Automotive Repair","category":"services_vehicle_service","basket":false},{"code":"811192","title":"Car Washes","category":"services_vehicle_service","basket":false},{"code":"812112","title":"Beauty Salons","category":"services_other","basket":false},{"code":"812113","title":"Nail Salons","category":"services_other","basket":false},{"code":"812191","title":"Diet and Weight Reducing Centers","category":"services_other","basket":false},{"code":"812320","title":"Drycleaning and Laundry Services (except Coin-Operated)","category":"services_other","basket":false},{"code":"812910","title":"Pet Care (except Veterinary) Services","category":"services_other","basket":false},{"code":"812930","title":"Parking Lots and Garages","category":"services_vehicle_service","basket":false},{"code":"813110","title":"Religious Organizations","category":"services_organizations_charity","basket":false},{"code":"813211","title":"Grantmaking Foundations","category":"services_organizations_charity","basket":false},{"code":"813410","title":"Civic and Social Organizations","category":"services_organizations_charity","basket":false},{"code":"221122","title":"Electric Power Distribution","category":"excluded","basket":false}];  // [{code,title,category}] curated consumer subset
 const CAT_DEFAULTS = {"goods_furniture_appliances":"449110","goods_clothing":"458110","goods_entertainment":"459110","goods_paper_office_reading":"459410","goods_personal_care_cleaning":"456120","goods_auto_parts":"441330","goods_medical":"456110","goods_other":"459999","services_health_care":"621111","services_education":"611110","services_information_communication":"517112","digital_subscriptions":"513210","services_vehicle_service":"811111","services_personal_business_finance":"522110","services_household_maintenance_repair":"561720","services_organizations_charity":"813211","services_other":"812990"};      // category -> representative NAICS
@@ -729,7 +734,7 @@ const fmt = n => n.toLocaleString("en-US", {maximumFractionDigits: 0});
 const CATS = CATS_STATIC || (DATA ? DATA.categories : {});
 const CAT_ORDER = Object.keys(CATS);
 const isLow = t => t.unmapped || (t.source !== "manual" && t.source !== "confirmed" &&
-  (t.source === "vector" || (t.source === "llm" && t.confidence != null && t.confidence < 0.7) || t.margin_warn));
+  (t.source === "vector" || (t.source === "llm" && t.confidence != null && t.confidence < ASSUME["method.lowconf"]) || t.margin_warn));
 const basketDesc = t => t.basket ? t.basket.map(p => `${Math.round(p.weight*100)}% ${p.title}`).join(", ") : "";
 const factorTip = t => {
   if (t.factor == null) return t.unmapped ? "No EPA factor for this code — assign an industry" : "";
@@ -795,13 +800,18 @@ function renderImpact() {
   $("mtab-gs").innerHTML = `Goods &amp; Services <small>${gsTons.toFixed(1)}t</small>`;
   $("mtab-offsets").innerHTML = `Offsets <small>−${offTons.toFixed(1)}t</small>`;
   $("mtab-total").innerHTML = `Total <small>${tons.toFixed(1)}t</small>`;
-  const damage = tons * 240, offset = tons * 600;
+  const damage = tons * ASSUME["impact.scc"], offset = tons * ASSUME["offsets.removal_price"];
   $("imp-damage").innerHTML = `$${fmt(damage)} <small>/yr</small>`;
   $("imp-damage-pct").textContent = annualSpend ? `${(damage/annualSpend*100).toFixed(1)}% of G&S spending` : "";
   $("imp-offset").innerHTML = `$${fmt(offset)} <small>/yr</small>`;
   $("imp-offset-pct").textContent = annualSpend ? `+${(offset/annualSpend*100).toFixed(1)}% on G&S spending` : "";
-  const X = 50, mm = tons * (226.0 * X - 0.04028 * (X-1)*X*(2*X-1)/6);
+  // closed-form fit to Bressler (2021) — see the mortality entry on the methodology page
+  const M = ASSUME["impact.mortality"];
+  const X = M.horizon_years, mm = tons * (M.umort_per_t * X - M.decay * (X-1)*X*(2*X-1)/6);
   $("imp-deaths").innerHTML = `${(mm/1e6).toFixed(2)} <small>(${fmt(mm)} micromorts)</small>`;
+  $("imp-damage-k").textContent = `Climate damages · $${ASSUME["impact.scc"]}/t`;
+  $("imp-offset-k").textContent = `To offset · $${ASSUME["offsets.removal_price"]}/t (Charm)`;
+  $("imp-deaths-k").textContent = `Excess deaths · ${X} yrs`;
   renderTotal();
 }
 
@@ -973,7 +983,7 @@ function renderMerchants() {
   for (const m of rows) {
     const c = domCat(m.sample);
     const acc = catAcc.get(c) || 0;
-    m.top80 = c !== "ignored" && m.total > 0 && acc < 0.8 * (catTot.get(c) || 0);
+    m.top80 = c !== "ignored" && m.total > 0 && acc < ASSUME["method.top80_review"] * (catTot.get(c) || 0);
     catAcc.set(c, acc + Math.max(0, m.total));
   }
   for (const m of rows) {
@@ -1271,16 +1281,11 @@ $("csvfile").onchange = async e => {
 // ---------- Travel tab (CoolClimate model; factors measured from their API
 // by finite differences — see data/coolclimate_travel_factors.json) ----------
 const TF = {
-  fuel: {1: {label: "Gasoline", d: 8.874, u: 2.307}, 2: {label: "Diesel", d: 11.304, u: 2.360}, 3: {label: "Electric", d: 0, u: 0}},
-  manPerMile: 0.056,
-  ground: {publictrans: 0.2253, bus: 0.0013, transit: 0.2054, commuter: 0.2054, intercity: 0.2331},
-  // Air: EPA GHG Emission Factors Hub 2025 per-haul combustion factors
-  // (0.207/0.129/0.163 kg per passenger-mile) + ~21% well-to-tank uplift
-  // (CORSIA baseline 89 vs 73.2 gCO2e/MJ). No contrail/non-CO2 uplift.
-  air: {short: 0.250, medium: 0.156, long: 0.197},
-  // representative round-trip miles per haul for the flight-count mode
-  // (2x a typical one-way segment: 200 / 1,000 / 3,000 mi)
-  airTripMiles: {short: 400, medium: 2000, long: 6000},
+  fuel: ASSUME["travel.vehicle_fuel"],
+  manPerMile: ASSUME["travel.vehicle_manufacture"],
+  ground: ASSUME["travel.ground_transit"],
+  air: ASSUME["travel.air"],
+  airTripMiles: ASSUME["travel.air_trip_miles"],
 };
 const TRAVEL = TRAVEL_SAVED || {
   vehicles: [{miles: 0, mpg: 22, fuel: 1}],
@@ -1340,21 +1345,22 @@ function renderTravelX() {
   const fleetMiles = TRAVEL.vehicles.reduce((a, v) => a + (+v.miles || 0), 0);
   const fleetGal = TRAVEL.vehicles.reduce((a, v) => a + (+v.miles || 0) / Math.max(+v.mpg || 22, 1), 0);
   const mpg = fleetGal > 0 ? fleetMiles / fleetGal : 22;
-  const galYr = gas.mo * 12 / 4.50;
+  const TCK = ASSUME["travel.crosscheck_rates"];
+  const galYr = gas.mo * 12 / TCK.gas_per_gal;
   const impliedMi = galYr * mpg;
   const airMode = TRAVEL.air;
   const enteredAir = airMode.mode === "flights"
     ? ["short", "medium", "long"].reduce((a, k2) => a + (+airMode["n" + k2] || 0) * TF.airTripMiles[k2], 0)
     : ["short", "medium", "long"].reduce((a, k2) => a + (+airMode[k2] || 0), 0);
-  const impliedAirMi = air.mo * 12 / 0.15;
+  const impliedAirMi = air.mo * 12 / TCK.air_per_mile;
   const g = TRAVEL.ground;
   const enteredTransit = g.mode === "simple" ? (+g.publictrans || 0)
     : ["bus", "transit", "commuter", "intercity"].reduce((a, k2) => a + (+g[k2] || 0), 0);
   host.innerHTML =
     `Gas stations: <b>$${fmt(gas.mo)}/mo</b> ≈ ${fmt(galYr)} gal/yr ≈ <b>${fmt(impliedMi)} mi/yr</b> at your ${mpg.toFixed(0)} MPG — you entered ${fmt(fleetMiles)} mi/yr.<br>` +
-    `Airlines: <b>$${fmt(air.mo)}/mo</b> ≈ <b>${fmt(impliedAirMi)} mi/yr</b> at ~15¢/mi — you entered ${fmt(enteredAir)} mi/yr.<br>` +
-    `Transit & rail: <b>$${fmt(transit.mo)}/mo</b> ≈ <b>${fmt(transit.mo * 12 / 0.25)} mi/yr</b> at ~25¢/mi — you entered ${fmt(enteredTransit)} mi/yr.<br>` +
-    `Taxi & rideshare: <b>$${fmt(taxi.mo)}/mo</b> — not a CoolClimate input; if it's significant, fold ≈${fmt(taxi.mo * 12 / 2)} mi/yr (~$2/mi) into a vehicle's miles.`;
+    `Airlines: <b>$${fmt(air.mo)}/mo</b> ≈ <b>${fmt(impliedAirMi)} mi/yr</b> at ~${Math.round(TCK.air_per_mile * 100)}¢/mi — you entered ${fmt(enteredAir)} mi/yr.<br>` +
+    `Transit & rail: <b>$${fmt(transit.mo)}/mo</b> ≈ <b>${fmt(transit.mo * 12 / TCK.transit_per_mile)} mi/yr</b> at ~${Math.round(TCK.transit_per_mile * 100)}¢/mi — you entered ${fmt(enteredTransit)} mi/yr.<br>` +
+    `Taxi & rideshare: <b>$${fmt(taxi.mo)}/mo</b> — not a CoolClimate input; if it's significant, fold ≈${fmt(taxi.mo * 12 / TCK.taxi_per_mile)} mi/yr (~$${TCK.taxi_per_mile}/mi) into a vehicle's miles.`;
 }
 
 function renderHomeX() {
@@ -1432,12 +1438,12 @@ const HF = {
   // while data/gridcarbon.json loads; the real factor is ZIP-resolved
   // (see elecResolve below).
   elecPerKwh: 0.199 + 0.018,
-  elecDollarsPerKwh: 0.2233,    // their local rate assumption ($1390 -> 6224.8 kWh)
-  gasPerTherm: 5.470 + 0.766,
-  gasDollarsPerTherm: 2.015,    // $830 -> 411.9 therms
-  oilPerGallon: 11.793 + 3.066,
-  oilDollarsPerGallon: 3.0,
-  sqftPerYear: 0.93,
+  elecDollarsPerKwh: ASSUME["home.crosscheck_rates"].kwh,    // their local rate assumption ($1390 -> 6224.8 kWh)
+  gasPerTherm: ASSUME["home.gas"].d + ASSUME["home.gas"].u,
+  gasDollarsPerTherm: ASSUME["home.crosscheck_rates"].therm,    // $830 -> 411.9 therms
+  oilPerGallon: ASSUME["home.oil"].d + ASSUME["home.oil"].u,
+  oilDollarsPerGallon: ASSUME["home.crosscheck_rates"].oil_gal,
+  sqftPerYear: ASSUME["home.construction"],
 };
 const HOME = HOME_SAVED || {
   elec: {mode: "kwh", kwh: 0, dollars: 0, zip: ""},
@@ -1591,19 +1597,20 @@ function applyHourlyMapping(lines, map, probe) {
   // be scaled wrong AND seasonally biased (two winter months of electric heat
   // ≠ one sixth of a year). A month counts as covered at ≥20 days, so a
   // mid-month-to-mid-month 12-month export still passes.
+  const GATE = ASSUME["elec.hourly_upload"];
   const mdays = new Array(12).fill(0);
   for (let m = 0; m < 12; m++)
     for (let d = DOY_2024[m]; d < DOY_2024[m + 1]; d++)
       if (seen.slice(d * 24, d * 24 + 24).some(Boolean)) mdays[m]++;
-  const covered = mdays.filter(n => n >= 20).length;
+  const covered = mdays.filter(n => n >= GATE.min_days_per_month).length;
   if (covered < 12) {
-    const have = mdays.map((n, m) => n >= 20 ? MONTHS_ABBR[m] : null).filter(Boolean);
+    const have = mdays.map((n, m) => n >= GATE.min_days_per_month ? MONTHS_ABBR[m] : null).filter(Boolean);
     throw new Error(`covers ${covered} month${covered === 1 ? "" : "s"} (${have.join(", ") || "none fully"}) — ` +
       `a full 12 months is needed: an annual footprint from a partial year would be mis-scaled and seasonally biased. ` +
       `Most utility portals let you set the export range to the last year.`);
   }
-  if (total < 50) throw new Error(`total is ${total.toFixed(1)} kWh — units look wrong (expected hundreds+ per month)`);
-  if (total > 200000) throw new Error(`total is ${Math.round(total).toLocaleString()} kWh — not a residential meter, or units are off`);
+  if (total < GATE.min_kwh) throw new Error(`total is ${total.toFixed(1)} kWh — units look wrong (expected hundreds+ per month)`);
+  if (total > GATE.max_kwh) throw new Error(`total is ${Math.round(total).toLocaleString()} kWh — not a residential meter, or units are off`);
   const notes = [];
   if (interval !== 60) notes.push(`${interval}-min intervals summed to hours`);
   if (map.usage_unit && map.usage_unit !== "kwh") notes.push(`converted from ${map.usage_unit.toUpperCase()}`);
@@ -2053,17 +2060,7 @@ function renderHome() {
 // measured from their API — kg CO2e per (calorie/day) over a year) ----------
 // f: kg CO2e per (calorie/day)·yr (measured); cps: calories per serving
 // (CoolClimate's own constants); def: US-average servings/person/week.
-const FF = {
-  beefpork: {label: "Beef, pork, lamb, veal", f: 2.2228, cps: 213, def: 7.4},
-  poultry: {label: "Poultry & eggs", f: 1.5585, cps: 204, def: 5.2},
-  fish: {label: "Fish & seafood", f: 2.0841, cps: 204, def: 2.3},
-  meatother: {label: "Alt meat (legumes, tofu, nuts)", f: 0.8176, cps: 204, def: 1.8},
-  dairy: {label: "Dairy", f: 1.4600, cps: 120, def: 15.3},
-  fruits: {label: "Fruits", f: 1.2228, cps: 70, def: 12.4},
-  veggies: {label: "Vegetables", f: 1.2228, cps: 70, def: 12.4},
-  cereals: {label: "Grains & baked goods", f: 0.5292, cps: 150, def: 28.6},
-  otherfood: {label: "Snacks, drinks, etc.", f: 0.8176, cps: 200, def: 23.6},
-};
+const FF = ASSUME["food.model"];
 const FOOD = FOOD_SAVED || {
   size: 3,
   sv: Object.fromEntries(Object.entries(FF).map(([k, v]) => [k, v.def])),  // servings/person/week
@@ -2099,7 +2096,7 @@ function foodTxnKg() {
   for (const t of DATA.transactions) {
     if (!t.naics || t.mix) continue;
     const spend = -t.amount, spend22 = spend * (t.deflator || 1);
-    if (/^(445|311|312)/.test(t.naics)) { gNom += spend; gKg += spend22 * 0.60; }
+    if (/^(445|311|312)/.test(t.naics)) { gNom += spend; gKg += spend22 * ASSUME["food.crosscheck_grocery"]; }
     else if (/^722/.test(t.naics) && t.factor != null) { rNom += spend; rKg += spend22 * t.factor; }
   }
   return {gNom: gNom / months, gKg: gKg / months * 12, rNom: rNom / months, rKg: rKg / months * 12};
@@ -2130,7 +2127,7 @@ function renderFood() {
   if (x) {
     $("kg-food-txn").textContent = `${((x.gKg + x.rKg) / 1000).toFixed(1)} t/yr`;
     $("foodxrows").innerHTML =
-      `Groceries $${fmt(x.gNom)}/mo × ~0.60 kg/$ → <b>${(x.gKg / 1000).toFixed(1)} t/yr</b> · ` +
+      `Groceries $${fmt(x.gNom)}/mo × ~${ASSUME["food.crosscheck_grocery"].toFixed(2)} kg/$ → <b>${(x.gKg / 1000).toFixed(1)} t/yr</b> · ` +
       `Dining out $${fmt(x.rNom)}/mo → <b>${(x.rKg / 1000).toFixed(1)} t/yr</b><br>` +
       `vs diet estimate <b>${(kg / 1000).toFixed(1)} t/yr</b> — the diet number is what counts in the totals.`;
   } else {
@@ -2288,7 +2285,8 @@ function renderFoodFig() {
 }
 
 // Average US household (CoolClimate national defaults, country mode), kg/yr
-const CC_AVG = {travel: 15718, home: 12219, food: 7002, goods: 7920, services: 7032};
+const CC_AVG = ASSUME["impact.us_benchmark"];
+const CC_AVG_TOTAL = Object.values(CC_AVG).reduce((a, v) => a + v, 0);
 
 function renderTotal() {
   if (!$("fig-total")) return;
@@ -2316,22 +2314,22 @@ function renderTotal() {
   rows[4].off = off.per.services * 1000;
   hbars("fig-total", rows, 0, total);
   $("total-tons").textContent = off.total > 0
-    ? `${(total / 1000).toFixed(1)} − ${off.total.toFixed(1)} = ${Math.max(0, total / 1000 - off.total).toFixed(1)} t net · US avg 49.9`
-    : `${(total / 1000).toFixed(1)} t CO₂e/yr · US avg 49.9`;
+    ? `${(total / 1000).toFixed(1)} − ${off.total.toFixed(1)} = ${Math.max(0, total / 1000 - off.total).toFixed(1)} t net · US avg ${(CC_AVG_TOTAL / 1000).toFixed(1)}`
+    : `${(total / 1000).toFixed(1)} t CO₂e/yr · US avg ${(CC_AVG_TOTAL / 1000).toFixed(1)}`;
 }
 
 // ---------- Offsets tab ----------
 const OFFSETS_SAVED = JSON.parse(localStorage.getItem("cf_offsets") || "null");
 const OFFSET_CATS = {travel: "Travel", home: "Home", food: "Food", goods: "Goods", services: "Services"};
-const OFFSETS = OFFSETS_SAVED || {rows: [{label: "Charm Industrial", cat: "goods", dollars: 0, price: 600}], recycle_lbs: 0, compost_lbs: 0, recycle_cat: "goods"};
+const OFFSETS = OFFSETS_SAVED || {rows: [{label: "Charm Industrial", cat: "goods", dollars: 0, price: ASSUME["offsets.removal_price"]}], recycle_lbs: 0, compost_lbs: 0, recycle_cat: "goods"};
 if (OFFSETS.recycle_lbs == null) OFFSETS.recycle_lbs = 0;
 if (OFFSETS.compost_lbs == null) OFFSETS.compost_lbs = 0;
 if (!OFFSETS.recycle_cat) OFFSETS.recycle_cat = "goods";
 for (const r of OFFSETS.rows) if (r.cat === "gs" || !(r.cat in OFFSET_CATS)) r.cat = "goods";
 
 // avoided t CO2e per (lb/week) over a year: lbs/wk x 52 / 2000 tons/yr x factor
-const RECYCLE_T_PER_LBWK = 52 / 2000 * 2.9;   // EPA equivalencies, mixed recyclables vs landfill
-const COMPOST_T_PER_LBWK = 52 / 2000 * 0.6;   // EPA WARM, food scraps diverted from landfill
+const RECYCLE_T_PER_LBWK = 52 / 2000 * ASSUME["offsets.recycle"];   // EPA equivalencies, mixed recyclables vs landfill
+const COMPOST_T_PER_LBWK = 52 / 2000 * ASSUME["offsets.compost"];   // EPA WARM, food scraps diverted from landfill
 
 function offsetTons() {
   const per = {travel: 0, home: 0, food: 0, goods: 0, services: 0};
@@ -2372,7 +2370,7 @@ function renderOffsets() {
     return `<div class="tvrow">` +
       `<input type="text" value="${esc(r.label || "")}" data-i="${i}" data-k="label" placeholder="Provider" style="width:130px;font:inherit;font-size:0.78rem;border:1px solid var(--line);border-radius:7px;padding:5px 7px;background:var(--card);color:var(--ink)" aria-label="Provider">` +
       `<input type="number" min="0" step="50" value="${+r.dollars || 0}" data-i="${i}" data-k="dollars" aria-label="Dollars per year"><label>$/yr at</label>` +
-      `<input type="number" min="1" step="25" value="${+r.price || 600}" data-i="${i}" data-k="price" style="width:70px" aria-label="Price per tonne"><label>$/t →</label>` +
+      `<input type="number" min="1" step="25" value="${+r.price || ASSUME["offsets.removal_price"]}" data-i="${i}" data-k="price" style="width:70px" aria-label="Price per tonne"><label>$/t →</label>` +
       `<select data-i="${i}" data-k="cat" aria-label="Section">${Object.entries(OFFSET_CATS).map(([k, l]) =>
         `<option value="${k}" ${r.cat === k ? "selected" : ""}>${l}</option>`).join("")}</select>` +
       `<span class="rowkg">−${tons.toFixed(2)} t/yr</span>` +
@@ -2408,7 +2406,7 @@ function renderOffsets() {
     touched();
   });
   $("offsetrows").querySelectorAll(".del").forEach(b => b.onclick = () => { OFFSETS.rows.splice(+b.dataset.i, 1); touched(); });
-  $("offsetadd").onclick = () => { OFFSETS.rows.push({label: "", cat: "gs", dollars: 0, price: 600}); touched(); };
+  $("offsetadd").onclick = () => { OFFSETS.rows.push({label: "", cat: "gs", dollars: 0, price: ASSUME["offsets.removal_price"]}); touched(); };
   $("recyclelbs").onchange = () => { OFFSETS.recycle_lbs = Math.max(0, +$("recyclelbs").value || 0); touched(); };
   $("compostlbs").onchange = () => { OFFSETS.compost_lbs = Math.max(0, +$("compostlbs").value || 0); touched(); };
   $("recyclecat").onchange = () => { OFFSETS.recycle_cat = $("recyclecat").value; touched(); };
@@ -2593,6 +2591,10 @@ setTab("merch");
 renderAll();
 
 // ---------- first-run splash ----------
+// headline numbers come from the assumptions registry, not hand-typed prose
+$("sp-scc").textContent = `$${ASSUME["impact.scc"]}`;
+$("sp-deaths").textContent = fmt(Math.round(1e6 / ASSUME["impact.mortality"].umort_per_t / 100) * 100);
+$("sp-removal").textContent = `$${ASSUME["offsets.removal_price"]}`;
 function closeSplash(tab) {
   $("splash").hidden = true;
   try { localStorage.setItem("cf_splash", "1"); } catch (e) {}

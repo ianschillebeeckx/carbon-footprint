@@ -41,10 +41,10 @@ GC = ROOT / "zip2co2_2" / "gridcarbon"
 OUT = ROOT / "web" / "data" / "gridcarbon.json"
 LB_TO_KG = 0.45359237
 
-ALPHA_BAND = (0.70, 1.45)
-UPLIFT_MAX = 12.0        # |%|
-COVERAGE_MIN = 0.90
-US_LOSS_GROSS_UP = 1 / (1 - 0.042)   # eGRID2023 US grid gross loss 4.2%
+sys.path.insert(0, str(ROOT / "src"))
+from cf.assumptions import ALPHA_BAND, UPLIFT_MAX, COVERAGE_MIN, GRID_LOSS  # noqa: E402
+
+US_LOSS_GROSS_UP = 1 / (1 - GRID_LOSS)   # eGRID2023 US grid gross loss (busbar -> meter)
 
 BA_TZ = {"CISO": -8, "LDWP": -8, "BANC": -8, "IID": -8, "TIDC": -8,
          "PACW": -8, "BPAT": -8, "PGE": -8, "SCL": -8, "PSEI": -8, "TPWR": -8,

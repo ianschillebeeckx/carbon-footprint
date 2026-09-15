@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, "src")
-from cf import classify  # noqa: E402
+from cf import assumptions, classify  # noqa: E402
 from cf.naics_prep import CATEGORIES  # noqa: E402
 
 TEMPLATE = Path("site/v2-template.html")
@@ -99,6 +99,7 @@ def build() -> None:
         .replace("__REMAP__", json.dumps(remap, separators=(",", ":")))
 
     # ---- static reference data: inline at build time (as the server does) ----
+    s = sub(s, "/*__ASSUME__*/null", json.dumps(assumptions.js_values(), separators=(",", ":")))
     s = sub(s, "/*__NAICS_OPTIONS__*/null", json.dumps(classify.naics_options(), separators=(",", ":")))
     s = sub(s, "/*__CAT_DEFAULTS__*/null", json.dumps(classify.default_naics(), separators=(",", ":")))
     s = sub(s, "/*__BASKET_OPTIONS__*/null", json.dumps(classify.basket_options(), separators=(",", ":")))
@@ -461,3 +462,8 @@ async function webUpload(text) {
 
 if __name__ == "__main__":
     build()
+    # methodology + industry-table pages render from the same registry
+    sys.path.insert(0, "scripts")
+    import build_methodology
+    build_methodology.build_methodology()
+    build_methodology.build_naics()
