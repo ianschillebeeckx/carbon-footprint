@@ -39,6 +39,14 @@ class Assumption:
 
 A = Assumption
 
+# Shared citations. CoolClimate's model is peer-reviewed (Jones & Kammen 2011);
+# the exact constants in this app were measured from the deployed calculator's
+# API in 2026, which postdates the paper — cite both, never the website alone.
+JK2011 = ("Jones & Kammen 2011, Environ. Sci. Technol. 45(9): 4088–4095",
+          "https://pubs.acs.org/doi/10.1021/es102221h")
+CC_API = ("CoolClimate calculator (constants measured from its API, 2026)",
+          "https://coolclimate.berkeley.edu/calculator")
+
 ASSUMPTIONS = [
 
     # ------------------------------------------------------------------
@@ -81,6 +89,22 @@ ASSUMPTIONS = [
       "misclassification can do to roughly the last fifth of each category.",
       value=0.8, display="80% of spend per category",
       code=("site/v2-template.html",)),
+
+    A("method.coolclimate", "method", "CoolClimate constants: paper vs deployed calculator",
+      "Travel, home-fuel, construction, food, and the US-benchmark factors follow "
+      "UC Berkeley's CoolClimate household model, whose methodology is "
+      "peer-reviewed ([Jones & Kammen 2011](https://pubs.acs.org/doi/10.1021/es102221h), "
+      "with the food/goods LCA groundwork in Jones, Kammen & McGrath 2008). The "
+      "*specific constants* in this app, however, were measured from the deployed "
+      "calculator's API by finite differences in 2026 — the calculator has been "
+      "updated since the paper, and the paper does not tabulate these exact "
+      "values (see [the measured-factors file](" + REPO + "data/coolclimate_travel_factors.json)). "
+      "So CoolClimate entries cite both: the paper for the model, the API "
+      "measurement for the value and its vintage. Where the deployed calculator "
+      "disagrees with its own documentation (the bus factor), the deviation is "
+      "flagged on that entry rather than silently patched.",
+      sources=(JK2011, CC_API),
+      code=("data/coolclimate_travel_factors.json", "data/coolclimate_factors.json")),
 
     A("method.lowconf", "method", "Low-confidence flag threshold",
       "Merchant classifications come from an LLM with a self-reported confidence. "
@@ -194,7 +218,7 @@ ASSUMPTIONS = [
              2: {"label": "Diesel", "d": 11.304, "u": 2.360},
              3: {"label": "Electric", "d": 0, "u": 0}},
       display="gas 8.87+2.31, diesel 11.30+2.36 kg/gal",
-      sources=(("CoolClimate Network calculator", "https://coolclimate.berkeley.edu/calculator"),),
+      sources=(JK2011, CC_API),
       code=("data/coolclimate_travel_factors.json", "site/v2-template.html")),
 
     A("travel.ev_grid_missing", "travel", "EVs count zero fuel emissions",
@@ -204,7 +228,7 @@ ASSUMPTIONS = [
       "10k miles depending on the region — if you drive an EV, add its kWh "
       "to your Home electricity to count it honestly.",
       bias="under",
-      sources=(("CoolClimate Network calculator", "https://coolclimate.berkeley.edu/calculator"),),
+      sources=(JK2011, CC_API),
       code=("site/v2-template.html",)),
 
     A("travel.vehicle_manufacture", "travel", "Vehicle manufacturing per mile",
@@ -213,21 +237,22 @@ ASSUMPTIONS = [
       "reduces it; a lightly-driven second car still carries most of its "
       "embodied emissions per mile.",
       value=0.056, display="0.056 kg/mile",
-      sources=(("CoolClimate Network calculator", "https://coolclimate.berkeley.edu/calculator"),),
+      sources=(JK2011, CC_API),
       code=("data/coolclimate_travel_factors.json",)),
 
     A("travel.ground_transit", "travel", "Transit factors (and CoolClimate's bus bug)",
-      "Per passenger-mile, measured from CoolClimate: simple \"public transit\" "
-      "225 g; detailed mode — transit rail 205 g, commuter rail 205 g, intercity "
-      "rail 233 g, bus **1.3 g**. That bus number is CoolClimate's own model "
-      "output and is ~100× below their published 107 g/mile constant — almost "
-      "certainly their bug, duplicated faithfully rather than silently patched. "
-      "Use the simple mode if you ride buses.",
+      "Per passenger-mile, measured from the deployed CoolClimate calculator: "
+      "simple \"public transit\" 225 g; detailed mode — transit rail 205 g, "
+      "commuter rail 205 g, intercity rail 233 g, bus **1.3 g**. That bus number "
+      "is what their calculator actually computes and is ~100× below the "
+      "~107 g/mile bus factor in their own data tables — almost certainly an "
+      "implementation bug (no paper publishes 1.3 g), duplicated faithfully "
+      "rather than silently patched. Use the simple mode if you ride buses.",
       value={"publictrans": 0.2253, "bus": 0.0013, "transit": 0.2054,
              "commuter": 0.2054, "intercity": 0.2331},
       display="205–233 g/pax-mile (bus 1.3 g — their bug)",
       bias="under",
-      sources=(("CoolClimate Network calculator", "https://coolclimate.berkeley.edu/calculator"),),
+      sources=(JK2011, CC_API),
       code=("data/coolclimate_travel_factors.json", "site/v2-template.html")),
 
     A("travel.air", "travel", "Flight factors, no contrail multiplier",
@@ -424,7 +449,7 @@ ASSUMPTIONS = [
       value={"d": 5.470, "u": 0.766},
       display="5.47 + 0.77 kg/therm",
       bias="under",
-      sources=(("CoolClimate Network calculator", "https://coolclimate.berkeley.edu/calculator"),),
+      sources=(JK2011, CC_API),
       code=("site/v2-template.html",)),
 
     A("home.oil", "home", "Heating oil per gallon",
@@ -432,7 +457,7 @@ ASSUMPTIONS = [
       "factors, measured from their API.",
       value={"d": 11.793, "u": 3.066},
       display="11.79 + 3.07 kg/gal",
-      sources=(("CoolClimate Network calculator", "https://coolclimate.berkeley.edu/calculator"),),
+      sources=(JK2011, CC_API),
       code=("site/v2-template.html",)),
 
     A("home.construction", "home", "Home construction amortized",
@@ -441,7 +466,7 @@ ASSUMPTIONS = [
       "~1.4 t/yr regardless of energy use — one reason square footage is a "
       "bigger lever than insulation marketing suggests.",
       value=0.93, display="0.93 kg/sqft/yr",
-      sources=(("CoolClimate Network calculator", "https://coolclimate.berkeley.edu/calculator"),),
+      sources=(JK2011, CC_API),
       code=("site/v2-template.html",)),
 
     A("home.water_omitted", "home", "Water & sewer deliberately omitted",
@@ -462,6 +487,7 @@ ASSUMPTIONS = [
       "consistency check, not a bill audit.",
       value={"kwh": 0.2233, "therm": 2.015, "oil_gal": 3.0},
       display="$0.223/kWh · $2.02/therm",
+      sources=(CC_API,),
       code=("site/v2-template.html",)),
 
     # ------------------------------------------------------------------
@@ -487,7 +513,7 @@ ASSUMPTIONS = [
              "cereals": {"label": "Grains & baked goods", "f": 0.5292, "cps": 150, "def": 28.6},
              "otherfood": {"label": "Snacks, drinks, etc.", "f": 0.8176, "cps": 200, "def": 23.6}},
       display="beef 2.22 → grains 0.53 kg per (cal/day)·yr",
-      sources=(("CoolClimate Network calculator", "https://coolclimate.berkeley.edu/calculator"),),
+      sources=(JK2011, CC_API),
       code=("data/coolclimate_factors.json", "site/v2-template.html")),
 
     A("food.legume_conservative", "food", "Legumes charged conservatively",
@@ -594,7 +620,7 @@ ASSUMPTIONS = [
       value={"travel": 15718, "home": 12219, "food": 7002,
              "goods": 7920, "services": 7032},  # kg/yr; totals 49.9 t
       display="49.9 t CO₂e / household / yr",
-      sources=(("CoolClimate Network calculator", "https://coolclimate.berkeley.edu/calculator"),),
+      sources=(JK2011, CC_API),
       code=("site/v2-template.html",)),
 
     # ------------------------------------------------------------------
