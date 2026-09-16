@@ -75,6 +75,17 @@ def build_ba(ba: str, year: int, egrid_kg: float, gas_leakage=1.0, use_imports=F
     gen = read_cache(f"gen_{ba}_{year}.csv.gz")
     load = read_cache(f"load_{ba}.csv.gz")["load_kwh"]
 
+    # The load cache is written for one calendar year (make_real_cache's YEAR).
+    # Building a different year silently reindexes it to all-NaN, which degrades
+    # to flat weights -- the load weighting quietly stops happening while every
+    # number still looks plausible. Fail instead: this shipped once.
+    load_year = load.index[0].year if len(load.index) else None
+    if load_year is not None and load_year != gen.index[0].year:
+        raise ValueError(
+            f"{ba}: load cache is indexed to {load_year} but generation to "
+            f"{gen.index[0].year}. Rebuild the cache with "
+            f"GC_YEAR={gen.index[0].year} python make_real_cache.py")
+
     imports = gen.pop("imports_mwh") if "imports_mwh" in gen else None
     ff = _fuel_factors(gas_leakage=gas_leakage)
     fuels = [c for c in gen.columns if c in ff]
