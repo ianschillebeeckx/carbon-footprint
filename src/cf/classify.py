@@ -342,6 +342,45 @@ def _resolve_basket(host_code: str, parts_in: list[dict], by_code: dict) -> tupl
     return parts, factor
 
 
+def reprice(result: dict, index: dict | None = None) -> bool:
+    """Bring a stored dataset onto the current factor set. Returns True if it changed.
+
+    Python twin of migrateWebData() in scripts/build_web.py. Transactions cache
+    their expanded factor and deflator at classification time, so a factor-set or
+    dollar-base change reaches only newly classified data unless something
+    repricess what is already on disk. Each row is re-expanded from its own stored
+    assignment (naics / mix / basket / category rollup all survive the round trip);
+    merchant rules are untouched.
+    """
+    if index is None:
+        index = json.loads(INDEX_FILE.read_text())
+    dataset = index.get("dataset", "EPA supply-chain factors")
+    meta = result.setdefault("meta", {})
+    if meta.get("dataset") == dataset and meta.get("deflators") == CPI_DEFLATOR:
+        return False
+
+    by_code = {e["code"]: e for e in index["entries"]}
+    for t in result.get("transactions", []):
+        if t.get("naics") is None and not t.get("mix"):
+            t["deflator"] = deflator_for(t.get("date", ""))
+            continue                                   # money movement carries no factor
+        if t.get("mix"):
+            a = {"naics": None, "mix": [{"naics": p["naics"], "weight": p["weight"]}
+                                        for p in t["mix"]]}
+        else:
+            a = {"naics": t["naics"], "cat": t.get("category")}
+            if t.get("basket_custom") and t.get("basket"):
+                a["basket"] = [{"naics": p["naics"], "weight": p["weight"]} for p in t["basket"]]
+        f = expand_assignment(a, by_code)
+        for k in ("factor", "factor_production", "factor_margins", "basket"):
+            if k in f:
+                t[k] = f[k]
+        t["deflator"] = deflator_for(t.get("date", ""))
+    meta["dataset"] = dataset
+    meta["deflators"] = CPI_DEFLATOR
+    return True
+
+
 def expand_assignment(a: dict, by_code: dict) -> dict:
     """Resolve a cached assignment ({naics}, {mix:[...]}, or
     {naics, basket:[...]}) into the display/rollup fields stored on each

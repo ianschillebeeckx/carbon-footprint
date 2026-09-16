@@ -54,8 +54,20 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, html.encode(), "text/html; charset=utf-8")
         elif path == "/v2":
             html = V2_TEMPLATE.read_text()
-            html = html.replace("/*__V2DATA__*/null", V2_FILE.read_text() if V2_FILE.exists() else "null")
             from . import assumptions, classify
+            # Reprice onto the current factor set before serving. The web build
+            # does this client-side (migrateWebData); this is the same contract
+            # for the local path, which injects the file directly. Writes back so
+            # it happens once per factor-set change, not once per request.
+            v2 = "null"
+            if V2_FILE.exists():
+                stored = json.loads(V2_FILE.read_text())
+                if classify.reprice(stored):
+                    V2_FILE.write_text(json.dumps(stored, indent=1))
+                    print(f"repriced {len(stored.get('transactions', []))} transactions "
+                          f"-> {stored['meta']['dataset']}")
+                v2 = json.dumps(stored)
+            html = html.replace("/*__V2DATA__*/null", v2)
             html = html.replace("/*__ASSUME__*/null", json.dumps(assumptions.js_values()))
             html = html.replace("/*__NAICS_OPTIONS__*/null", json.dumps(classify.naics_options()))
             html = html.replace("/*__CAT_DEFAULTS__*/null", json.dumps(classify.default_naics()))
