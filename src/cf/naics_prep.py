@@ -307,6 +307,24 @@ GENERAL_MERCH_BASKET = [("315250", 0.15), ("337122", 0.15), ("334111", 0.1), ("3
                         ("339930", 0.1), ("339920", 0.1), ("325620", 0.15), ("322230", 0.15)]
 GENERAL_MERCH_CODES = {"455110", "455211", "455219", "459999", "459420", "459991"}
 
+# Grocery share of general-merchandise retailers, from their own filings.
+# These stores are substantially food businesses, and the Food tab's diet model
+# already counts those calories — so charging the whole ticket in Goods &
+# Services double-counts the grocery half. The share below is routed to a
+# food code (category "excluded"), which keeps both the dollars and the kg out
+# of the G&S total while leaving them visible in the Food cross-check.
+#
+#   455211  warehouse clubs & supercenters — Walmart US FY2026 ~60% grocery,
+#           Costco FY2025 40.6% foods & sundries + 14.1% fresh = 54.7%
+#   455110  department stores — Target's Food & Beverage segment ~20%; classic
+#           department stores carry none, so this is the conservative end
+#
+# 455219 (All Other General Merchandise) is deliberately absent: it is dominated
+# here by Amazon, whose household spend is mostly non-food, and no filing
+# supports a grocery share for the code as a whole.
+GROCERY_SHARE = {"455211": 0.57, "455110": 0.20}
+GROCERY_PROXY = "445110"      # supermarkets: category "excluded", seen by the Food cross-check
+
 
 def category_for(code: str) -> str:
     for length in range(6, 1, -1):
@@ -376,7 +394,7 @@ def build() -> dict:
     # factor of what's actually bought there. The commodities' margin factors
     # already contain the store/wholesale/transport layer, so no separate
     # retail component is kept anywhere.
-    n_basket = 0
+    n_basket = n_split = 0
     for code, entry in seen.items():
         basket = RETAIL_BASKETS.get(code) or (GENERAL_MERCH_BASKET if code in GENERAL_MERCH_CODES else None)
         if not basket:
@@ -391,6 +409,19 @@ def build() -> dict:
         entry["factor_note"] = "commodity basket (manufacturing incl.)"
         entry["basket"] = [{"naics": c, "weight": round(w / total_w, 4)} for c, w in avail]
         n_basket += 1
+
+        # Grocery-heavy retailers additionally declare a default_mix: the food
+        # share on an excluded food code, the rest spread over the same basket.
+        # expand_assignment() fans the transaction out across those categories,
+        # so the food half leaves the G&S total instead of being charged twice.
+        share = GROCERY_SHARE.get(code)
+        if share and GROCERY_PROXY in seen:
+            entry["default_mix"] = [{"naics": GROCERY_PROXY, "weight": share}] + [
+                {"naics": c, "weight": round(w / total_w * (1 - share), 4)} for c, w in avail
+            ]
+            entry["factor_note"] = (f"commodity basket; {share:.0%} grocery share routed to "
+                                    "Food and excluded from Goods & Services")
+            n_split += 1
 
     # Utilities have no EPA factors (physical-unit territory — the Home tab
     # handles them via kWh/therms). Synthetic factor-0 entries let PG&E-style
@@ -415,7 +446,8 @@ def build() -> dict:
     }
     INDEX_FILE.write_text(json.dumps(index, indent=1))
     n_enriched = sum(1 for e in seen.values() if e["code"] in ENRICH)
-    print(f"Built {INDEX_FILE}: {len(seen)} codes, {n_enriched} enriched, {n_basket} retail codes basket-priced")
+    print(f"Built {INDEX_FILE}: {len(seen)} codes, {n_enriched} enriched, "
+          f"{n_basket} retail codes basket-priced, {n_split} with a grocery split")
     return index
 
 

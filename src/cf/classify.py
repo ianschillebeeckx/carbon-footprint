@@ -411,6 +411,14 @@ def expand_assignment(a: dict, by_code: dict) -> dict:
         return {"naics": a["naics"], "naics_title": f"{a['naics']} — no EPA factor, assign an industry",
                 "factor": None, "category": "excluded", "mix": None, "basket": None,
                 "margin_warn": False, "unmapped": True}
+    # Retailers that sell a lot of groceries fan out into a mix rather than a
+    # single category, so the food share can be routed to "excluded" and leave
+    # the G&S total — the Food tab's diet model already counts those calories.
+    # A basket cannot express this: it blends to one factor under one category.
+    # Skipped when the user has said otherwise (own basket, or a rollup override).
+    if entry.get("default_mix") and not a.get("basket") and not a.get("cat"):
+        return expand_assignment({"mix": entry["default_mix"]}, by_code)
+
     if a.get("basket"):   # user-customized commodity basket for this merchant
         parts, factor = _resolve_basket(code, a["basket"], by_code)
         prod = round(sum(p["factor_production"] * p["weight"] for p in parts), 4) if parts else None

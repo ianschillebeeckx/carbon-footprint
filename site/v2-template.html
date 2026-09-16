@@ -1862,16 +1862,24 @@ function foodKg() {
 }
 
 function foodTxnKg() {
-  // groceries at the CE-weighted ~0.55 kg/$ commodity composite;
-  // restaurants at their own USEEIO factor. 2022-USD spend, annualized.
+  // groceries at the CE-weighted commodity composite; restaurants at their own
+  // USEEIO factor. 2024-USD spend, annualized. Split transactions contribute
+  // their food legs only — that is how a warehouse club's grocery share, which
+  // is routed out of Goods & Services, still shows up as food spend here.
   if (!DATA) return null;
   const months = DATA.meta.months;
   let gNom = 0, gKg = 0, rNom = 0, rKg = 0;
+  const add = (code, spend, spend22, factor) => {
+    if (/^(445|311|312)/.test(code)) { gNom += spend; gKg += spend22 * ASSUME["food.crosscheck_grocery"]; }
+    else if (/^722/.test(code) && factor != null) { rNom += spend; rKg += spend22 * factor; }
+  };
   for (const t of DATA.transactions) {
-    if (!t.naics || t.mix) continue;
     const spend = -t.amount, spend22 = spend * (t.deflator || 1);
-    if (/^(445|311|312)/.test(t.naics)) { gNom += spend; gKg += spend22 * ASSUME["food.crosscheck_grocery"]; }
-    else if (/^722/.test(t.naics) && t.factor != null) { rNom += spend; rKg += spend22 * t.factor; }
+    if (t.mix) {
+      for (const p of t.mix) add(p.naics, spend * p.weight, spend22 * p.weight, p.factor);
+    } else if (t.naics) {
+      add(t.naics, spend, spend22, t.factor);
+    }
   }
   return {gNom: gNom / months, gKg: gKg / months * 12, rNom: rNom / months, rKg: rKg / months * 12};
 }

@@ -50,6 +50,7 @@ def build() -> None:
             "category": e["category"],
             "naics2017": e.get("naics2017"), "useeio": e.get("useeio"),
             **({"basket": e["basket"]} if e.get("basket") else {}),
+            **({"default_mix": e["default_mix"]} if e.get("default_mix") else {}),
             **({"factor_note": e["factor_note"]} if e.get("factor_note") else {}),
         }
 
@@ -313,6 +314,12 @@ function expandAssignmentW(a) {
   if (!entry) {
     return {naics: a.naics, naics_title: `${a.naics} — no EPA factor, assign an industry`, factor: null,
             category: "excluded", mix: null, basket: null, margin_warn: false, unmapped: true};
+  }
+  // Grocery-heavy retailers fan out into a mix so the food share can sit in
+  // "excluded" and leave the G&S total (the Food tab already counts it). A
+  // basket can't: one blended factor, one category. See classify.py's twin.
+  if (entry.default_mix && !(a.basket && a.basket.length) && !a.cat) {
+    return expandAssignmentW({mix: entry.default_mix});
   }
   if (a.basket && a.basket.length) {
     const [parts, factor] = resolveBasketW(code, a.basket);
