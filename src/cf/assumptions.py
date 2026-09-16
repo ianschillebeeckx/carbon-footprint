@@ -636,14 +636,27 @@ ASSUMPTIONS = [
       code=("zip2co2_2/make_real_cache.py", "zip2co2_2/gridcarbon/data/fuel_factors.csv")),
 
     A("elec.load_shape", "electricity", "Weighted by when households use power",
-      "The hourly intensity is averaged using a typical home's hourly usage "
-      "(OpenEI TMY3 residential load profiles, aligned to local time) — "
-      "households use most power on winter evenings, when solar is gone and "
-      "gas is ramping, so the factor usually runs a few percent above the "
-      "flat annual average (CISO +1.2%, PNM +10.7%). The weights only decide "
-      "which hours count more; your kWh input supplies all the scale.",
-      display="TMY3 residential, per-BA local time",
-      sources=(("OpenEI TMY3 load profiles", "https://data.openei.org/submissions/153"),),
+      "The hourly intensity is averaged using a typical home's hourly usage — "
+      "households use most power in the evening, when solar is gone and gas is "
+      "ramping, so the factor runs a little above or below the flat annual "
+      "average depending on the grid (CISO +1.0%, PNM +9.9%, Portland −4.7%). "
+      "The weights only decide which hours count more; your kWh input supplies "
+      "all the scale.\n\n"
+      "The shape comes from **NREL's ResStock 2025 release**, summing all five "
+      "residential building types per state so it reflects the actual housing "
+      "stock rather than a handful of prototype houses. It replaces OpenEI's "
+      "TMY3 residential profiles, which OpenEI has formally deprecated — those "
+      "were five EnergyPlus models with documented defects that landed on this "
+      "app's own stations, including no air conditioning at all in the Marine "
+      "climate region (Portland, Seattle) and a Tampa heating season applied "
+      "across the Hot-Humid zone (Dallas). All 61 balancing authorities now "
+      "use ResStock; every one of the 48 that ships an hourly shape peaks "
+      "between 18:00 and 23:00 local, as a residential profile should.",
+      display="NREL ResStock 2025, per-BA local time",
+      sources=(("NREL End-Use Load Profiles / ResStock 2025 release 1",
+                "https://data.openei.org/submissions/4520"),
+               ("OpenEI TMY3 profiles (deprecated, previously used)",
+                "https://data.openei.org/submissions/153")),
       code=("zip2co2_2/make_real_cache.py", "zip2co2_2/gridcarbon/core.py")),
 
     A("elec.seasonal_limit", "electricity", "Seasonality is TMY3's typical home, not yours",
