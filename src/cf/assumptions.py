@@ -120,10 +120,16 @@ ASSUMPTIONS = [
 
     A("method.top80_review", "method", "Review guidance: top 80% of spend",
       "Classification errors on small merchants barely move the total, so the "
-      "merchant list marks the merchants that make up the top 80% of spend in "
-      "each category (green dot). Reviewing just those bounds the damage any "
-      "misclassification can do to roughly the last fifth of each category.",
-      value=0.8, display="80% of spend per category",
+      "merchant list marks the merchants making up the top 80% of **emissions** "
+      "in each category (green dot). Reviewing just those bounds what a "
+      "misclassification can cost to roughly the last fifth of the category.\n\n"
+      "Ranked by kg rather than dollars, which are not interchangeable here: "
+      "factors span about 8× across the index's 10th-to-90th percentile, so a "
+      "merchant sitting just below a dollar cutoff can outweigh several above "
+      "it. An earlier version ranked by spend while claiming to bound "
+      "emissions. The 80% convention itself is ordinary ABC/Pareto triage — "
+      "verify the vital few, sample the rest.",
+      value=0.8, display="80% of emissions per category",
       code=("site/v2-template.html",)),
 
     A("method.coolclimate", "method", "CoolClimate constants: paper vs deployed calculator",

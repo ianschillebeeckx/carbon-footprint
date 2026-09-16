@@ -685,7 +685,10 @@ async function webUpload(text) {
   let months = 1;
   if (dates.length) {
     const days = (new Date(dates[dates.length - 1]) - new Date(dates[0])) / 86400000 + 1;
-    months = Math.max(1, Math.round(days / 30.44));
+    // Fractional, not rounded: Math.round sent a 45-day window to "1 month" and
+    // then annualized it by 12, overstating by 48% (correct scaling is
+    // 365/45 = 8.1x). Worst just above a month boundary, ~4% at a full year.
+    months = Math.max(1, days / 30.44);
   }
 
   // dedupe to merchant|hint; resolve: local rules -> tier-0 rules -> shared cache -> LLM
@@ -1000,11 +1003,18 @@ function merchantAgg() {
     const key = `${t.merchant}|${t.category_hint}`;
     let m = map.get(key);
     if (!m) {
-      m = {merchant: t.merchant, category_hint: t.category_hint, count: 0, total: 0, sample: t};
+      m = {merchant: t.merchant, category_hint: t.category_hint, count: 0, total: 0, kg: 0, sample: t};
       map.set(key, m);
     }
     m.count++;
-    m.total += -t.amount;  // refunds net out
+    const spend = -t.amount;   // refunds net out
+    m.total += spend;
+    // kg as well as dollars: the ● review marks rank by emissions, because that
+    // is what a misclassification actually costs and factors span ~8x across
+    // the p10-p90 of the index.
+    const s22 = spend * (t.deflator || 1);
+    m.kg += t.mix ? t.mix.reduce((a, p) => a + s22 * p.weight * p.factor, 0)
+                  : (t.factor != null ? s22 * t.factor : 0);
     m.sample = t;  // all share the same assignment
   }
   return [...map.values()].sort((a, b) => b.total - a.total);
@@ -1021,17 +1031,21 @@ function renderMerchants() {
   const hintCount = new Map();   // merchant -> number of distinct category hints
   for (const m of rows) hintCount.set(m.merchant, (hintCount.get(m.merchant) || 0) + 1);
   // ● marks: within each category, the merchants making up the first 80% of
-  // spend — reviewing those covers most of the footprint. Computed over all
-  // rows (rows are already sorted by spend desc), independent of filters.
+  // EMISSIONS — reviewing those bounds what a misclassification can cost. Ranked
+  // by kg rather than dollars, because the two are not interchangeable: factors
+  // span roughly 8x across the index's p10-p90, so a merchant just below the
+  // dollar cutoff can outweigh several above it. Computed over all rows,
+  // independent of filters.
   const domCat = t => { if (!t.mix) return t.category;
     let c = null, w = 0; for (const p of t.mix) if (p.weight > w) { w = p.weight; c = p.category; } return c; };
+  const byKg = [...rows].sort((a, b) => b.kg - a.kg);
   const catTot = new Map(), catAcc = new Map();
-  for (const m of rows) { const c = domCat(m.sample); catTot.set(c, (catTot.get(c) || 0) + Math.max(0, m.total)); }
-  for (const m of rows) {
+  for (const m of byKg) { const c = domCat(m.sample); catTot.set(c, (catTot.get(c) || 0) + Math.max(0, m.kg)); }
+  for (const m of byKg) {
     const c = domCat(m.sample);
     const acc = catAcc.get(c) || 0;
-    m.top80 = c !== "ignored" && m.total > 0 && acc < ASSUME["method.top80_review"] * (catTot.get(c) || 0);
-    catAcc.set(c, acc + Math.max(0, m.total));
+    m.top80 = c !== "ignored" && m.kg > 0 && acc < ASSUME["method.top80_review"] * (catTot.get(c) || 0);
+    catAcc.set(c, acc + Math.max(0, m.kg));
   }
   for (const m of rows) {
     const t = m.sample;
@@ -1051,7 +1065,7 @@ function renderMerchants() {
       : "";
     row.innerHTML =
       `<span class="m"><span class="name">` +
-        (m.top80 ? `<span class="t80" title="Top 80% of ${esc((CATS[domCat(t)] ? CATS[domCat(t)].label : "").split(" — ")[0])} spending — reviewing the ● merchants covers most of your footprint">●</span>` : "") +
+        (m.top80 ? `<span class="t80" title="Top 80% of ${esc((CATS[domCat(t)] ? CATS[domCat(t)].label : "").split(" — ")[0])} emissions — reviewing the ● merchants bounds what a misclassification can cost you">●</span>` : "") +
         `${esc(m.merchant)}</span>` +
         `<small title="${esc(basketDesc(t))}">${esc(t.naics_title)}${t.basket ? " · 🧺 basket" : ""}${m.category_hint ? " · " + esc(m.category_hint) : ""} · ${srcLabel}${allcats}</small></span>` +
       `<span class="tot">$${fmt(m.total)}<small> · ${m.count}</small></span>` +
@@ -2642,9 +2656,26 @@ function renderChart() {
 }
 
 function renderAll() { renderImpact(); renderCats(); renderChart(); renderGsFig(); renderLeft(); }
-$("window").textContent = DATA
-  ? `${DATA.meta.start || "?"} → ${DATA.meta.end || "?"} · ${DATA.meta.months} months · ${DATA.meta.count} transactions`
-  : "No data — upload a transactions CSV (Merchant + Amount required; Date and Category help — see the ? by the upload button)";
+// months is fractional (see the annualization note in classify.py) — round for
+// display only. Anything materially under a year gets a warning rather than a
+// silent scale-up: household spending is seasonal, so annualizing a short
+// window carries whatever was unusual about it straight into the total. The
+// hourly-electricity uploader hard-gates this; the transactions path can't,
+// because a partial year is still worth looking at — but it should say so.
+if (DATA) {
+  const mo = DATA.meta.months;
+  const w = $("window");
+  w.textContent = `${DATA.meta.start || "?"} → ${DATA.meta.end || "?"} · ` +
+    `${mo < 10 ? mo.toFixed(1) : Math.round(mo)} months · ${DATA.meta.count} transactions`;
+  if (mo < 10) {
+    w.innerHTML += ` <span style="color:var(--warn)" title="Totals are scaled to a year from this window. `
+      + `Household spending is seasonal — holidays, travel, heating — so a partial year carries its own `
+      + `quirks into the annual figure. Upload ~12 months for a stable number.">· annualized from a `
+      + `partial year ⚠</span>`;
+  }
+} else {
+  $("window").textContent = "No data — upload a transactions CSV (Merchant + Amount required; Date and Category help — see the ? by the upload button)";
+}
 renderTravel();
 renderHome();
 renderFood();

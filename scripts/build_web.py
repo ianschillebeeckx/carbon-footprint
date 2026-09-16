@@ -434,7 +434,10 @@ async function webUpload(text) {
   let months = 1;
   if (dates.length) {
     const days = (new Date(dates[dates.length - 1]) - new Date(dates[0])) / 86400000 + 1;
-    months = Math.max(1, Math.round(days / 30.44));
+    // Fractional, not rounded: Math.round sent a 45-day window to "1 month" and
+    // then annualized it by 12, overstating by 48% (correct scaling is
+    // 365/45 = 8.1x). Worst just above a month boundary, ~4% at a full year.
+    months = Math.max(1, days / 30.44);
   }
 
   // dedupe to merchant|hint; resolve: local rules -> tier-0 rules -> shared cache -> LLM

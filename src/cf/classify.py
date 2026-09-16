@@ -135,7 +135,11 @@ def parse_csv(text: str) -> tuple[list[dict], dict]:
     months = 1
     if dates:
         days = (dt.date.fromisoformat(dates[-1]) - dt.date.fromisoformat(dates[0])).days + 1
-        months = max(1, round(days / 30.44))
+        # Fractional, not rounded: round() sent a 45-day window to "1 month" and
+        # then annualized it by 12, overstating by 48% (correct scaling is
+        # 365/45 = 8.1x). The error is worst just above a month boundary and
+        # fades to ~4% at a full year.
+        months = max(1.0, days / 30.44)
     meta = {"start": dates[0] if dates else None, "end": dates[-1] if dates else None,
             "months": months, "count": len(txns)}
     return txns, meta
