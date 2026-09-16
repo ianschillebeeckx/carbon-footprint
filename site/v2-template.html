@@ -1078,7 +1078,12 @@ for (const k of ["nshort", "nmedium", "nlong"]) TRAVEL.air[k] = +TRAVEL.air[k] |
 
 const vehKg = v => {
   const miles = +v.miles || 0, f = TF.fuel[+v.fuel] || TF.fuel[1];
-  return miles / Math.max(+v.mpg || 22, 1) * (f.d + f.u) + miles * TF.manPerMile;
+  // Manufacturing is powertrain-specific: the battery adds ~0.029 kg/mile, so an
+  // EV's embodied burden runs ~1.5x an equivalent petrol car's. (Its *operating*
+  // emissions are the opposite story, and are not counted here at all — see the
+  // EV note on the methodology page.)
+  const man = +v.fuel === 3 ? TF.manPerMile.ev : TF.manPerMile.ice;
+  return miles / Math.max(+v.mpg || 22, 1) * (f.d + f.u) + miles * man;
 };
 
 function travelKg() {

@@ -285,6 +285,41 @@ ASSUMPTIONS = [
                 "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-B/part-158")),
       code=("src/cf/classify.py",)),
 
+    A("gs.eeio_limitations", "gs", "What spend-based accounting cannot see",
+      "Goods & Services is 30–40% of a typical footprint here and rests on "
+      "input-output modelling, which has limits worth stating plainly rather "
+      "than leaving to be discovered.\n\n"
+      "**Price stands in for quantity.** A dollar is the only input, so a $24 "
+      "bottle of detergent carries exactly twice the emissions of a $12 one. "
+      "Buying secondhand is charged as if new; a sale reads as a reduction; "
+      "switching to a cheaper supplier \"cuts\" your footprint. This is the "
+      "limitation most likely to mislead someone taking action, because it "
+      "rewards spending less rather than consuming less — and those diverge "
+      "exactly where you have premium low-carbon options.\n\n"
+      "**The resolution is coarser than the code list suggests.** The 972 "
+      "codes collapse to 392 distinct factor sets, so many pairs of "
+      "\"different\" industries are numerically identical. Errors that stay "
+      "inside one factor set cost nothing; the ones that matter are "
+      "retail-versus-commodity and included-versus-excluded.\n\n"
+      "**Imports are priced at domestic technology.** The model behind our "
+      "factor set carries no import-specific emission factors, so a "
+      "Vietnamese-made shirt is charged as though it were made under the US "
+      "grid and US industrial efficiency. Since US production is generally "
+      "less carbon-intensive per dollar than what the US imports, this biases "
+      "the number **down**, most for the import-heavy categories: apparel, "
+      "electronics, furniture, toys.\n\n"
+      "What follows is that the app is far more trustworthy about *shape* "
+      "than *level* — which categories dominate, and how this year compares "
+      "with last — than about any single merchant or the absolute total. "
+      "Read the goods figure as two significant figures at best.",
+      bias="varies",
+      sources=(("USEEIO model registry (import factor status)",
+                "https://github.com/USEPA/USEEIO/blob/master/models.md"),
+               ("EPA 600/R-24/116, Estimating Embodied Environmental Flows in Imports",
+                "https://www.epa.gov/land-research/us-environmentally-extended-input-output-useeio-technical-content"),
+               ("Design notes §7 (known limitations)", REPO + "naics_mapping_design_notes.md")),
+      code=("src/cf/naics_prep.py", "site/v2-template.html")),
+
     A("gs.counted_elsewhere", "gs", "Fuel, flights, utilities, food leave G&S",
       "Transactions whose emissions are modeled physically in another tab are "
       "excluded from Goods & Services to prevent double counting: gas stations "
@@ -333,11 +368,23 @@ ASSUMPTIONS = [
       code=("site/v2-template.html",)),
 
     A("travel.vehicle_manufacture", "travel", "Vehicle manufacturing per mile",
-      "Building and maintaining the vehicle is amortized at 0.056 kg CO₂e per "
-      "mile driven, regardless of fuel (CoolClimate's approach). Driving less "
-      "reduces it; a lightly-driven second car still carries most of its "
-      "embodied emissions per mile.",
-      value=0.056, display="0.056 kg/mile",
+      "Building and maintaining the vehicle, amortized over the miles it "
+      "drives: **0.056 kg CO₂e/mile for petrol and diesel, 0.085 for "
+      "electric**. The petrol figure is CoolClimate's and holds up well — "
+      "rebuilding it from GREET vehicle-cycle parameters via ICCT gives "
+      "0.046–0.051 for US cars and SUVs over their real lifetime mileage, so "
+      "0.056 sits just above a defensible band.\n\n"
+      "Electric vehicles carry more, not less: an 85 kWh pack at R&D GREET "
+      "2024's US cell intensity of 64 kg CO₂e/kWh adds roughly 0.029 kg/mile "
+      "on top of the glider. Using one powertrain-blind number understated "
+      "EVs by about 1.5×. Note this is the opposite direction from their "
+      "operating emissions, which the app currently omits entirely.\n\n"
+      "Amortizing per mile has a consequence worth naming: a barely-driven "
+      "second car is charged almost nothing here (2,000 miles/year → ~110 kg) "
+      "even though its real embodied burden is ~8 t spread over its life, "
+      "nearer 460 kg/year. The per-mile figure is right for comparing how you "
+      "travel, and wrong for deciding whether to keep a car.",
+      value={"ice": 0.056, "ev": 0.085}, display="0.056 kg/mi petrol · 0.085 EV",
       sources=(JK2011, CC_API),
       code=("data/coolclimate_travel_factors.json",)),
 
