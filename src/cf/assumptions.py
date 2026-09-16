@@ -64,13 +64,28 @@ ASSUMPTIONS = [
     # Cross-cutting method
     # ------------------------------------------------------------------
     A("method.gwp", "method", "All gases as CO₂e (GWP-100)",
-      "Every factor in the app is expressed as CO₂-equivalent over a 100-year "
-      "horizon, as published by its source (EPA supply-chain factors, eGRID, "
-      "CoolClimate). Methane-heavy activities (gas leakage, landfill, beef) would "
-      "look substantially worse on a 20-year horizon; GWP-100 is the reporting "
-      "standard and every upstream source uses it, so the app does too.",
+      "Every factor is expressed as CO₂-equivalent over a 100-year horizon, "
+      "as published by its source. GWP-100 is what the reporting standards "
+      "require: the UNFCCC transparency framework mandates AR5 values for "
+      "national inventories, and EPA's own inventory and eGRID use them.\n\n"
+      "The assessment vintage is not uniform across our sources, and it is "
+      "honest to say so. eGRID is AR5. The supply-chain factors moved to AR6 "
+      "with v1.4.0 (methane 29.8 rather than 28, nitrous oxide 273 rather "
+      "than 265). CoolClimate documents no vintage at all and is probably "
+      "AR4-era. Re-expressing everything on one set would move a total by "
+      "under 1%, because the difference between AR5 and AR6 is a few percent "
+      "on two gases that are a small share of the mix — so this is a "
+      "documentation issue rather than a numerical one.\n\n"
+      "The horizon matters far more than the vintage. On a 20-year basis "
+      "methane's weight nearly triples (82.5 against 29.8), which would raise "
+      "beef by roughly 1.6–2×, natural gas upstream by about the same, and a "
+      "US-average emissions mix by around 21%. Methane-heavy activities are "
+      "therefore understated here relative to their near-term warming effect.",
       bias="under",
-      sources=(("IPCC AR5 WG1 Ch.8 (GWP values)", "https://www.ipcc.ch/report/ar5/wg1/"),)),
+      sources=(("IPCC AR5 WG1 Ch.8, Table 8.7", "https://www.ipcc.ch/report/ar5/wg1/"),
+               ("IPCC AR6 WG1 Ch.7, Table 7.15", "https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/"),
+               ("UNFCCC Decision 18/CMA.1 (common metrics)",
+                "https://unfccc.int/process-and-meetings/transparency-and-reporting/reporting-and-review/methods-for-climate-change-transparency/common-metrics"))),
 
     A("method.annualize", "method", "Spending window → annual rate",
       "Uploaded transactions cover whatever window the export spans. The app "
@@ -81,16 +96,26 @@ ASSUMPTIONS = [
       bias="varies",
       code=("site/v2-template.html", "src/cf/classify.py")),
 
-    A("method.cpi_deflator", "method", "Spending deflated to 2022 dollars",
-      "The EPA factors are kg CO₂e per **2022** dollar, so later spending is "
-      "deflated by the CPI-U annual average before multiplying (a 2025 dollar buys "
-      "~9% less stuff than a 2022 dollar, so it carries ~9% less production). "
-      "Values: 2022 = 1.000, 2023 = 0.960, 2024 = 0.933, 2025 = 0.909, "
-      "2026 = 0.882 (extrapolated at ~3%). Without this, inflation would read as "
-      "emissions growth.",
-      value={2022: 1.000, 2023: 0.960, 2024: 0.933, 2025: 0.909, 2026: 0.882},
-      display="1.000 → 0.882 (2022→2026)",
-      sources=(("BLS CPI-U", "https://www.bls.gov/cpi/"),),
+    A("method.cpi_deflator", "method", "Spending rebased to 2024 dollars",
+      "The factor set is kg CO₂e per **2024** dollar, so spending from other "
+      "years is rebased by the CPI-U annual average before multiplying. A "
+      "2022 dollar bought about 7% more than a 2024 one, so it is scaled "
+      "*up*; a 2026 dollar buys less, so it is scaled down. Without this, "
+      "inflation would read as emissions growth.\n\n"
+      "Computed from BLS series CUUR0000SA0 annual averages — 2022 = 292.655, "
+      "2023 = 304.702, 2024 = 313.689, 2025 = 321.943, 2026 = 331.655 "
+      "(January–August) — as 313.689 ÷ the year's index. The 2026 figure "
+      "refreshes when BLS publishes that annual average in January. Note "
+      "October 2025 was never published — the federal shutdown made the "
+      "survey unrecoverable — so the 2025 average rests on eleven months.\n\n"
+      "One honest limitation: CPI-U is a *household basket* standing in for "
+      "what should be commodity-specific output prices. Close enough across "
+      "goods and services in aggregate, but wrong in places — gasoline's 2022 "
+      "price spike means fuel dollars from that year need a very different "
+      "adjustment than the all-items index gives.",
+      value={2022: 1.0719, 2023: 1.0295, 2024: 1.000, 2025: 0.9744, 2026: 0.9458},
+      display="1.072 → 0.946 (2022→2026), 2024 base",
+      sources=(("BLS CPI-U, series CUUR0000SA0", "https://www.bls.gov/cpi/"),),
       code=("src/cf/classify.py",)),
 
     A("method.top80_review", "method", "Review guidance: top 80% of spend",
@@ -130,16 +155,35 @@ ASSUMPTIONS = [
     # Goods & Services
     # ------------------------------------------------------------------
     A("gs.epa_factors", "gs", "EPA supply-chain factors (USEEIO)",
-      "Every dollar of classified spending is multiplied by EPA's Supply Chain "
-      "GHG Emission Factor for its NAICS commodity — v1.3.0, kg CO₂e per 2022 "
-      "dollar at **purchaser price, with margins**: the cradle-to-shelf average "
-      "for that commodity across the whole US economy, including transport, "
-      "wholesale, and retail. These are economy-wide averages from EPA's USEEIO "
-      "input-output model — they can't see brands, so a dollar of artisanal "
-      "furniture and a dollar of IKEA carry the same factor. All 972 usable "
-      "codes are browsable on the [industry table](naics.html).",
-      display="972 NAICS codes, kg CO₂e / 2022 USD",
-      sources=(("EPA Supply Chain GHG Emission Factors v1.3.0",
+      "Every dollar of classified spending is multiplied by the Supply Chain "
+      "GHG Emission Factor for its NAICS commodity — **v1.4.0, kg CO₂e per "
+      "2024 dollar at purchaser price, with margins**: the cradle-to-shelf "
+      "average for that commodity across the whole US economy, including "
+      "transport, wholesale and retail. These are economy-wide averages from "
+      "the USEEIO input-output model — they can't see brands, so a dollar of "
+      "artisanal furniture and a dollar of IKEA carry the same factor. All "
+      "972 usable codes are browsable on the [industry table](naics.html).\n\n"
+      "**This is no longer an EPA dataset.** EPA published through v1.3.0 and "
+      "then stopped; v1.4.0 (October 2025) is published by the Cornerstone "
+      "Sustainability Data Initiative and authored by Wesley Ingwersen, who "
+      "built USEEIO at EPA before leaving in July 2025 — same model lineage, "
+      "same structure, different publisher. It moves to 2023 emissions data "
+      "and AR6 global warming potentials.\n\n"
+      "Factors fell a median 9.5% across the codes we use, but most of that "
+      "is the dollar rebase rather than decarbonisation: the release notes "
+      "report a −0.9 correlation between a commodity's factor change and its "
+      "price change. Rebasing our deflator from 2022 to 2024 dollars pushes "
+      "the other way by about 7%, so the net effect on a typical footprint is "
+      "small. The two changes ship together for exactly that reason — either "
+      "alone would swing totals by more than the correction is worth. "
+      "v1.4.0 publishes 2017 NAICS keys only, so the factors are joined onto "
+      "the 2022 crosswalk from EPA's last release; 971 of our 972 codes match "
+      "(the miss is electric power distribution, which is excluded to the "
+      "Home tab anyway).",
+      display="972 NAICS codes, kg CO₂e / 2024 USD",
+      sources=(("Supply Chain GHG Emission Factors v1.4.0 (Cornerstone)",
+                "https://zenodo.org/records/17202747"),
+               ("EPA Supply Chain GHG Emission Factors v1.3.0 (last EPA release)",
                 "https://catalog.data.gov/dataset/supply-chain-greenhouse-gas-emission-factors-v1-3-by-naics-6"),
                ("USEEIO model", "https://www.epa.gov/land-research/us-environmentally-extended-input-output-useeio-models")),
       code=("data/naics2022_with_2017_emission_factors_1.csv", "src/cf/naics_prep.py")),
@@ -733,13 +777,15 @@ ASSUMPTIONS = [
       code=("site/v2-template.html",)),
 
     A("food.crosscheck_grocery", "food", "Grocery cross-check composite",
-      "The cross-check converts uploaded grocery spend (2022 USD) at a "
-      "~0.55 kg CO₂e/$ commodity composite — a diet-mix assumption, since "
-      "spend can't see what's in the cart. Rebuilt bottom-up from the EPA "
-      "factors this repo ships, weighted by BLS Consumer Expenditure "
-      "food-at-home shares, which gives 0.53. Restaurants use their own "
-      "USEEIO factors: **0.13–0.26 kg/$** (full-service 0.194, limited-"
-      "service 0.255, the rest of NAICS 722 at 0.132) — mostly the service, "
+      "The cross-check converts uploaded grocery spend (2024 USD) at a "
+      "**0.53 kg CO₂e/$** commodity composite — a diet-mix assumption, since "
+      "spend can't see what's in the cart. Rebuilt bottom-up from the factor "
+      "set this repo ships, weighted by BLS Consumer Expenditure "
+      "food-at-home shares: cereals and bakery 12.5% × 0.268, meat/fish/eggs "
+      "22.7% × 0.914, dairy 10.1% × 0.740, fruit and vegetables 15.3% × "
+      "0.433, everything else 39.4% × 0.375. Restaurants use their own "
+      "factors: **0.12–0.22 kg/$** (full-service 0.168, limited-service "
+      "0.220, the rest of NAICS 722 at 0.117) — mostly the service, "
       "diet-blind. An earlier version of this note quoted 0.23–0.36 for "
       "restaurants, which contradicted the data in this repo.\n\n"
       "A strong disagreement with the diet estimate usually means heavy "
@@ -747,9 +793,9 @@ ASSUMPTIONS = [
       "Note also that spend-based estimates run structurally below process "
       "LCA, so this cross-check reads low against the diet model by "
       "construction.",
-      value=0.55, display="0.55 kg CO₂e / 2022 $",
-      sources=(("EPA Supply Chain GHG Emission Factors v1.3.0",
-                "https://catalog.data.gov/dataset/supply-chain-greenhouse-gas-emission-factors-v1-3-by-naics-6"),
+      value=0.53, display="0.53 kg CO₂e / 2024 $",
+      sources=(("Supply Chain GHG Emission Factors v1.4.0",
+                "https://zenodo.org/records/17202747"),
                ("BLS Consumer Expenditures 2024", "https://www.bls.gov/news.release/cesan.nr0.htm"),
                ("Design notes §3", REPO + "naics_mapping_design_notes.md")),
       code=("site/v2-template.html",)),

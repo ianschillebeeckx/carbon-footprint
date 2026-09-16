@@ -108,7 +108,9 @@ def build() -> None:
     s = sub(s, "/*__CATS__*/null", json.dumps(categories, separators=(",", ":")))
 
     # ---- user state: localStorage instead of server injection ----
-    s = sub(s, "/*__V2DATA__*/null", 'JSON.parse(localStorage.getItem("cf_data") || "null")')
+    s = sub(s, "/*__V2DATA__*/null",
+            'JSON.parse(localStorage.getItem("cf_data") || "null");\n'
+            'migrateWebData();   // reprice cached factors if the factor set moved')
     s = sub(s, "/*__TRAVEL__*/null", 'JSON.parse(localStorage.getItem("cf_travel") || "null")')
     s = sub(s, "/*__HOME__*/null", 'JSON.parse(localStorage.getItem("cf_home") || "null")')
     s = sub(s, "/*__FOOD__*/null", 'JSON.parse(localStorage.getItem("cf_food") || "null")')
@@ -241,6 +243,36 @@ function normalizeMerchant(name) {
 }
 
 function saveWebData() { localStorage.setItem("cf_data", JSON.stringify(DATA)); }
+
+// Factor-set migration. Transactions cache their expanded factor and deflator at
+// upload time, so a factor-set or dollar-base change would otherwise reach only
+// new uploads — an existing user would keep computing on the old vintage forever
+// without any signal. Re-expand from each row's stored assignment (naics / mix /
+// basket / cat all survive) and re-derive the deflator. Corrections are keyed by
+// merchant in cf_rules and are untouched.
+function migrateWebData() {
+  if (!DATA || !DATA.meta || DATA.meta.dataset === WEB_META.dataset) return;
+  const from = DATA.meta.dataset || "(unversioned)";
+  let n = 0;
+  for (const t of DATA.transactions) {
+    const a = t.mix ? {naics: null, mix: t.mix.map(p => ({naics: p.naics, weight: p.weight}))}
+      : {naics: t.naics,
+         basket: t.basket_custom && t.basket ? t.basket.map(p => ({naics: p.naics, weight: p.weight})) : null,
+         cat: t.category};
+    const f = expandAssignmentW(a);
+    if (t.naics == null && !t.mix) continue;          // non-purchase rows carry no factor
+    Object.assign(t, {factor: f.factor, factor_production: f.factor_production,
+                      factor_margins: f.factor_margins, basket: f.basket ?? t.basket,
+                      deflator: deflatorFor(t.date)});
+    n++;
+  }
+  DATA.meta.dataset = WEB_META.dataset;
+  DATA.meta.deflators = WEB_META.deflators;
+  saveWebData();
+  console.log(`[cf] repriced ${n} transactions: ${from} -> ${WEB_META.dataset}`);
+}
+// NB: called from just below `const DATA = ...`, not here — this runtime block is
+// injected above that declaration, so touching DATA here hits the temporal dead zone.
 function saveWebRules() { localStorage.setItem("cf_rules", JSON.stringify(WEB_RULES)); }
 
 function resolveBasketW(host, partsIn) {

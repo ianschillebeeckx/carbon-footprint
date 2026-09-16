@@ -410,7 +410,7 @@
     </div>
     <div class="tcard">
       <h3>Cross-check from your transactions
-        <button class="info" aria-label="About the transactions cross-check" data-tip="Your grocery and restaurant transactions (2022 USD) at spend-based composites — diet-blind, so a strong disagreement with the diet estimate usually means heavy dining out (undercounted here) or premium groceries (overcounted). Composites on the methodology page.">?</button>
+        <button class="info" aria-label="About the transactions cross-check" data-tip="Your grocery and restaurant transactions (2024 USD) at spend-based composites — diet-blind, so a strong disagreement with the diet estimate usually means heavy dining out (undercounted here) or premium groceries (overcounted). Composites on the methodology page.">?</button>
         <span class="tkg" id="kg-food-txn"></span></h3>
       <div id="foodxrows" class="hint"></div>
     </div>
@@ -449,7 +449,7 @@
 
   <div id="right">
     <div id="catlist"></div>
-    <p class="hint">$/mo is nominal spend, refunds netted out. kg is computed on spend deflated to 2022 USD (CPI), times each transaction's NAICS factor (bottom-up USEEIO, purchaser price with margins), so the shown kg/$ blends in the deflator. Click a category to filter. Corrections apply to all transactions of the same merchant and persist server-side. Factors, rules, and sources: <a href="methodology.html#gs" target="_blank" rel="noopener">methodology — goods &amp; services</a>.</p>
+    <p class="hint">$/mo is nominal spend, refunds netted out. kg is computed on spend rebased to 2024 USD (CPI), times each transaction's NAICS factor (bottom-up USEEIO, purchaser price with margins), so the shown kg/$ blends in the rebasing. Click a category to filter. Corrections apply to all transactions of the same merchant and persist server-side. Factors, rules, and sources: <a href="methodology.html#gs" target="_blank" rel="noopener">methodology — goods &amp; services</a>.</p>
   </div>
 
   <div id="chartpane">
@@ -461,7 +461,7 @@
     <div id="chart-host" hidden></div>
     <div class="legend" id="chart-legend"></div>
     <div id="chart-tip"></div>
-    <p class="hint" style="margin-top:12px" id="chart-note">Annualized t CO₂e by category, bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Bar heights are scaled to section totals; hover a segment for its share.</p>
+    <p class="hint" style="margin-top:12px" id="chart-note">Annualized t CO₂e by category, bottom-up from each transaction's NAICS factor (USEEIO v1.4.0, spend rebased to 2024 USD). Bar heights are scaled to section totals; hover a segment for its share.</p>
   </div>
 </div>
 
@@ -498,7 +498,7 @@ const factorTip = t => {
   else s = `${t.factor.toFixed(2)} kg/$ (supply chain incl. margins)`;
   if (t.factor_note) s += ` · ${t.factor_note}`;
   if (t.margin_warn) s += " · ⚠ zero-margin row for a goods category — likely the store was mapped, not the product";
-  if (t.deflator && t.deflator !== 1) s += ` · per 2022 USD: spend ×${t.deflator} before multiplying`;
+  if (t.deflator && t.deflator !== 1) s += ` · per 2024 USD: spend ×${t.deflator} before multiplying`;
   if (t.useeio) s += ` · USEEIO ${t.useeio}`;
   return s;
 };
@@ -515,7 +515,7 @@ function stats() {
   for (const t of DATA.transactions) {
     if (t.naics == null && !t.mix) continue;        // money movement: out of every total
     const spend = -t.amount;                        // refunds net out as negative
-    const spend22 = spend * (t.deflator || 1);      // factors are per 2022 USD
+    const spend22 = spend * (t.deflator || 1);      // factors are per 2024 USD
     if (t.mix) {
       for (const p of t.mix) {
         per[p.category].dollars += spend * p.weight;
@@ -2022,7 +2022,7 @@ function setChartMode(m) {
   $("chart-host").hidden = m !== "monthly";
   $("chart-title").textContent = m === "overall" ? "G&S emissions — overall (t CO₂e/yr)" : "G&S emissions by month (kg CO₂e)";
   $("chart-note").textContent = m === "overall"
-    ? "Annualized t CO₂e by category, bottom-up from each transaction's NAICS factor (EPA/USEEIO, spend deflated to 2022 USD). Bar heights are scaled to section totals; hover a segment for its share."
+    ? "Annualized t CO₂e by category, bottom-up from each transaction's NAICS factor (USEEIO v1.4.0, spend rebased to 2024 USD). Bar heights are scaled to section totals; hover a segment for its share."
     : "Each month shows a Goods bar (left) and a Services bar (right); the top three categories of each get their own color, the rest fold into a remainder.";
 }
 $("chartmode").querySelectorAll("button").forEach(b => b.onclick = () => setChartMode(b.dataset.m));

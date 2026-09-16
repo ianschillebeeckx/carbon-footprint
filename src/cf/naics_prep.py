@@ -1,7 +1,7 @@
 """Build the NAICS retrieval index for v2 transaction classification.
 
-Reads the EPA supply-chain emission factors CSV (v1.3.0, kg CO2e per
-2022 USD, purchaser price) and produces data/naics_index.json: one entry
+Reads the supply-chain emission factors CSV (v1.4.0, kg CO2e per
+2024 USD, purchaser price) and produces data/naics_index.json: one entry
 per 2022 NAICS-6 code with its factors, display category (CoolClimate's
 Goods & Services taxonomy + Digital Subscriptions, or "excluded"), and a
 search_text used for embedding retrieval. Consumer-relevant codes get
@@ -20,7 +20,9 @@ import csv
 import json
 from pathlib import Path
 
-FACTORS_CSV = Path("data/naics2022_with_2017_emission_factors_1.csv")
+# v1.4.0 factors joined onto the 2022<->2017 crosswalk from EPA's v1.3.0 release
+# (v1.4.0 publishes 2017 keys only). Regenerate with scripts/build_factor_csv.py.
+FACTORS_CSV = Path("data/naics2022_with_2017_emission_factors_v140.csv")
 INDEX_FILE = Path("data/naics_index.json")
 
 # Display categories. G&S categories map to CoolClimate calculator fields;
@@ -322,7 +324,8 @@ DUP_PICK = {
     "335910": "335912",  # household batteries are primary (AA/AAA), not industrial storage
 }
 
-DATASET = "EPA Supply Chain GHG Emission Factors v1.3.0 (kg CO2e / 2022 USD, purchaser price)"
+DATASET = ("Supply Chain GHG Emission Factors v1.4.0 (kg CO2e / 2024 USD, purchaser price; "
+           "Cornerstone Sustainability Data Initiative, successor to EPA's v1.3.0)")
 
 
 def build() -> dict:
