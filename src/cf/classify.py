@@ -64,8 +64,10 @@ NON_PURCHASE_MERCHANT = re.compile(
 HEALTH_INSURER = re.compile(
     r"\b(kaiser|blue shield|blue cross|anthem|aetna|cigna|united ?health|humana|"
     r"oscar health|health net|molina|delta dental|vsp)\b", re.I)
-HEALTH_INSURANCE_MIX = [{"naics": "622110", "weight": 0.6},   # hospitals
-                        {"naics": "621111", "weight": 0.4}]   # physicians
+# Declared once in the assumptions registry (CMS NHEA utilization mix) and
+# imported here — never transcribed, or the methodology page and the computed
+# factor drift apart. See gs.health_insurance.
+from .assumptions import HEALTH_INSURANCE_MIX  # noqa: E402
 
 # Hint-level tier-0: the statement category alone pins these, whatever the
 # merchant string says (Geico, State Farm, Zelle, ...).

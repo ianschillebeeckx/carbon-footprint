@@ -192,7 +192,8 @@ def build() -> None:
     s = sub(s, "transfers, card payments, and income are detected and excluded automatically.",
             "transfers, card payments, and income are detected and excluded automatically. "
             "Your file never leaves this browser — only merchant names and category hints are "
-            "sent (to a shared classification cache); amounts, dates, and accounts stay local.")
+            "sent, to a shared classification cache and, for merchants not already known, to "
+            "Anthropic's API; amounts, dates, and accounts stay local.")
 
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(s)
