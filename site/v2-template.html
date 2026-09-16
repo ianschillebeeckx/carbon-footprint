@@ -402,7 +402,7 @@
   <div class="tcol">
     <div class="tcard">
       <h3>Diet — servings per person, per week
-        <button class="info" aria-label="About diet emissions" data-tip="CoolClimate's food model: servings → calories → CO₂e (per-row factors shown inline). US-average defaults prefilled; the cal/day readout should land near ~2,300/person if servings are realistic. Legumes/tofu/nuts go under alt meat, charged conservatively — a beef→beans swap is at least as good as displayed. Beef→poultry/beans are the biggest levers. Factors and sources: methodology page.">?</button>
+        <button class="info" aria-label="About diet emissions" data-tip="Each row is servings per week × the emissions of one serving — no dollars and no calories enter the maths. Factors are Poore & Nemecek 2018 medians (38,700 farms, one common cradle-to-retail boundary including land-use change); serving sizes are the FDA reference amounts, shown in grams beside each row. US-average defaults are prefilled and the cal/day readout is a plausibility check, not an input. Beef and lamb are ruminants and emit several times what pork or chicken do — that swap is the biggest lever here. Per-row sources: methodology page.">?</button>
         <span class="tkg" id="kg-food-diet"></span></h3>
       <div class="tvrow"><label>People in household:</label>
         <input type="number" min="1" max="12" step="1" id="foodsize" style="width:62px" aria-label="People in household"></div>
@@ -1866,14 +1866,39 @@ if (FOOD.sv && FOOD.sv.fruitveg != null) {
   FOOD.sv.fruits = FOOD.sv.veggies = Math.round((+FOOD.sv.fruitveg || 0) / 2 * 10) / 10;
   delete FOOD.sv.fruitveg;
 }
+// Migrate the CoolClimate-era rows. `beefpork` fused ruminants with pork and
+// `poultry` fused chicken with eggs; both are now split, so a saved value is
+// divided by US per-capita availability rather than dropped — the user's own
+// answer is preserved as closely as the old shape allows, and they can adjust.
+if (FOOD.sv && FOOD.sv.beefpork != null) {
+  const n = +FOOD.sv.beefpork || 0;
+  FOOD.sv.beeflamb = Math.round(n * 0.55 * 10) / 10;   // beef+lamb share of US red meat
+  FOOD.sv.pork = Math.round(n * 0.45 * 10) / 10;
+  delete FOOD.sv.beefpork;
+}
+if (FOOD.sv && FOOD.sv.poultry != null && FOOD.sv.eggs == null) {
+  const n = +FOOD.sv.poultry || 0;
+  FOOD.sv.poultry = Math.round(n * 0.69 * 10) / 10;
+  FOOD.sv.eggs = Math.round(n * 0.31 * 10) / 10;
+}
+if (FOOD.sv && FOOD.sv.meatother != null) {           // "alt meat" -> legumes
+  FOOD.sv.legume = FOOD.sv.meatother;
+  delete FOOD.sv.meatother;
+}
+if (FOOD.sv && FOOD.sv.cereals != null) {             // renamed for clarity
+  FOOD.sv.grains = FOOD.sv.cereals;
+  delete FOOD.sv.cereals;
+}
 for (const k of Object.keys(FF)) if (FOOD.sv[k] == null) FOOD.sv[k] = FF[k].def;
 
-const foodCalDay = k => (+FOOD.sv[k] || 0) * FF[k].cps / 7;   // per person
+const foodCalDay = k => (+FOOD.sv[k] || 0) * FF[k].cps / 7;   // per person, readout only
 
 function foodKg() {
+  // servings/week x 52 x kg per serving x household size. Calories are not in
+  // this calculation at all — they are a plausibility readout beside each row.
   const size = Math.max(1, +FOOD.size || 1);
   let total = 0;
-  for (const k of Object.keys(FF)) total += foodCalDay(k) * size * FF[k].f;
+  for (const k of Object.keys(FF)) total += (+FOOD.sv[k] || 0) * 52 * FF[k].kg * size;
   return total;
 }
 
@@ -1911,12 +1936,17 @@ function saveFood() {
 function renderFood() {
   const size = Math.max(1, +FOOD.size || 1);
   $("foodsize").value = size;
-  $("foodrows").innerHTML = `<div class="tvrow" style="color:var(--muted);font-size:0.74rem;margin-top:4px">Servings per person, per week:</div>` +
-    Object.entries(FF).map(([k, v]) =>
-    `<div class="tvrow"><label>${v.label}:</label>` +
+  $("foodrows").innerHTML = `<div class="tvrow" style="color:var(--muted);font-size:0.74rem;margin-top:4px">How many times a week, per person:</div>` +
+    Object.entries(FF).map(([k, v]) => {
+    // Show the serving mass: "a serving" is the single hardest thing to judge,
+    // and the factors are literally per-gram-of-food, so the gram anchor is the
+    // number that makes the input answerable.
+    const anchor = v.g ? `${v.g} g` : "~200 kcal";
+    return `<div class="tvrow"><label>${v.label}:</label>` +
     `<input type="number" min="0" step="0.5" value="${+FOOD.sv[k] || 0}" data-f="${k}" style="width:72px" aria-label="${v.label} servings per person per week">` +
-    `<span class="rowkg" title="${(v.f / 365 * 1000).toFixed(1)} g CO₂e per calorie · ${(v.f / 365 * v.cps).toFixed(2)} kg per serving">` +
-      `${(v.f / 365 * 1000).toFixed(1)} g/cal · ${(v.f / 365 * v.cps).toFixed(2)} kg/sv · ${fmt(foodCalDay(k) * size * v.f)} kg/yr</span></div>`).join("");
+    `<span class="rowkg" title="One serving = ${anchor} (${v.g ? "FDA reference amount, as purchased" : "calorie-based composite"}) · ${v.kg.toFixed(2)} kg CO₂e per serving · ${v.src}">` +
+      `${anchor} · ${v.kg.toFixed(2)} kg/serving · ${fmt((+FOOD.sv[k] || 0) * 52 * v.kg * size)} kg/yr</span></div>`;
+    }).join("");
   const totalCal = Object.keys(FF).reduce((a, k) => a + foodCalDay(k), 0);
   const kg = foodKg();
   $("kg-food-diet").textContent = `≈${fmt(totalCal)} cal/person·day · ${fmt(kg)} kg/yr`;
@@ -2071,15 +2101,20 @@ function renderHomeFig() {
 }
 function renderFoodFig() {
   const size = Math.max(1, +FOOD.size || 1);
-  const kgOf = k => foodCalDay(k) * size * FF[k].f;
+  const kgOf = k => (+FOOD.sv[k] || 0) * 52 * FF[k].kg * size;
+  // Beef is broken out on its own: it is normally the largest single slice of
+  // the food footprint, and burying it inside "meat" hides the one distinction
+  // that actually changes what someone would do differently.
   const groups = [
-    ["Meat (beef, poultry, fish)", kgOf("beefpork") + kgOf("poultry") + kgOf("fish")],
-    ["Alt meat", kgOf("meatother")],
+    ["Beef & lamb", kgOf("beeflamb")],
+    ["Pork", kgOf("pork")],
+    ["Poultry & eggs", kgOf("poultry") + kgOf("eggs")],
+    ["Fish & seafood", kgOf("fish")],
     ["Dairy", kgOf("dairy")],
-    ["Fruits", kgOf("fruits")],
-    ["Vegetables", kgOf("veggies")],
-    ["Grains", kgOf("cereals")],
-    ["Snacks & other", kgOf("otherfood")],
+    ["Legumes, tofu, nuts", kgOf("legume")],
+    ["Fruits & vegetables", kgOf("fruits") + kgOf("veggies")],
+    ["Grains", kgOf("grains")],
+    ["Snacks & drinks", kgOf("otherfood")],
   ];
   vstack("fig-food", groups.map(([label, kg], i) => ({label, kg, color: PAL[i % 8]})));
 }
@@ -2101,7 +2136,7 @@ function renderTotal() {
   const rows = [
     {label: "Travel", avg: CC_AVG.travel, segs: tp.map((r, i) => ({kg: r.kg, color: PAL[i % 8], title: r.label}))},
     {label: "Home", avg: CC_AVG.home, segs: [["Electricity", hk.elec], ["Natural gas", hk.gas], ["Heating oil", hk.oil], ["Construction", hk.sqft]].map(([t, kg], i) => ({kg, color: PAL[i % 8], title: t}))},
-    {label: "Food", avg: CC_AVG.food, segs: Object.entries(FF).map(([k, v], i) => ({kg: foodCalDay(k) * size * v.f, color: PAL[i % 8], title: v.label}))},
+    {label: "Food", avg: CC_AVG.food, segs: Object.entries(FF).map(([k, v], i) => ({kg: (+FOOD.sv[k] || 0) * 52 * v.kg * size, color: PAL[i % 8], title: v.label}))},
     {label: "Goods", avg: CC_AVG.goods, segs: secSegs("Goods")},
     {label: "Services", avg: CC_AVG.services, segs: secSegs("Services")},
   ];

@@ -846,36 +846,122 @@ ASSUMPTIONS = [
     # ------------------------------------------------------------------
     # Food
     # ------------------------------------------------------------------
-    A("food.model", "food", "Diet model: servings → calories → CO₂e",
-      "CoolClimate's food model at full meat detail. Weekly servings convert "
-      "to calories/day with their serving sizes (beef/pork 213 cal, poultry/"
-      "fish 204, dairy 120, fruits/vegetables 70, grains 150), then calories "
-      "carry measured factors — per (calorie/day) over a year: beef & pork "
-      "2.22 kg, fish 2.08, poultry 1.56, dairy 1.46, fruits/vegetables 1.22 "
-      "(modeled jointly), snacks/other 0.82, grains 0.53. US-average servings "
-      "prefilled; the calories-per-day readout should land near ~2,300 if "
-      "your servings are realistic. Beef→poultry or beef→legume swaps are "
-      "the biggest levers.",
-      value={"beefpork": {"label": "Beef, pork, lamb, veal", "f": 2.2228, "cps": 213, "def": 7.4},
-             "poultry": {"label": "Poultry & eggs", "f": 1.5585, "cps": 204, "def": 5.2},
-             "fish": {"label": "Fish & seafood", "f": 2.0841, "cps": 204, "def": 2.3},
-             "meatother": {"label": "Alt meat (legumes, tofu, nuts)", "f": 0.8176, "cps": 204, "def": 1.8},
-             "dairy": {"label": "Dairy", "f": 1.4600, "cps": 120, "def": 15.3},
-             "fruits": {"label": "Fruits", "f": 1.2228, "cps": 70, "def": 12.4},
-             "veggies": {"label": "Vegetables", "f": 1.2228, "cps": 70, "def": 12.4},
-             "cereals": {"label": "Grains & baked goods", "f": 0.5292, "cps": 150, "def": 28.6},
-             "otherfood": {"label": "Snacks, drinks, etc.", "f": 0.8176, "cps": 200, "def": 23.6}},
-      display="beef 2.22 → grains 0.53 kg per (cal/day)·yr",
-      sources=(JK2011, CC_API),
-      code=("data/coolclimate_factors.json", "site/v2-template.html")),
+    A("food.model", "food", "Diet model: servings × emissions per serving",
+      "You give weekly servings; each is multiplied by the emissions of one "
+      "serving of that food. **No dollars and no calories enter the "
+      "calculation** — the calorie figure shown next to each row is a "
+      "plausibility readout, not an input to the maths.\n\n"
+      "Factors are **Poore & Nemecek 2018 medians**, the standard food-LCA "
+      "reference: ~1,530 studies covering 38,700 farms in 119 countries, "
+      "re-run to one common cradle-to-retail boundary including land-use "
+      "change. The single boundary is the point — individual food LCAs draw "
+      "theirs differently, so a beef paper and a lentil paper cannot "
+      "legitimately be compared, while these can. That comparison is the "
+      "advice this tab exists to give.\n\n"
+      "**Median rather than mean, deliberately.** P&N's means are pulled "
+      "upward by a long tail of extensive tropical systems — their global "
+      "beef mean is 99 kg CO₂e/kg against a median of 60. Their own 12 US "
+      "beef observations have a median of 59, the 56th percentile of the "
+      "global distribution, so the median is both the more robust estimator "
+      "and very close to what American production actually measures. That "
+      "single choice does the work an explicit US correction would, without "
+      "importing a second study's system boundary.\n\n"
+      "Serving sizes are the FDA's reference amounts (21 CFR 101.12; USDA "
+      "FSIS 9 CFR 317.312 for meat), which resolve the trap in this "
+      "conversion: the regulation sets the same portion as **85 g cooked or "
+      "110 g uncooked**, and P&N's meat unit is raw retail weight, so a "
+      "serving is 110 g of their unit. Grains and legumes run the other way — "
+      "140 g of cooked rice is 45 g dry, and their rice unit is dry.\n\n"
+      "Two honest caveats. Seafood uses global farmed-fish values because "
+      "**80% of US seafood is imported** (NOAA) and P&N has no North American "
+      "observations — global is the correct choice here, not a compromise. "
+      "And this model puts meat at ~70% of food emissions against Heller's "
+      "NHANES estimate of 57%; ours is cradle-to-retail with land-use change "
+      "while Heller's is farm-gate, which explains much but likely not all of "
+      "the gap.",
+      value={
+        # kg = kg CO2e per serving (P&N median kg/kg x serving grams).
+        # g   = serving mass in P&N's functional unit (raw/as-purchased).
+        # cps = calories per serving, for the plausibility readout only.
+        # def = US-average servings/week, from per-capita availability.
+        "beeflamb":  {"label": "Beef & lamb", "kg": 6.600, "g": 110, "cps": 213, "def": 4.5,
+                      "src": "P&N median, beef+lamb blended by US availability"},
+        "pork":      {"label": "Pork", "kg": 1.163, "g": 110, "cps": 213, "def": 3.8,
+                      "src": "P&N median"},
+        "poultry":   {"label": "Poultry", "kg": 0.827, "g": 110, "cps": 190, "def": 5.4,
+                      "src": "P&N median"},
+        "eggs":      {"label": "Eggs", "kg": 0.210, "g": 50, "cps": 78, "def": 5.4,
+                      "src": "P&N median, one large egg"},
+        "fish":      {"label": "Fish & seafood", "kg": 0.868, "g": 110, "cps": 180, "def": 1.5,
+                      "src": "P&N farmed median; 80% of US seafood is imported"},
+        "dairy":     {"label": "Dairy", "kg": 0.636, "g": 240, "cps": 120, "def": 10.5,
+                      "src": "P&N milk median, milk-equivalent serving"},
+        "legume":    {"label": "Legumes, tofu, nuts", "kg": 0.090, "g": 60, "cps": 150, "def": 1.8,
+                      "src": "P&N blend: pulses, tofu, nuts"},
+        "fruits":    {"label": "Fruits", "kg": 0.084, "g": 140, "cps": 70, "def": 12.4,
+                      "src": "P&N blend: apples, citrus, bananas, berries"},
+        "veggies":   {"label": "Vegetables", "kg": 0.038, "g": 85, "cps": 35, "def": 12.4,
+                      "src": "P&N blend: brassicas, root, other, tomatoes"},
+        "grains":    {"label": "Grains & baked goods", "kg": 0.064, "g": 50, "cps": 130, "def": 28.6,
+                      "src": "P&N wheat & rye median"},
+        "otherfood": {"label": "Snacks, drinks, oils, sugar", "kg": 0.130, "g": None, "cps": 200,
+                      "def": 23.6,
+                      "src": "composite ~0.65 kg/1000 kcal (sugar, oil, flour, maize, beer)"},
+      },
+      display="beef 6.60 → vegetables 0.04 kg per serving",
+      sources=(("Poore & Nemecek 2018, Science 360(6392):987–995",
+                "https://www.science.org/doi/10.1126/science.aaq0216"),
+               ("Poore 2018, full model (per-observation database), Univ. of Oxford",
+                "https://doi.org/10.5287/bodleian:0z9MYbMyZ"),
+               ("FDA reference amounts, 21 CFR 101.12",
+                "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-101/subpart-A/section-101.12"),
+               ("NOAA Fisheries of the United States (seafood import share)",
+                "https://www.fisheries.noaa.gov/national/sustainable-fisheries/fisheries-united-states")),
+      code=("site/v2-template.html",)),
 
-    A("food.legume_conservative", "food", "Legumes charged conservatively",
-      "Beans, lentils, tofu and nuts share CoolClimate's blended \"alt meat\" "
-      "factor. The literature puts pure legumes ~2–4× lower than that blend, "
-      "so a beef→beans swap is at least as good as displayed — the app "
-      "overstates plant-protein emissions rather than overselling the swap.",
-      bias="over",
-      sources=(("Poore & Nemecek 2018", "https://www.science.org/doi/10.1126/science.aaq0216"),),
+    A("food.snacks_composite", "food", "The snacks and drinks bucket is constructed",
+      "Everything that isn't a recognisable food group — sugar, cooking oil, "
+      "crisps, soft drinks, beer, baked goods — lands in one row at **0.65 kg "
+      "CO₂e per 1,000 kcal**. Unlike the other rows there is no \"kg of "
+      "snacks\" to measure, so this number is built rather than looked up: a "
+      "basket of refined sugar (0.65 per 1,000 kcal), vegetable oil (0.71), "
+      "wheat flour (0.58), maize (0.41) and beer (2.74), weighted 30/20/35/10/5 "
+      "by calories.\n\n"
+      "The reassuring part is how little the weighting matters. Every "
+      "component except beer sits between 0.41 and 0.71, so the basket would "
+      "have to be badly wrong to move the answer much — the bucket is "
+      "heterogeneous in content but nearly homogeneous in carbon per calorie. "
+      "Using P&N medians instead of means gives 0.61 rather than 0.72. The "
+      "basket shares are our estimate, not a sourced figure, and this is the "
+      "least firmly grounded row in the model — it is also about 6% of a "
+      "default food footprint, down from 22% under the previous model.",
+      value=0.65, display="0.65 kg CO₂e / 1,000 kcal",
+      bias="varies",
+      sources=(("Poore & Nemecek 2018, per-product retail values",
+                "https://www.science.org/doi/10.1126/science.aaq0216"),),
+      code=("site/v2-template.html",)),
+
+    A("food.swaps", "food", "What the diet levers actually show",
+      "With every row on one boundary, the comparisons the tab exists to make "
+      "become meaningful. A serving of beef or lamb carries **6.6 kg CO₂e**; "
+      "the same serving of pork carries 1.16, chicken 0.83, and beans or tofu "
+      "0.09. So swapping one weekly beef dinner for legumes saves about "
+      "340 kg a year per person — more than a third of a typical household's "
+      "entire annual food footprint per head.\n\n"
+      "The ruminant/non-ruminant line is the one that matters, and it is "
+      "biological rather than agricultural: cattle and sheep ferment feed in a "
+      "rumen and emit methane directly, while pigs and chickens do not. That "
+      "is why pork sits closer to chicken than to beef despite both being red "
+      "meat, and it is why \"eat less meat\" is weaker advice than \"eat less "
+      "beef\".\n\n"
+      "An earlier version of this model — inherited from CoolClimate — "
+      "compressed this spread about fivefold, showing beef at only ~2× "
+      "chicken. Notably CoolClimate's own published work says beef is "
+      "\"nearly 10 times\" chicken per gram; it was their deployed calculator, "
+      "not their research, that had lost the signal.",
+      sources=(("Poore & Nemecek 2018", "https://www.science.org/doi/10.1126/science.aaq0216"),
+               ("Jones, Kammen & McGrath 2008 (the ~10x claim)",
+                "https://escholarship.org/uc/item/55b3r1qj")),
       code=("site/v2-template.html",)),
 
     A("food.crosscheck_grocery", "food", "Grocery cross-check composite",
@@ -1014,6 +1100,13 @@ ASSUMPTIONS = [
       "app's own section boundaries so the comparison is apples-to-apples. "
       "It reproduces the 48 t published in Jones & Kammen 2011 almost "
       "exactly.\n\n"
+      "The **food slice is the exception and is our own**: 7.06 t, which is "
+      "what this app's diet model produces at US-average servings. When the "
+      "food factors were re-derived from Poore & Nemecek, leaving "
+      "CoolClimate's 7.0 t in the benchmark would have compared a household "
+      "measured one way against an average measured another. It lands within "
+      "1% of the figure it replaced, which is coincidence rather than "
+      "confirmation — the composition underneath is very different.\n\n"
       "**Which is the problem: their base year is 2005.** US per-capita "
       "greenhouse emissions have fallen roughly 30% since then (about 25 to "
       "17.5 t CO₂e per person), and the decline is concentrated in a cleaner "
@@ -1024,7 +1117,7 @@ ASSUMPTIONS = [
       "sector declines rather than deflating the total, since food, goods "
       "and services have barely moved; that work is still outstanding.",
       bias="over",
-      value={"travel": 15718, "home": 12219, "food": 7002,
+      value={"travel": 15718, "home": 12219, "food": 7056,
              "goods": 7920, "services": 7032},  # kg/yr; totals 49.9 t
       display="49.9 t CO₂e / household / yr",
       sources=(JK2011, CC_API),
