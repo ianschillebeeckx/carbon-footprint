@@ -276,7 +276,7 @@
     </div>
     <div class="tcard">
       <h3>Cross-check from your transactions
-        <button class="info" aria-label="About the offsets cross-check" data-tip="Transactions whose merchant looks like an offset/removal provider (Charm, Climeworks, Wren, Terrapass, Tradewater…). Two things to do with a match: enter it as a purchase here, and mark the transaction Non-purchase in Goods &amp; Services so the spend itself doesn't count as consumption emissions (it usually lands in charity/services otherwise).">?</button></h3>
+        <button class="info" aria-label="About the offsets cross-check" data-tip="Transactions whose merchant looks like an offset/removal provider (Charm Industrial, Climeworks, Wren, Terrapass, Tradewater…). Enter the spend as a purchase here — and if the flag says it's still counted in Goods &amp; Services, mark it Non-purchase there so the money isn't charged as consumption on top. A row that already sits in an excluded category isn't counted and needs nothing.">?</button></h3>
       <div id="offsetxrows" class="hint"></div>
     </div>
     <div class="tcard tsum">Offsets: <b id="kg-offsets-total">–</b>
@@ -783,6 +783,16 @@ const catMatches = t => !ui.cat ? true
   : ui.cat === "__nonexcluded" ? (t.mix ? t.mix.some(p => p.category !== "excluded") : t.category !== "excluded")
   : (t.category === ui.cat || (t.mix && t.mix.some(p => p.category === ui.cat)));
 const ui = { search: "", cat: "", src: "" };
+
+// Does this transaction contribute to the Goods & Services total? Mirrors the
+// inclusion rule in stats(): money movement carries no code, and the "excluded"
+// rollup (fuel, flights, utilities, groceries, restaurants — all modelled
+// physically in another tab) is dropped from the total even though the row keeps
+// its NAICS code. A mix counts if any leg lands outside "excluded".
+const countsInGs = t =>
+  (t.naics != null || !!t.mix) &&
+  (t.mix ? t.mix.some(p => p.category !== "excluded" && p.category !== "ignored")
+         : t.category !== "excluded" && t.category !== "ignored");
 
 function stats() {
   const per = {};   // cat -> {dollars, kg}
@@ -2375,13 +2385,20 @@ function offsetTons() {
   return {per, total: per.travel + per.home + per.food + per.goods + per.services};
 }
 
-const OFFSET_MERCHANT = /charm|climeworks|wren\b|terrapass|tradewater|carbonfund|cool ?effect|gold standard|pachama/i;
+// Short provider names collide with ordinary merchants: bare "charm" matched a
+// coffee shop and bare "pachama" matched a refill store called Pachamama. Anchor
+// the ambiguous ones to the full company name or a word boundary.
+const OFFSET_MERCHANT = /charm ?industrial|climeworks|wren\b|terrapass|tradewater|carbonfund|cool ?effect|gold standard|pachama\b/i;
 function offsetTxnScan() {
   if (!DATA) return null;
   const byM = new Map();
   for (const t of DATA.transactions) {
     if (!OFFSET_MERCHANT.test(t.merchant)) continue;
-    const m = byM.get(t.merchant) || {merchant: t.merchant, total: 0, n: 0, counted: t.naics != null || t.mix};
+    // "counted" means it actually lands in the G&S total, which is what the user
+    // is being asked to fix. Having a NAICS code is not enough: stats() drops the
+    // "excluded" rollup from the total, so a coded-but-excluded row already costs
+    // nothing and flagging it sends the user to change something that is correct.
+    const m = byM.get(t.merchant) || {merchant: t.merchant, total: 0, n: 0, counted: countsInGs(t)};
     m.total += -t.amount; m.n++;
     byM.set(t.merchant, m);
   }
@@ -2428,7 +2445,7 @@ function renderOffsets() {
   $("offsetxrows").innerHTML = !scan ? "Upload a transactions CSV to scan for offset providers."
     : !scan.length ? "No offset-provider merchants found in your transactions (looked for Charm, Climeworks, Wren, Terrapass, Tradewater…)."
     : scan.map(m => `Found <b>${esc(m.merchant)}</b>: $${fmt(m.total)} across ${m.n} transaction${m.n > 1 ? "s" : ""}` +
-        (m.counted ? ` — <span style="color:var(--warn)">still classified as consumption in G&S; mark it Non-purchase there</span>` : " (already non-purchase ✓)")).join("<br>");
+        (m.counted ? ` — <span style="color:var(--warn)">still counted as consumption in G&S; mark it Non-purchase there</span>` : " (not counted in G&amp;S ✓)")).join("<br>");
 
   const touched = () => { renderOffsets(); renderImpact(); saveOffsets(); };
   $("offsetrows").querySelectorAll("input,select").forEach(el => el.onchange = () => {
