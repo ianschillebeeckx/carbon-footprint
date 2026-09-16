@@ -279,21 +279,42 @@ def main():
     print(f"gen caches: {len(built)} BAs ({', '.join(sorted(built)[:12])}…); "
           f"skipped {len(skipped)} without eGRID rows or generation")
 
-    # load shapes
-    catalog = _tmy3_catalog()
+    # Load shapes. Preferred source is NREL ResStock 2025 (state-level, all five
+    # residential building types summed) via make_resstock_shapes.py. OpenEI's
+    # TMY3 residential profiles are the fallback and are DEPRECATED by OpenEI
+    # itself — five prototype houses with documented defects in exactly the
+    # climate regions we map to Portland, Seattle and Dallas. Run
+    # make_resstock_shapes.py before this script to use the better source.
+    catalog = None
     station_cache = {}
+    resstock_cache = {}
+    n_res = n_tmy3 = 0
     for ba in built:
         st = STATIONS.get(ba)
         if st is None:
             print(f"  ! no station for {ba}; using Dallas (national-ish default)")
             st = "TX_Dallas-Fort.Worth.Intl.AP.722590"
-        if st not in station_cache:
-            arr = fetch_station(st, catalog)
-            station_cache[st] = arr
-            print(f"  fetched TMY3 {st} ({len(arr)} hours)")
-        arr = station_cache[st]
-        # TMY3 is a non-leap synthetic year (8760) in LOCAL time. Roll to UTC
-        # alignment (see BA_UTC_OFFSET), then align by position; leap years
+        state = st[:2]
+        rs_path = os.path.join(CACHE_RAW, f"resstock_{state}.csv.gz")
+        arr = None
+        if os.path.exists(rs_path):
+            if state not in resstock_cache:
+                import gzip as _gzip
+                with _gzip.open(rs_path, "rt") as fh:
+                    fh.readline()
+                    resstock_cache[state] = np.array([float(x) for x in fh], dtype=float)
+            arr = resstock_cache[state]
+            n_res += 1
+        else:
+            if catalog is None:
+                catalog = _tmy3_catalog()
+            if st not in station_cache:
+                station_cache[st] = fetch_station(st, catalog)
+                print(f"  fetched TMY3 {st} ({len(station_cache[st])} hours) [deprecated fallback]")
+            arr = station_cache[st]
+            n_tmy3 += 1
+        # Both sources are a non-leap year (8760) in LOCAL standard time. Roll to
+        # UTC alignment (see BA_UTC_OFFSET), then align by position; leap years
         # repeat the final day. w_h is a shape — day-off-by-one is immaterial,
         # the hour-of-day alignment is not.
         off = BA_UTC_OFFSET.get(ba, -6)
@@ -301,6 +322,8 @@ def main():
         n = len(hours)
         vals = np.resize(vals, n)
         write_cache(f"load_{ba}.csv.gz", pd.DataFrame({"load_kwh": vals}, index=hours))
+
+    print(f"load shapes: {n_res} BAs on ResStock 2025, {n_tmy3} on deprecated TMY3")
 
     # real egrid_ba_annual.csv
     out = os.path.join(HERE, "gridcarbon", "data", "egrid_ba_annual.csv")
