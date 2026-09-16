@@ -149,12 +149,22 @@ ASSUMPTIONS = [
       code=("data/coolclimate_travel_factors.json", "data/coolclimate_factors.json")),
 
     A("method.lowconf", "method", "Low-confidence flag threshold",
-      "Merchant classifications come from an LLM with a self-reported confidence. "
-      "Below 0.7 the row is flagged for review (amber), as are pure vector-search "
-      "matches and goods codes missing retail margins. The threshold is a triage "
-      "knob, not a statement about accuracy — spot checks show most sub-0.7 "
-      "assignments are still reasonable.",
+      "Merchant classifications come from an LLM with a self-reported "
+      "confidence. Below 0.7 the row is flagged for review (amber), as are "
+      "pure vector-search matches and goods codes missing retail margins.\n\n"
+      "A self-reported confidence is a **ranking signal, not a probability**. "
+      "The literature is consistent that language models are systematically "
+      "overconfident and that verbalised scores cluster on round numbers, so "
+      "0.7 does not mean \"70% likely right\" — it is simply a cutoff that "
+      "surfaces roughly the right rows to look at. Flagging vector-only "
+      "matches and margin-less goods codes as well is deliberate "
+      "defence-in-depth, since those failures don't depend on the confidence "
+      "signal being meaningful.",
       value=0.7, display="confidence < 0.7",
+      sources=(("Xiong et al. 2024 (ICLR), confidence elicitation in LLMs",
+                "https://arxiv.org/abs/2306.13063"),
+               ("Tian et al. 2023 (EMNLP), verbalized confidence calibration",
+                "https://aclanthology.org/2023.emnlp-main.330/")),
       code=("site/v2-template.html", "worker/src/index.js")),
 
     # ------------------------------------------------------------------
@@ -212,7 +222,19 @@ ASSUMPTIONS = [
       "bank's own category column is weighted more heavily than the merchant "
       "string — \"Delta\" the airline and \"Delta\" the faucet brand separate on "
       "the hint. LLM picks carry a confidence and can be corrected; corrections "
-      "are remembered.",
+      "are remembered.\n\n"
+      "**This has never been measured, and the entry should say so until it "
+      "is.** The right metric is not how often the code is exactly right: 972 "
+      "codes collapse to 392 distinct factor sets, so many disagreements cost "
+      "literally nothing, while a single retail-versus-commodity confusion is "
+      "a 3–5× error. What would actually be informative is spend-weighted "
+      "factor error against a hand-labelled sample — how close the assigned "
+      "factor lands to the right one, weighted by the money involved. Until "
+      "that exists, treat the ● review marks as the real quality control.\n\n"
+      "One structural caveat: the classification cache is shared across users, "
+      "so a wrong answer for a common merchant propagates and, unlike an LLM "
+      "call, is not re-derived. Your corrections stay local and always win "
+      "locally.",
       bias="varies",
       code=("worker/src/index.js", "src/cf/classify.py")),
 
@@ -227,11 +249,18 @@ ASSUMPTIONS = [
       code=("src/cf/naics_prep.py", "site/v2-template.html")),
 
     A("gs.nonpurchase", "gs", "Transfers, payments, income excluded",
-      "Credit-card payments, account transfers, Venmo, paychecks, and refunds "
+      "Credit-card payments, account transfers, Venmo, paychecks and refunds "
       "are money movement, not consumption — they're detected (by category hint "
-      "and merchant pattern) and carry no emissions, and they're excluded from "
-      "spending totals rather than zeroed into them. Getting this wrong "
-      "double-counts every card payment.",
+      "and merchant pattern), carry no emissions, and are dropped from spending "
+      "totals rather than counted as zero-emission spending. Getting this wrong "
+      "would double-count every card payment against the charges behind it.\n\n"
+      "Two consequences worth naming. **Cash is invisible**: an ATM withdrawal "
+      "is correctly not a purchase, but whatever the cash then bought never "
+      "appears anywhere, so a cash-heavy household is undercounted with no "
+      "sign that anything is missing. And mortgage payments are excluded, "
+      "which is right for principal (housing is handled physically in the Home "
+      "tab) though the interest is technically a purchased financial service.",
+      bias="under",
       code=("src/cf/classify.py",)),
 
     A("gs.taxes_ignored", "gs", "Taxes and government fees ignored",
@@ -326,9 +355,16 @@ ASSUMPTIONS = [
       "(NAICS 457) and airlines (481) → Travel; electric, gas, and water "
       "utilities (2211/221210/2213) → Home; groceries (445/311/312) and "
       "restaurants (722) → Food's diet model. Each tab shows the excluded "
-      "spend as a cross-check against your physical inputs. Cost of the "
-      "choice: the restaurant *service* overhead (the building, not the food) "
-      "is dropped, so heavy dining-out is slightly undercounted.",
+      "spend as a cross-check against your physical inputs. Grocery-heavy "
+      "general merchandisers are handled by splitting the ticket rather than "
+      "excluding it — see the basket entry.\n\n"
+      "Cost of the choice: a restaurant bill is mostly *service* — the "
+      "building, the staff, the dishwasher — and only about a third food, but "
+      "excluding the whole transaction drops that overhead along with the "
+      "meal. At roughly 0.13–0.17 kg/$ of genuine non-food emissions, a "
+      "household spending $3,500 a year on restaurants loses **450–600 kg** "
+      "that nothing else picks up. Not \"slight\", as an earlier version of "
+      "this note put it.",
       bias="under",
       code=("src/cf/naics_prep.py", "site/v2-template.html")),
 
