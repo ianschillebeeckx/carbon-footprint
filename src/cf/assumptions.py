@@ -350,12 +350,24 @@ ASSUMPTIONS = [
     A("travel.crosscheck_rates", "travel", "Travel cross-check price assumptions",
       "The cross-check panel converts your uploaded gas-station and airline "
       "spend into implied physical activity at assumed prices: gasoline "
-      "$4.50/gallon, economy air fare ~15¢/mile, transit ~25¢/mile, and "
+      "$4.00/gallon, economy air fare ~17.5¢/mile, transit ~29¢/mile, and "
       "rideshare ~$2/mile. Rough yardsticks to catch a missing vehicle or "
-      "forgotten trip — not accounting inputs.",
-      value={"gas_per_gal": 4.50, "air_per_mile": 0.15,
-             "transit_per_mile": 0.25, "taxi_per_mile": 2},
-      display="$4.50/gal · 15¢/air-mile · 25¢/transit-mile",
+      "forgotten trip — not accounting inputs.\n\n"
+      "Gasoline is the trailing-year average rather than the spot price, "
+      "since the panel converts a past year of card spend. Air fare comes "
+      "from BTS 2025 domestic passenger revenue over revenue passenger-miles "
+      "(~16.7¢, ~17.5¢ including bag and change fees); transit from APTA's "
+      "national fare revenue over passenger-miles. The rideshare figure is an "
+      "unsourced estimate — city TNC datasets would settle it. These move "
+      "with the market; figures are as of September 2026.",
+      value={"gas_per_gal": 4.00, "air_per_mile": 0.175,
+             "transit_per_mile": 0.29, "taxi_per_mile": 2},
+      display="$4.00/gal · 17.5¢/air-mile · 29¢/transit-mile",
+      sources=(("EIA weekly US retail gasoline prices",
+                "https://www.eia.gov/petroleum/gasdiesel/"),
+               ("BTS airline financial data (2025)",
+                "https://www.bts.gov/topics/airlines-and-airports/airline-financial-data"),
+               NTD),
       code=("site/v2-template.html",)),
 
     # ------------------------------------------------------------------
@@ -393,24 +405,51 @@ ASSUMPTIONS = [
       "schema change (solar/wind split by battery integration — including "
       "EIA's typo'd \"Solar witho Integrated Battery Storage\" column, which "
       "is real and carries data); missing it would have read July noons as "
-      "85% gas.",
+      "85% gas.\n\n"
+      "Per-fuel combustion intensities are EIA's fleet averages — coal 1,048, "
+      "gas 435, petroleum 1,116 g CO₂/kWh (the previous petroleum figure of "
+      "700 was 37% low). They are CO₂-only against a CO₂e calibration target, "
+      "roughly a 1% difference that α absorbs.\n\n"
+      "**On the data year:** EIA-930 for 2025 is complete and published, and "
+      "we are deliberately not using it yet. The reconstruction has to be "
+      "calibrated against a *measured* annual rate from the same calendar "
+      "year, and the newest eGRID available is 2024 — pairing a 2025 "
+      "reconstruction with a 2024 target makes α absorb a year of real fleet "
+      "change as though it were reconstruction error, which we measured: "
+      "LDWP's α went to 1.53 and Arizona's to 1.52 under the mismatch, "
+      "against 1.14 each when the years line up. The shape year advances when "
+      "eGRID2025 does.",
       display="8,784 hours × fuel mix, per BA",
-      sources=(("EIA-930 Hourly Electric Grid Monitor", "https://www.eia.gov/electricity/gridmonitor/"),),
+      sources=(("EIA-930 Hourly Electric Grid Monitor", "https://www.eia.gov/electricity/gridmonitor/"),
+               ("EIA FAQ #74, CO₂ per kWh by fuel", "https://www.eia.gov/tools/faqs/faq.php?id=74&t=11")),
       code=("zip2co2_2/make_real_cache.py", "zip2co2_2/gridcarbon/core.py")),
 
     A("elec.alpha_calibration", "electricity", "Calibrated to eGRID (α), which doubles as validation",
       "The reconstructed hourly curve has the right *shape* but an uncertain "
       "*level* (fuel factors are national fleet averages; CISO's gas fleet is "
       "newer than average). One scalar α per BA rescales the curve so its "
-      "annual average exactly matches EPA's measured eGRID rate — level from "
-      "EPA, shape from EIA-930. α also doubles as an integrity check: "
-      "|α−1| measures reconstruction error. 37/61 BAs land within ±10%, all "
-      "major load centers within ±5% (NYIS 1.00, PJM 1.02, CISO 0.97). BAs "
-      "with α outside [0.70, 1.45] indicate a structural data problem and "
-      "don't ship an hourly shape at all.",
+      "annual average exactly matches the measured eGRID rate — level from "
+      "eGRID, shape from EIA-930. α also doubles as an integrity check: "
+      "|α−1| measures reconstruction error, and the median BA now sits within "
+      "**7.8%** of its measured rate, with 55 of 61 inside the shipping band "
+      "(ERCO 0.98, MISO 0.96, NYIS 0.95, PJM 0.93). BAs outside [0.70, 1.45] "
+      "indicate a structural data problem and don't ship an hourly shape.\n\n"
+      "**Provenance caveat.** The calibration target is eGRID2024, and EPA "
+      "has not released it — as of September 2026 it is eight months past "
+      "EPA's own stated January 2026 date. These rates come from the "
+      "community edition produced by running EPA's MIT-licensed eGRID code "
+      "on March 2026 inputs and published on Zenodo. Same code, same inputs, "
+      "different publisher, so \"calibrated to EPA's published rate\" is no "
+      "longer literally true. It is still much better than calibrating "
+      "against 2023: refreshing the target also let the calibration and the "
+      "shape use the *same calendar year* for the first time, which is what "
+      "α assumes. Moving to eGRID2024 shifted rates by a median −2.4%, and "
+      "much more in places — CISO −11%, PNM −24%, BPAT −18%.",
       value={"band_lo": 0.70, "band_hi": 1.45},
-      display="α ∈ [0.70, 1.45] to ship hourly",
-      sources=(("EPA eGRID", "https://www.epa.gov/egrid"),
+      display="α ∈ [0.70, 1.45] to ship hourly · eGRID2024",
+      sources=(("eGRID2024 community edition (EPA's code, Cornerstone build)",
+                "https://zenodo.org/records/18968658"),
+               ("EPA eGRID", "https://www.epa.gov/egrid"),
                ("Alpha validation table", REPO + "zip2co2_2/README.md")),
       code=("zip2co2_2/gridcarbon/core.py", "scripts/build_gridcarbon_web.py")),
 
@@ -515,22 +554,30 @@ ASSUMPTIONS = [
       code=("zip2co2_2/gridcarbon/data/fuel_factors.csv", "scripts/build_gridcarbon_web.py")),
 
     A("elec.delivery_loss", "electricity", "Delivery losses",
-      "Intensities are computed at the busbar; ~4.2% of US generation is lost "
+      "Intensities are computed at the busbar; 4.4% of US generation is lost "
       "in transmission and distribution before it reaches your meter, so "
-      "factors are grossed up by 1/(1−0.042). Your kWh input is what your "
-      "meter (and bill) shows.",
-      value=0.042, display="+4.4% (grid gross loss 4.2%)",
-      sources=(("EPA eGRID summary data (grid gross loss)", "https://www.epa.gov/egrid/summary-data"),),
+      "factors are grossed up by 1/(1−0.044). Your kWh input is what your "
+      "meter (and bill) shows.\n\n"
+      "This is eGRID's grid gross loss, which is the right basis and a "
+      "little lower than EIA's headline ~5%: eGRID divides estimated losses "
+      "by total disposition *after* subtracting direct use (electricity that "
+      "never transits the grid and so cannot be lost) and net interstate "
+      "exports. Regional variation is small — 4.36% Western, 4.41% Eastern, "
+      "4.42% ERCOT, 4.76% Hawaii — so one national figure is fine. The "
+      "series is noisy year to year (5.1% in 2022, 4.2% in 2023, 4.4% in "
+      "2024), and 4.2% happened to be its low point.",
+      value=0.044, display="+4.6% (grid gross loss 4.4%)",
+      sources=(("EPA eGRID technical guide §3.5 (grid gross loss)", "https://www.epa.gov/egrid"),),
       code=("scripts/build_gridcarbon_web.py",)),
 
     A("elec.ship_gate", "electricity", "When hourly data isn't trusted: flat fallback",
       "A BA ships its hourly shape only if α is in band, the load-weighting "
-      "adjustment is |uplift| ≤ 12%, and ≥ 90% of hours reconstructed — 46 of "
+      "adjustment is |uplift| ≤ 12%, and ≥ 90% of hours reconstructed — 48 of "
       "61 BAs pass. The rest (plus ZIPs with no BA mapping) degrade to EPA's "
       "flat annual eGRID rate plus upstream: level right, no claim about "
       "hours. Better no shape than a wrong shape.",
       value={"uplift_max_pct": 12.0, "coverage_min": 0.90},
-      display="|uplift| ≤ 12% · coverage ≥ 90% · 46/61 BAs ship",
+      display="|uplift| ≤ 12% · coverage ≥ 90% · 48/61 BAs ship",
       code=("scripts/build_gridcarbon_web.py",)),
 
     A("elec.hourly_upload", "electricity", "Advanced: your meter replaces the assumed profile",
@@ -629,13 +676,25 @@ ASSUMPTIONS = [
       code=("site/v2-template.html",)),
 
     A("home.crosscheck_rates", "home", "Home cross-check price assumptions",
-      "Utility spend from your upload is converted to implied usage at "
-      "CoolClimate's rate assumptions — $0.223/kWh and $2.02/therm — to "
-      "compare against what you entered. Local rates vary ±2×; it's a "
-      "consistency check, not a bill audit.",
-      value={"kwh": 0.2233, "therm": 2.015, "oil_gal": 3.0},
-      display="$0.223/kWh · $2.02/therm",
-      sources=(CC_API,),
+      "Utility spend from your upload is converted to implied usage at US "
+      "average residential rates — $0.182/kWh, $1.48/therm, $3.98/gallon of "
+      "heating oil — to compare against what you entered. These come from "
+      "EIA's published series (electricity 2026 year-to-date, gas the 2025 "
+      "volume-weighted annual average, oil the 2025–26 heating season) and "
+      "replace CoolClimate's much older assumptions, which had drifted 23% "
+      "high on electricity and 36% high on gas.\n\n"
+      "Treat it as a consistency check, not a bill audit: residential "
+      "electricity spans nearly 4× across states (North Dakota ~12¢ to "
+      "Hawaii ~46¢), so your own tariff may sit well away from the average. "
+      "Figures are as of September 2026.",
+      value={"kwh": 0.1816, "therm": 1.479, "oil_gal": 3.98},
+      display="$0.182/kWh · $1.48/therm",
+      sources=(("EIA Electric Power Monthly, Table 5.6.B",
+                "https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_6_b"),
+               ("EIA Natural Gas Monthly, residential price",
+                "https://www.eia.gov/dnav/ng/hist/n3010us3a.htm"),
+               ("EIA Heating Oil and Propane Update",
+                "https://www.eia.gov/petroleum/heatingoilpropane/")),
       code=("site/v2-template.html",)),
 
     # ------------------------------------------------------------------
@@ -803,8 +862,20 @@ ASSUMPTIONS = [
       "The amber comparison tick is the average US household from "
       "CoolClimate's national defaults: 49.9 t CO₂e/yr — travel 15.7, home "
       "12.2, food 7.0, goods 7.9, services 7.0. A *household* average (not "
-      "per person), computed under this app's own section boundaries so the "
-      "comparison is apples-to-apples.",
+      "per person — at 2.5 people that is ~20 t each), computed under this "
+      "app's own section boundaries so the comparison is apples-to-apples. "
+      "It reproduces the 48 t published in Jones & Kammen 2011 almost "
+      "exactly.\n\n"
+      "**Which is the problem: their base year is 2005.** US per-capita "
+      "greenhouse emissions have fallen roughly 30% since then (about 25 to "
+      "17.5 t CO₂e per person), and the decline is concentrated in a cleaner "
+      "grid and more efficient vehicles — precisely the home and travel "
+      "slices that dominate this benchmark. So the tick is probably 15–30% "
+      "above a true 2026 US household and flatters every user a little. "
+      "Correcting it properly means rescaling home and travel by their own "
+      "sector declines rather than deflating the total, since food, goods "
+      "and services have barely moved; that work is still outstanding.",
+      bias="over",
       value={"travel": 15718, "home": 12219, "food": 7002,
              "goods": 7920, "services": 7032},  # kg/yr; totals 49.9 t
       display="49.9 t CO₂e / household / yr",

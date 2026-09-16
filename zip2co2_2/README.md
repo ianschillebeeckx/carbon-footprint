@@ -111,9 +111,15 @@ at the referenced sites.
 ## Alpha validation results (2024 data, 2023 eGRID)
 
 Alpha doubles as a per-BA integrity check: |alpha − 1| measures how far EPA's measured rate
-sits from our bottom-up reconstruction. **37/61 BAs within ±10%, 46/61 within ±20%.** All
-major load centers tight: NYIS 1.00, PJM 1.02, CISO 0.97, ISNE 0.98, FPL 0.96, MISO 1.09,
-ERCO 1.13, SWPP 1.13, LDWP 1.18.
+sits from our bottom-up reconstruction. On eGRID2024 + EIA-930 2024 (matched calendar years,
+EIA per-fuel combustion factors): **32/61 BAs within ±10%, 49/61 within ±20%, median |alpha-1|
+= 0.078.** All major load centers tight: SWPP 0.99, ERCO 0.98, MISO 0.96, NYIS 0.95, FPL 0.94,
+PJM 0.93, ISNE 0.90, LDWP 1.14, CISO 0.79.
+
+Calendar-year matching matters more than shape recency. EIA-930 2025 is published, but pairing
+it with a 2024 eGRID target makes alpha absorb a year of real fleet change: LDWP 1.53 and
+AZPS 1.52 under the mismatch, against 1.14 each when the years line up. Advance the shape year
+only when eGRID does.
 
 Outliers, by class (all outside the gate degrade to flat eGRID level):
 

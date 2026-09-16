@@ -43,7 +43,13 @@ CACHE_RAW = os.path.join(HERE, "cache")
 sys.path.insert(0, HERE)
 from gridcarbon.sources import write_cache  # noqa: E402
 
-YEAR = 2024
+# Data years are separable and move on different schedules: EIA-930 publishes
+# a complete year within weeks, eGRID lags by 12-18 months (and as of Sep 2026
+# EPA has not shipped eGRID2024 at all — see EGRID_SRC). Override either with
+# GC_YEAR / GC_EGRID_YEAR rather than editing.
+YEAR = int(os.environ.get("GC_YEAR", 2025))
+EGRID_YEAR = int(os.environ.get("GC_EGRID_YEAR", 2024))
+EGRID_SRC = os.environ.get("GC_EGRID_SRC", f"egrid_ba{str(EGRID_YEAR)[-2:]}.csv")
 
 # EIA changed the 930 schema mid-2024: Jan-Jun uses the classic fuel set
 # ("Solar", "Hydropower and Pumped Storage"); Jul-Dec splits solar/wind by
@@ -237,7 +243,7 @@ def fetch_station(st, catalog):
 def main():
     df = load_eia930()
     hours = pd.date_range(f"{YEAR}-01-01 01:00", f"{YEAR+1}-01-01 00:00", freq="h", tz="UTC")
-    egrid = {r["ba"]: r for r in csv.DictReader(open(os.path.join(CACHE_RAW, "egrid_ba23.csv")))}
+    egrid = {r["ba"]: r for r in csv.DictReader(open(os.path.join(CACHE_RAW, EGRID_SRC)))}
     built, skipped = [], []
     for ba, g in df.groupby("Balancing Authority"):
         if ba not in egrid:
@@ -299,13 +305,22 @@ def main():
     # real egrid_ba_annual.csv
     out = os.path.join(HERE, "gridcarbon", "data", "egrid_ba_annual.csv")
     with open(out, "w", newline="") as f:
-        f.write("# eGRID2023 rev2 BA23 sheet: BACO2E annual total output rate (BAC2ERTA lb/MWh\n")
+        f.write(f"# eGRID{EGRID_YEAR} BA sheet: BACO2E annual total output rate (BAC2ERTA\n")
         f.write("# -> kg/kWh). Production-based; imports shape-only per make_real_cache.py note.\n")
+        if EGRID_YEAR >= 2024:
+            f.write("#\n# PROVENANCE: EPA has not released eGRID2024 (8 months past its stated\n")
+            f.write("# January 2026 date as of this refresh). These rates come from the community\n")
+            f.write("# edition produced by running EPA's own MIT-licensed eGRID code\n")
+            f.write("# (github.com/USEPA/egrid, commit 8932a07) on March 2026 CEMS+EIA inputs,\n")
+            f.write("# published by the Cornerstone Sustainability Data Initiative at\n")
+            f.write("# zenodo.org/records/18968658. Same code and inputs, different publisher --\n")
+            f.write("# so 'calibrated to EPA's published rate' is no longer literally true, and\n")
+            f.write("# the assumptions registry says so. Swap back when EPA ships its own.\n")
         w = csv.writer(f)
         w.writerow(["ba", "ba_name", "subregion", "egrid_year", "kg_co2e_per_kwh", "data_quality"])
         for ba in sorted(built):
             r = egrid[ba]
-            w.writerow([ba, r["ba_name"], "", 2023,
+            w.writerow([ba, r["ba_name"], "", EGRID_YEAR,
                         round(float(r["co2e_lb_per_mwh"]) * 0.45359237 / 1000, 6), "PUBLISHED"])
     print(f"egrid_ba_annual.csv: {len(built)} BAs (PUBLISHED)")
 
