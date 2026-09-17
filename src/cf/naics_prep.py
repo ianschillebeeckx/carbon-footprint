@@ -155,6 +155,28 @@ PREFIX_CATEGORY = {
     "488410": "services_vehicle_service",     # motor vehicle towing
     "488490": "services_vehicle_service",     # other road support incl. toll operations
     "221": "excluded",                        # utilities
+    # ...but only the ENERGY utilities are modelled physically (kWh, therms,
+    # gallons). Water, sewer and refuse are household services the Home tab
+    # never sees, so excluding them counts them NOWHERE. Water alone is the
+    # fourth-largest line in the US-average basket.
+    "221310": "services_household_maintenance_repair",   # water supply & irrigation
+    "221320": "services_household_maintenance_repair",   # sewage treatment
+    "562111": "services_household_maintenance_repair",   # solid waste collection
+    "562991": "services_household_maintenance_repair",   # septic tank services
+    "561621": "services_household_maintenance_repair",   # security/alarm monitoring
+    # Consumer repair of goods already owned — no other tab models these.
+    "811210": "services_household_maintenance_repair",   # electronics repair
+    "811420": "services_household_maintenance_repair",   # furniture repair/reupholstery
+    "811430": "services_household_maintenance_repair",   # shoe & leather repair
+    "811490": "services_household_maintenance_repair",   # other household goods repair
+    "512131": "goods_entertainment",                     # cinema admissions
+    "541921": "services_other",                          # portrait photography
+    # Recreational vehicles are NOT covered by the Travel tab's per-mile
+    # manufacturing amortisation (that models the household's entered cars),
+    # so unlike 4411xx car dealers these must stay in scope.
+    "441210": "goods_other",                             # RV dealers
+    "441222": "goods_other",                             # boat dealers
+    "441227": "goods_other",                             # motorcycle/ATV dealers
     "531": "excluded",                        # real estate/rent
     "324": "excluded",                        # petroleum
     "92": "excluded",                         # government

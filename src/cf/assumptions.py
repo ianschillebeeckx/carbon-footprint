@@ -1211,34 +1211,107 @@ ASSUMPTIONS = [
       code=("site/v2-template.html",)),
 
     A("impact.us_benchmark", "impact", "US household benchmark",
-      "The amber comparison tick is the average US household from "
-      "CoolClimate's national defaults: 49.9 t CO₂e/yr — travel 15.7, home "
-      "12.2, food 7.0, goods 7.9, services 7.0. A *household* average (not "
-      "per person — at 2.5 people that is ~20 t each), computed under this "
-      "app's own section boundaries so the comparison is apples-to-apples. "
-      "It reproduces the 48 t published in Jones & Kammen 2011 almost "
-      "exactly.\n\n"
-      "The **food slice is the exception and is our own**: 7.06 t, which is "
-      "what this app's diet model produces at US-average servings. When the "
-      "food factors were re-derived from Poore & Nemecek, leaving "
-      "CoolClimate's 7.0 t in the benchmark would have compared a household "
-      "measured one way against an average measured another. It lands within "
-      "1% of the figure it replaced, which is coincidence rather than "
-      "confirmation — the composition underneath is very different.\n\n"
-      "**Which is the problem: their base year is 2005.** US per-capita "
-      "greenhouse emissions have fallen roughly 30% since then (about 25 to "
-      "17.5 t CO₂e per person), and the decline is concentrated in a cleaner "
-      "grid and more efficient vehicles — precisely the home and travel "
-      "slices that dominate this benchmark. So the tick is probably 15–30% "
-      "above a true 2026 US household and flatters every user a little. "
-      "Correcting it properly means rescaling home and travel by their own "
-      "sector declines rather than deflating the total, since food, goods "
-      "and services have barely moved; that work is still outstanding.",
-      bias="over",
-      value={"travel": 15718, "home": 12219, "food": 7056,
-             "goods": 7920, "services": 7032},  # kg/yr; totals 49.9 t
-      display="49.9 t CO₂e / household / yr",
-      sources=(JK2011, CC_API),
+      "The amber comparison tick is the average US household **run through "
+      "this app's own model**, not a figure copied from another calculator. "
+      "The registry stores the average household's *inputs* — kilowatt-hours, "
+      "therms, vehicle miles, servings, dollars by NAICS code — and the same "
+      "functions that price your entries price those. A factor change moves "
+      "your bar and the tick together; there is no second implementation to "
+      "drift.\n\n"
+      "**Home** is RECS 2020 consumption at the US grid average: 10,566 kWh, "
+      "343 therms and 23.3 gallons of heating oil a year, in 1,845 sq ft "
+      "(RECS 2024 floor area). The gas and oil figures are means across *all* "
+      "households including the 39% that burn no gas and the 95% that burn no "
+      "oil — right for an average, a description of nobody in particular.\n\n"
+      "**Travel** is 20,324 vehicle miles (1.83 vehicles x 11,106 miles, FHWA "
+      "Highway Statistics) at 22.6 mpg — fuel-sales-based on-road economy, not "
+      "the window sticker. No electric vehicle: at 1.94% of registrations the "
+      "average household owns 0.035 of one. Transit is 271 passenger-miles "
+      "from the National Transit Database, air 8,526 from BTS, split across "
+      "haul bands by DOT origin-destination data.\n\n"
+      "**Food** is not stored here at all — it is the diet tab's own starting "
+      "servings at the default household size, so the benchmark and an "
+      "untouched form are the same number by construction.\n\n"
+      "**Goods and services is the BLS Consumer Expenditure Survey basket**, "
+      "$32,679 a year across 143 NAICS codes, priced with the same factor "
+      "table your transactions use. Food, motor fuel, home energy, air fares, "
+      "shelter, vehicle purchases and pure transfers are removed, because this "
+      "app models each of those physically somewhere else — leaving them in "
+      "would count them twice.\n\n"
+      "**Read the goods figure as out-of-pocket purchases, not a footprint.** "
+      "CE measures what households actually pay. The national accounts put "
+      "total household consumption at roughly twice that, the difference being "
+      "employer-paid health premiums, government-paid medical care and imputed "
+      "financial services — real consumption, with real emissions, that never "
+      "appears as a purchase anyone makes. At these factors that fuller basket "
+      "would score about 7.5-9 t rather than 3.9. CE is used anyway because "
+      "the tick has to be comparable with what a user can actually track, and "
+      "nobody can import a transaction that was never made. The consequence is "
+      "that the goods bar flatters: you see only the accounts you imported, "
+      "and even a complete import stops short of the fuller basket.\n\n"
+      "The tick totals about 32 t against the 49.9 t it replaces. Roughly a "
+      "fifth of that drop is real decarbonisation in the home and travel "
+      "slices since the 2005 base year of the old figure; the rest is the "
+      "goods-and-services slice, where the source it came from prices a dollar "
+      "of consumer spending about four times higher than EPA's factors do.",
+      bias="under",
+      value={
+        "home": {"kwh": 10566, "therms": 343, "gallons": 23.3, "sqft": 1845},
+        "travel": {"miles": 20324, "mpg": 22.6,
+                   "bus": 104, "transit": 101, "commuter": 66, "intercity": 49,
+                   "short": 48, "medium": 5438, "long": 3040},
+        # BLS CE Table 2500 (all consumer units, 2024) mapped to 2022 NAICS-6.
+        # Dollars per consumer unit per year; priced at run time through the
+        # same BY_CODE factor table transactions use.
+        "gs_basket": {
+        "524114": 4054.75, "524126": 2857.12, "517112": 1359.39, "315250": 1121.12,
+        "611310": 1052.55, "721110": 905.72, "517111": 801.83, "813110": 780.78,
+        "516210": 673.7, "811111": 669.45, "456110": 657.8, "238220": 629.72, "236118": 570.83,
+        "221310": 559.48, "524113": 530.15, "456120": 485, "812112": 478.51, "459910": 472.05,
+        "624410": 470.46, "316210": 461.14, "713940": 449.95, "449129": 447.39,
+        "522220": 417.75, "812910": 408.07, "522210": 404, "621210": 401.7, "238160": 374.53,
+        "335220": 368.15, "459991": 352.38, "813219": 322.24, "622110": 317.74,
+        "611110": 281.26, "325612": 277.18, "334111": 264.8, "562111": 257.87,
+        "337121": 254.12, "561730": 238.02, "459110": 231.88, "326211": 217.43,
+        "325611": 208.88, "621111": 204.34, "711310": 195.72, "337122": 187.51,
+        "561720": 186.25, "459120": 177.24, "541110": 175.53, "315990": 166.47,
+        "334310": 163.44, "444180": 152.05, "459410": 146.41, "238330": 141.51,
+        "322291": 131.24, "444240": 131.24, "449210": 130.56, "541219": 128.35,
+        "441222": 126.94, "238320": 125.94, "335210": 124.29, "339113": 122.5,
+        "711211": 121.43, "339910": 115.59, "337910": 113.83, "456130": 110.2, "611620": 110.2,
+        "812210": 109.42, "522291": 108.21, "314120": 106.59, "444140": 105.66,
+        "621399": 101.91, "441210": 89.28, "459210": 86.55, "459310": 83.18, "812990": 79.04,
+        "812930": 77.64, "624120": 76.66, "455211": 76.3, "444230": 76.22, "813211": 70.47,
+        "561710": 68.04, "623110": 67.45, "621320": 66.77, "488490": 65.54, "813930": 61.24,
+        "484210": 59.85, "513210": 58.3, "621511": 55.89, "812310": 48.7, "337126": 46.91,
+        "337110": 45.86, "561790": 45.75, "524128": 45.04, "441330": 44.55, "561621": 44.4,
+        "444120": 44.01, "459999": 43.67, "812320": 43.53, "491110": 43.29, "611519": 37.32,
+        "444110": 36.92, "441227": 36.88, "813940": 35.08, "522110": 34.47, "621610": 34.42,
+        "532289": 33.26, "459140": 32.57, "611691": 31.85, "713290": 31.18, "458320": 30.76,
+        "449121": 30.24, "712110": 30.16, "459130": 30.01, "532284": 29.36, "513120": 28.24,
+        "711130": 26.85, "512131": 26.14, "449122": 25.45, "488410": 25.44, "541921": 24.31,
+        "513110": 24.21, "516110": 19.81, "812220": 17.01, "713930": 16.61, "561510": 15.3,
+        "337211": 14.9, "811198": 14.11, "811210": 12.93, "811412": 11.88, "811420": 9.33,
+        "562991": 8.69, "812921": 7.5, "811490": 6.84, "713120": 6.12, "532281": 4,
+        "459920": 3, "492110": 2.48, "459420": 2.37, "532210": 2.19, "811430": 2,
+        "493110": 1.43, "713990": 1.3, "621999": 1.15, "532282": 1.06, "532283": 0.22
+        },
+      },
+      display="~32 t CO2e / household / yr, computed from US-average inputs",
+      sources=(("EIA Residential Energy Consumption Survey (RECS) 2020 "
+                "consumption tables; 2024 housing characteristics",
+                "https://www.eia.gov/consumption/residential/data/2020/"),
+               ("FHWA Highway Statistics 2023, Table VM-1 (light-duty miles "
+                "and on-road fuel economy)",
+                "https://www.fhwa.dot.gov/policyinformation/statistics/2023/vm1.cfm"),
+               ("FTA National Transit Database, RY2024 service by mode",
+                "https://www.transit.dot.gov/ntd"),
+               ("BLS Consumer Expenditure Survey, Table 2500, all consumer "
+                "units, 2024",
+                "https://www.bls.gov/cex/tables.htm"),
+               ("US Census, average population per household (Table HH-6)",
+                "https://www.census.gov/data/tables/time-series/demo/families/households.html"),
+               JK2011),
       code=("site/v2-template.html",)),
 
     # ------------------------------------------------------------------

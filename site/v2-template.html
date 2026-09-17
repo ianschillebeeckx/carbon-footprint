@@ -290,7 +290,7 @@
   <div class="tcol" style="max-width:860px">
     <div class="tcard">
       <h3>Your footprint by section
-        <button class="info" aria-label="About this figure" data-tip="Each bar stacks that section's components (hover a segment for its share). The amber tick is the average US household — 49.9 t/yr (CoolClimate national defaults; per-section values on the methodology page). Green boxes left of the zero line are your offsets, drawn negative against the section they're assigned to.">?</button>
+        <button class="info" aria-label="About this figure" data-tip="Each bar stacks that section's components (hover a segment for its share). The amber tick is the average US household run through this same model — US-average kWh, miles, servings and spending, not a number quoted from elsewhere (inputs and sources on the methodology page). Its goods and services bar counts out-of-pocket purchases only, so expect yours to sit below it. Green boxes left of the zero line are your offsets, drawn negative against the section they're assigned to.">?</button>
         <span class="tkg" id="total-tons"></span></h3>
       <div id="fig-total"></div>
       <p class="hint" style="margin-bottom:0">Amber tick = average US household (CoolClimate national defaults). Goods &amp; Services come from your classified transactions; Travel/Home/Food from your inputs on those tabs.</p>
@@ -2131,8 +2131,46 @@ function renderFoodFig() {
 }
 
 // Average US household (CoolClimate national defaults, country mode), kg/yr
-const CC_AVG = ASSUME["impact.us_benchmark"];
-const CC_AVG_TOTAL = Object.values(CC_AVG).reduce((a, v) => a + v, 0);
+// The US-average tick is COMPUTED, never quoted. The registry stores the average
+// household's INPUTS — kWh, therms, miles, servings, dollars by NAICS — and they
+// run through the same travelKg/homeKg/foodKg and the same factor table your own
+// numbers do, so a factor change moves your bar and the tick together.
+// Lazy + memoised on the grid payload, which arrives after first paint.
+const US_IN = ASSUME["impact.us_benchmark"];
+let _usAvg = null, _usAvgGrid;
+function usAvg() {
+  const grid = G2 ? G2.us_kg : null;
+  if (_usAvg && _usAvgGrid === grid) return _usAvg;
+  const T = US_IN.travel, H = US_IN.home;
+  const travel = travelKg({
+    vehicles: [{miles: T.miles, mpg: T.mpg, fuel: 1}],   // linear in miles: 1.83 cars == one pseudo-car
+    ground: {mode: "detail", bus: T.bus, transit: T.transit, commuter: T.commuter, intercity: T.intercity},
+    air: {mode: "haul", short: T.short, medium: T.medium, long: T.long},
+  }).total;
+  const home = homeKg({
+    elec: {mode: "kwh", kwh: H.kwh}, gas: {mode: "therms", therms: H.therms},
+    oil: {mode: "gallons", gallons: H.gallons}, sqft: H.sqft,
+  }, {usNational: true}).total;
+  // Food isn't stored in the benchmark: it IS the diet tab's own starting
+  // servings, so an untouched form sits exactly on the tick by construction.
+  const food = foodKg({
+    size: ASSUME["food.household_size"],
+    sv: Object.fromEntries(Object.entries(FF).map(([k, v]) => [k, v.def])),
+  });
+  // Goods & services: the BLS CE basket priced through the same factor table,
+  // split by the same section mapping the user's own bars use.
+  const byCode = new Map(NAICS_ALL.map(o => [o.code, o]));
+  let goods = 0, services = 0;
+  for (const code in US_IN.gs_basket) {
+    const e = byCode.get(code);
+    if (!e || e.category === "excluded" || e.category === "ignored") continue;
+    const sec = CATS[e.category] && CATS[e.category].section;
+    if (sec === "Goods") goods += US_IN.gs_basket[code] * e.factor;
+    else services += US_IN.gs_basket[code] * e.factor;
+  }
+  _usAvgGrid = grid;
+  return (_usAvg = {travel, home, food, goods, services});
+}
 
 function renderTotal() {
   if (!$("fig-total")) return;
@@ -2143,16 +2181,18 @@ function renderTotal() {
     .map((c, i) => ({kg: gsAnnual(c), color: PAL[i % 8], title: CATS[c].label}));
   const tp = travelParts();
   const hk = homeKg();
+  const AVG = usAvg();
   const size = Math.max(1, +FOOD.size || 1);
   const rows = [
-    {label: "Travel", avg: CC_AVG.travel, segs: tp.map((r, i) => ({kg: r.kg, color: PAL[i % 8], title: r.label}))},
-    {label: "Home", avg: CC_AVG.home, segs: [["Electricity", hk.elec], ["Natural gas", hk.gas], ["Heating oil", hk.oil], ["Construction", hk.sqft]].map(([t, kg], i) => ({kg, color: PAL[i % 8], title: t}))},
-    {label: "Food", avg: CC_AVG.food, segs: Object.entries(FF).map(([k, v], i) => ({kg: (+FOOD.sv[k] || 0) * 52 * v.kg * size, color: PAL[i % 8], title: v.label}))},
-    {label: "Goods", avg: CC_AVG.goods, segs: secSegs("Goods")},
-    {label: "Services", avg: CC_AVG.services, segs: secSegs("Services")},
+    {label: "Travel", avg: AVG.travel, segs: tp.map((r, i) => ({kg: r.kg, color: PAL[i % 8], title: r.label}))},
+    {label: "Home", avg: AVG.home, segs: [["Electricity", hk.elec], ["Natural gas", hk.gas], ["Heating oil", hk.oil], ["Construction", hk.sqft]].map(([t, kg], i) => ({kg, color: PAL[i % 8], title: t}))},
+    {label: "Food", avg: AVG.food, segs: Object.entries(FF).map(([k, v], i) => ({kg: (+FOOD.sv[k] || 0) * 52 * v.kg * size, color: PAL[i % 8], title: v.label}))},
+    {label: "Goods", avg: AVG.goods, segs: secSegs("Goods")},
+    {label: "Services", avg: AVG.services, segs: secSegs("Services")},
   ];
   const total = rows.reduce((a, r) => a + r.segs.reduce((x, s) => x + s.kg, 0), 0);
   const off = offsetTons();
+  const avgTotal = Object.values(AVG).reduce((a, v) => a + v, 0);
   rows[0].off = off.per.travel * 1000;
   rows[1].off = off.per.home * 1000;
   rows[2].off = off.per.food * 1000;
@@ -2163,8 +2203,8 @@ function renderTotal() {
   // removed tonne is credited in full — but because reducing and offsetting are
   // different levers and one merged number hides which was pulled.
   $("total-tons").textContent = off.total > 0
-    ? `${(total / 1000).toFixed(1)} t gross − ${off.total.toFixed(1)} offset = ${Math.max(0, total / 1000 - off.total).toFixed(1)} t net · US avg ${(CC_AVG_TOTAL / 1000).toFixed(1)}`
-    : `${(total / 1000).toFixed(1)} t CO₂e/yr · US avg ${(CC_AVG_TOTAL / 1000).toFixed(1)}`;
+    ? `${(total / 1000).toFixed(1)} t gross − ${off.total.toFixed(1)} offset = ${Math.max(0, total / 1000 - off.total).toFixed(1)} t net · US avg ${(avgTotal / 1000).toFixed(1)}`
+    : `${(total / 1000).toFixed(1)} t CO₂e/yr · US avg ${(avgTotal / 1000).toFixed(1)}`;
 }
 
 // ---------- Offsets tab ----------
