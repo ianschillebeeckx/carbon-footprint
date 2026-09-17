@@ -1863,7 +1863,7 @@ function renderHome() {
 // (CoolClimate's own constants); def: US-average servings/person/week.
 const FF = ASSUME["food.model"];
 const FOOD = FOOD_SAVED || {
-  size: 3,
+  size: ASSUME["food.household_size"],
   sv: Object.fromEntries(Object.entries(FF).map(([k, v]) => [k, v.def])),  // servings/person/week
 };
 // migrate the earlier calories/day shape

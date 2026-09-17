@@ -890,6 +890,20 @@ ASSUMPTIONS = [
       "110 g uncooked**, and P&N's meat unit is raw retail weight, so a "
       "serving is 110 g of their unit. Grains and legumes run the other way — "
       "140 g of cooked rice is 45 g dry, and their rice unit is dry.\n\n"
+      "**The starting servings are the US average**, from USDA ERS "
+      "loss-adjusted food availability — what is left after spoilage, plate "
+      "waste and cooking shrinkage, not what leaves the farm. Divided by each "
+      "row's serving mass that gives 4.4 servings of beef and lamb a week, "
+      "6.4 of poultry, 15.8 of vegetables and 5.8 of fruit. So an untouched "
+      "form describes an average American eater, and every number you change "
+      "moves you off that average for a reason you chose.\n\n"
+      "One conversion deserves stating because it is worth ~0.5 t a year. "
+      "LAFA's loss-adjusted weight is already net of cooking loss — ERS "
+      "defines loss to include \"cooking loss and natural shrinkage\", and a "
+      "MyPlate ounce-equivalent is cooked meat — so servings are counted at "
+      "85 g cooked while the factor prices 110 g raw. Same serving, two "
+      "bases. Were LAFA on a raw retail basis instead, every meat row would "
+      "fall 23%.\n\n"
       "Two honest caveats. Seafood uses global farmed-fish values because "
       "**80% of US seafood is imported** (NOAA) and P&N has no North American "
       "observations — global is the correct choice here, not a compromise. "
@@ -901,29 +915,33 @@ ASSUMPTIONS = [
         # kg = kg CO2e per serving (P&N median kg/kg x serving grams).
         # g   = serving mass in P&N's functional unit (raw/as-purchased).
         # cps = calories per serving, for the plausibility readout only.
-        # def = US-average servings/week, from per-capita availability.
-        "beeflamb":  {"label": "Beef & lamb", "kg": 6.600, "g": 110, "cps": 213, "def": 4.5,
+        # def = US-average servings/week, from USDA ERS loss-adjusted food
+        # availability (LAFA) divided by this row's serving mass. LAFA's
+        # loss-adjusted weight is already net of cooking shrinkage, so meat
+        # rows convert at 85 g cooked even though the factor prices 110 g raw
+        # — the same serving, two bases.
+        "beeflamb":  {"label": "Beef & lamb", "kg": 6.600, "g": 110, "cps": 213, "def": 4.4,
                       "src": "P&N median, beef+lamb blended by US availability"},
-        "pork":      {"label": "Pork", "kg": 1.163, "g": 110, "cps": 213, "def": 3.8,
+        "pork":      {"label": "Pork", "kg": 1.163, "g": 110, "cps": 213, "def": 3.4,
                       "src": "P&N median"},
-        "poultry":   {"label": "Poultry", "kg": 0.827, "g": 110, "cps": 190, "def": 5.4,
+        "poultry":   {"label": "Poultry", "kg": 0.827, "g": 110, "cps": 190, "def": 6.4,
                       "src": "P&N median"},
-        "eggs":      {"label": "Eggs", "kg": 0.210, "g": 50, "cps": 78, "def": 5.4,
+        "eggs":      {"label": "Eggs", "kg": 0.210, "g": 50, "cps": 78, "def": 4.1,
                       "src": "P&N median, one large egg"},
-        "fish":      {"label": "Fish & seafood", "kg": 0.868, "g": 110, "cps": 180, "def": 1.5,
+        "fish":      {"label": "Fish & seafood", "kg": 0.868, "g": 110, "cps": 180, "def": 1.0,
                       "src": "P&N farmed median; 80% of US seafood is imported"},
         "dairy":     {"label": "Dairy", "kg": 0.636, "g": 240, "cps": 120, "def": 10.5,
                       "src": "P&N milk median, milk-equivalent serving"},
-        "legume":    {"label": "Legumes, tofu, nuts", "kg": 0.090, "g": 60, "cps": 150, "def": 1.8,
+        "legume":    {"label": "Legumes, tofu, nuts", "kg": 0.090, "g": 60, "cps": 150, "def": 3.0,
                       "src": "P&N blend: pulses, tofu, nuts"},
-        "fruits":    {"label": "Fruits", "kg": 0.084, "g": 140, "cps": 70, "def": 12.4,
+        "fruits":    {"label": "Fruits", "kg": 0.084, "g": 140, "cps": 70, "def": 5.8,
                       "src": "P&N blend: apples, citrus, bananas, berries"},
-        "veggies":   {"label": "Vegetables", "kg": 0.038, "g": 85, "cps": 35, "def": 12.4,
+        "veggies":   {"label": "Vegetables", "kg": 0.038, "g": 85, "cps": 35, "def": 15.8,
                       "src": "P&N blend: brassicas, root, other, tomatoes"},
-        "grains":    {"label": "Grains & baked goods", "kg": 0.064, "g": 50, "cps": 130, "def": 28.6,
+        "grains":    {"label": "Grains & baked goods", "kg": 0.064, "g": 50, "cps": 130, "def": 21.2,
                       "src": "P&N wheat & rye median"},
         "otherfood": {"label": "Snacks, drinks, oils, sugar", "kg": 0.130, "g": None, "cps": 200,
-                      "def": 23.6,
+                      "def": 31.8,
                       "src": "composite ~0.65 kg/1000 kcal (sugar, oil, flour, maize, beer)"},
       },
       display="beef 6.60 → vegetables 0.04 kg per serving",
@@ -934,7 +952,28 @@ ASSUMPTIONS = [
                ("FDA reference amounts, 21 CFR 101.12",
                 "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-101/subpart-A/section-101.12"),
                ("NOAA Fisheries of the United States (seafood import share)",
-                "https://www.fisheries.noaa.gov/national/sustainable-fisheries/fisheries-united-states")),
+                "https://www.fisheries.noaa.gov/national/sustainable-fisheries/fisheries-united-states"),
+               ("USDA ERS Food Availability (Per Capita) Data System — "
+                "Loss-Adjusted Food Availability (starting servings)",
+                "https://www.ers.usda.gov/data-products/food-availability-per-capita-data-system")),
+      code=("site/v2-template.html",)),
+
+    A("food.household_size", "food", "Household size starts at the US average",
+      "The food tab multiplies per-person servings by the number of people "
+      "eating, so the starting value decides what an untouched form reports. "
+      "It is **2.51**, the Census average household — the same figure the "
+      "US-average comparison is drawn at, so a form nobody has edited sits on "
+      "the benchmark rather than above it.\n\n"
+      "It is a household average, not a family average: single-person "
+      "households are a third of the total and pull it well below the 3.1 "
+      "people in the average *family*. Anyone cooking for a family should "
+      "raise it.",
+      bias="neutral",
+      value=2.51,
+      display="2.51 people",
+      sources=(("US Census Bureau, America's Families and Living Arrangements, "
+                "Table HH-6 (2024)",
+                "https://www.census.gov/data/tables/time-series/demo/families/households.html"),),
       code=("site/v2-template.html",)),
 
     A("food.snacks_composite", "food", "The snacks and drinks bucket is constructed",
