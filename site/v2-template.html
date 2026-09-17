@@ -405,7 +405,7 @@
         <button class="info" aria-label="About diet emissions" data-tip="Each row is servings per week × the emissions of one serving — no dollars and no calories enter the maths. Factors are Poore & Nemecek 2018 medians (38,700 farms, one common cradle-to-retail boundary including land-use change); serving sizes are the FDA reference amounts, shown in grams beside each row. US-average defaults are prefilled and the cal/day readout is a plausibility check, not an input. Beef and lamb are ruminants and emit several times what pork or chicken do — that swap is the biggest lever here. Per-row sources: methodology page.">?</button>
         <span class="tkg" id="kg-food-diet"></span></h3>
       <div class="tvrow"><label>People in household:</label>
-        <input type="number" min="1" max="12" step="1" id="foodsize" style="width:62px" aria-label="People in household"></div>
+        <input type="number" min="1" max="12" step="any" id="foodsize" style="width:62px" aria-label="People in household"></div>
       <div id="foodrows"></div>
     </div>
     <div class="tcard">
@@ -579,7 +579,7 @@ function renderImpact() {
   $("imp-deaths").innerHTML = `${deaths >= 0.1 ? deaths.toFixed(1) : "<0.1"} <small>(${fmt(mm)} micromorts)</small>`;
   $("imp-damage-k").textContent = `Climate damages · $${ASSUME["impact.scc"]}/t`;
   $("imp-offset-k").textContent = `To offset · $${ASSUME["offsets.removal_price"]}/t (Charm)`;
-  $("imp-deaths-k").textContent = `Excess deaths · ${X} yrs`;
+  $("imp-deaths-k").textContent = `Excess deaths · ${M.horizon_years} yrs`;
   renderTotal();
 }
 
