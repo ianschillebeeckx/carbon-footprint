@@ -293,7 +293,7 @@
         <button class="info" aria-label="About this figure" data-tip="Each bar stacks that section's components (hover a segment for its share). The amber tick is the average US household run through this same model — US-average kWh, miles, servings and spending, not a number quoted from elsewhere (inputs and sources on the methodology page). Its goods and services bar counts out-of-pocket purchases only, so expect yours to sit below it. Green boxes left of the zero line are your offsets, drawn negative against the section they're assigned to.">?</button>
         <span class="tkg" id="total-tons"></span></h3>
       <div id="fig-total"></div>
-      <p class="hint" style="margin-bottom:0">Amber tick = average US household (CoolClimate national defaults). Goods &amp; Services come from your classified transactions; Travel/Home/Food from your inputs on those tabs.</p>
+      <p class="hint" style="margin-bottom:0">Amber tick = average US household, run through this same model on US-average inputs. Its Goods &amp; Services bar counts out-of-pocket purchases only (BLS spending data), so expect yours to sit below it — you see just the accounts you imported. Goods &amp; Services come from your classified transactions; Travel/Home/Food from your inputs on those tabs.</p>
     </div>
   </div>
 </div>
@@ -2505,6 +2505,12 @@ const OFFSET_TYPES = {
   avoidance: "Other avoidance (cookstoves, renewables, efficiency)",
 };
 const OFFSET_INTEGRITY = ASSUME["offsets.integrity"];
+// Resolve a row's type ONCE, for both the credited-tonnes maths and the row
+// display. They used to resolve it separately and disagreed whenever a row
+// carried a type the map didn't recognise — the row claimed full credit while
+// the total applied the avoidance discount.
+const offsetType = r => (r && OFFSET_TYPES[r.type]) ? r.type : "durable";
+const offsetK = r => OFFSET_INTEGRITY[offsetType(r)];
 
 function offsetTons() {
   const per = {travel: 0, home: 0, food: 0, goods: 0, services: 0};
@@ -2515,7 +2521,7 @@ function offsetTons() {
     // cancel an emitted one and is credited in full; an avoidance credit is
     // credited at what the evidence supports (Probst 2024). See the
     // offsets.integrity entry.
-    const k = OFFSET_INTEGRITY[r.type] != null ? OFFSET_INTEGRITY[r.type] : OFFSET_INTEGRITY.avoidance;
+    const k = offsetK(r);
     claimed += t;
     per[r.cat in per ? r.cat : "goods"] += t * k;
   }
@@ -2556,8 +2562,8 @@ function renderOffsets() {
   if (!$("offsetrows")) return;
   $("offsetrows").innerHTML = OFFSETS.rows.map((r, i) => {
     const tons = (+r.dollars || 0) / Math.max(+r.price || 0, 1);
-    const type = r.type || "durable";
-    const k = OFFSET_INTEGRITY[type] != null ? OFFSET_INTEGRITY[type] : OFFSET_INTEGRITY.avoidance;
+    const type = offsetType(r);
+    const k = offsetK(r);
     const credited = tons * k;
     // A durable-removal claim below ~$100/t does not exist in the market: the
     // durable floor is biochar at roughly $130. Flag the combination rather
@@ -2610,7 +2616,12 @@ function renderOffsets() {
   const touched = () => { renderOffsets(); renderImpact(); saveOffsets(); };
   $("offsetrows").querySelectorAll("input,select").forEach(el => el.onchange = () => {
     const r = OFFSETS.rows[+el.dataset.i];
-    r[el.dataset.k] = el.dataset.k === "label" || el.dataset.k === "cat" ? el.value : +el.value;
+    // Only the two money fields are numeric. Listing the string fields instead
+    // meant a new one (`type`) silently became +"durable" = NaN: the select
+    // snapped back on every change, and the row displayed full credit while
+    // the total quietly credited it at the avoidance rate.
+    const numeric = el.dataset.k === "dollars" || el.dataset.k === "price";
+    r[el.dataset.k] = numeric ? +el.value : el.value;
     touched();
   });
   $("offsetrows").querySelectorAll(".del").forEach(b => b.onclick = () => { OFFSETS.rows.splice(+b.dataset.i, 1); touched(); });
