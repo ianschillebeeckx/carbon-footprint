@@ -91,6 +91,8 @@ def hourly_local(df, ba):
 
 def main():
     summary = {r["ba"]: r for r in csv.DictReader(open(GC / "dist" / "summary.csv"))}
+    # Shape year comes from the build output, not a literal — see egrid_year below.
+    SHAPE_YEAR = int(next(iter(summary.values()))["year"])
     bas, ba_idx = [], {}
     shaped = flat_only = 0
     for ba, s in sorted(summary.items()):
@@ -132,10 +134,15 @@ def main():
         ba_idx[ba] = len(bas)
         bas.append(o)
 
-    # BA names from the eGRID extraction (summary lacks them)
+    # BA names from the eGRID extraction (summary lacks them). Take the data
+    # year from the file too: these vintages move independently and hardcoding
+    # them here shipped a payload claiming eGRID2023 while carrying eGRID2024.
+    egrid_year = None
     for r in read_commented(GC / "data" / "egrid_ba_annual.csv"):
         if r["ba"] in ba_idx:
             bas[ba_idx[r["ba"]]]["name"] = r["ba_name"]
+        egrid_year = egrid_year or int(r["egrid_year"])
+    assert egrid_year, "no eGRID year found in egrid_ba_annual.csv"
 
     zips, utils, util_idx = {}, [], {}
     for r in read_commented(GC / "data" / "zip_ba.csv"):
@@ -180,12 +187,13 @@ def main():
     us_flat = sub_kg["US"]
 
     OUT.write_text(json.dumps({
-        "year": 2024, "egrid_year": 2023,
+        "year": SHAPE_YEAR, "egrid_year": egrid_year,
         "bas": bas, "zips": zips, "utils": utils,
         "fb": fb_entries, "fb_zips": fb_zips, "us_kg": us_flat,
-        "sources": "EIA-930 hourly generation 2024; eGRID2023 BA rates (calibration) "
-                   "+ 4.2% US grid loss; OpenEI TMY3 residential load shapes; "
-                   "IPCC AR5 upstream. Fallback: eGRID2023 subregion.",
+        "sources": (f"EIA-930 hourly generation {SHAPE_YEAR}; eGRID{egrid_year} BA rates "
+                    f"(calibration) + {GRID_LOSS * 100:.1f}% US grid loss; NREL ResStock "
+                    f"2025 residential load shapes; IPCC AR5 upstream. "
+                    f"Fallback: eGRID{egrid_year} subregion."),
     }, separators=(",", ":")))
     print(f"Wrote {OUT}: {OUT.stat().st_size:,}b — {len(bas)} BAs "
           f"({shaped} with hourly shape, {flat_only} flat-degraded), "
