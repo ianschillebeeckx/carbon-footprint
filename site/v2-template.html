@@ -2130,7 +2130,6 @@ function renderFoodFig() {
   vstack("fig-food", groups.map(([label, kg], i) => ({label, kg, color: PAL[i % 8]})));
 }
 
-// Average US household (CoolClimate national defaults, country mode), kg/yr
 // The US-average tick is COMPUTED, never quoted. The registry stores the average
 // household's INPUTS — kWh, therms, miles, servings, dollars by NAICS — and they
 // run through the same travelKg/homeKg/foodKg and the same factor table your own
