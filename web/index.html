@@ -2433,7 +2433,7 @@ function usAvg() {
   });
   // Goods & services: the BLS CE basket priced through the same factor table,
   // split by the same section mapping the user's own bars use.
-  const byCode = new Map(NAICS_ALL.map(o => [o.code, o]));
+  const byCode = new Map((NAICS_ALL || []).map(o => [o.code, o]));
   let goods = 0, services = 0;
   for (const code in US_IN.gs_basket) {
     const e = byCode.get(code);
