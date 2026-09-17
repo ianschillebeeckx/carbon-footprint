@@ -335,8 +335,22 @@ ASSUMPTIONS = [
       "Vietnamese-made shirt is charged as though it were made under the US "
       "grid and US industrial efficiency. Since US production is generally "
       "less carbon-intensive per dollar than what the US imports, this biases "
-      "the number **down**, most for the import-heavy categories: apparel, "
-      "electronics, furniture, toys.\n\n"
+      "the number **down**.\n\n"
+      "EPA also publishes import-adjusted models, which couple this same model "
+      "to a global trade database and so let that bias be measured instead of "
+      "guessed. Comparing the two across 398 detail commodities, the median "
+      "correction is **+9%**. The largest anywhere in the economy is +131% "
+      "(telephone apparatus manufacturing), and the top of the list is all "
+      "electronics and aircraft. But the retail codes that most consumer "
+      "spending actually lands on move far less: clothing stores +7%, "
+      "department and online retail +5%, groceries +3%, apparel manufacturing "
+      "under +2%. Economy-wide the correction is +17% to +25% for 2022, "
+      "depending on which trade database is used.\n\n"
+      "**We do not apply it.** A few percent on the retail codes sits well "
+      "inside the uncertainty of everything else described here, and there is "
+      "no published per-commodity multiplier — deriving one would make it ours "
+      "to rebuild and re-validate at every EPA release. The bias is real, it "
+      "runs downward, and on this app's spending it is small.\n\n"
       "What follows is that the app is far more trustworthy about *shape* "
       "than *level* — which categories dominate, and how this year compares "
       "with last — than about any single merchant or the absolute total. "
@@ -344,8 +358,12 @@ ASSUMPTIONS = [
       bias="varies",
       sources=(("USEEIO model registry (import factor status)",
                 "https://github.com/USEPA/USEEIO/blob/master/models.md"),
-               ("EPA 600/R-24/116, Estimating Embodied Environmental Flows in Imports",
-                "https://www.epa.gov/land-research/us-environmentally-extended-input-output-useeio-technical-content"),
+               ("Ingwersen, Namovich, Young & Vendries (2024), Estimating Embodied "
+                "Environmental Flows in International Imports for the USEEIO Model, "
+                "EPA/600/R-24/116 (see Corrigendum, revised Table 5)",
+                "https://cfpub.epa.gov/si/si_public_record_report.cfm?dirEntryId=362470"),
+               ("USEEIO v2.5 import-adjusted models (catbird/kinglet/waxwing, BEA detail)",
+                "https://catalog.data.gov/dataset/useeio-v2-5-models"),
                ("Design notes §7 (known limitations)", REPO + "naics_mapping_design_notes.md")),
       code=("src/cf/naics_prep.py", "site/v2-template.html")),
 
