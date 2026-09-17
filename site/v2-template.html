@@ -2159,15 +2159,22 @@ function renderTotal() {
   rows[3].off = off.per.goods * 1000;
   rows[4].off = off.per.services * 1000;
   hbars("fig-total", rows, 0, total);
+  // Gross stays visible next to net. Not to discourage removal — a durably
+  // removed tonne is credited in full — but because reducing and offsetting are
+  // different levers and one merged number hides which was pulled.
   $("total-tons").textContent = off.total > 0
-    ? `${(total / 1000).toFixed(1)} − ${off.total.toFixed(1)} = ${Math.max(0, total / 1000 - off.total).toFixed(1)} t net · US avg ${(CC_AVG_TOTAL / 1000).toFixed(1)}`
+    ? `${(total / 1000).toFixed(1)} t gross − ${off.total.toFixed(1)} offset = ${Math.max(0, total / 1000 - off.total).toFixed(1)} t net · US avg ${(CC_AVG_TOTAL / 1000).toFixed(1)}`
     : `${(total / 1000).toFixed(1)} t CO₂e/yr · US avg ${(CC_AVG_TOTAL / 1000).toFixed(1)}`;
 }
 
 // ---------- Offsets tab ----------
 const OFFSETS_SAVED = /*__OFFSETS__*/null;
 const OFFSET_CATS = {travel: "Travel", home: "Home", food: "Food", goods: "Goods", services: "Services"};
-const OFFSETS = OFFSETS_SAVED || {rows: [{label: "Charm Industrial", cat: "goods", dollars: 0, price: ASSUME["offsets.removal_price"]}], recycle_lbs: 0, compost_lbs: 0, recycle_cat: "goods"};
+const OFFSETS = OFFSETS_SAVED || {rows: [{label: "Charm Industrial", cat: "goods", type: "durable", dollars: 0, price: ASSUME["offsets.removal_price"]}], recycle_lbs: 0, compost_lbs: 0, recycle_cat: "goods"};
+// Rows saved before offsets carried a type predate the integrity model. They
+// were entered when the app credited everything in full, so default them to
+// durable rather than silently downgrading someone's existing entry.
+for (const r of OFFSETS.rows) if (!r.type) r.type = "durable";
 if (OFFSETS.recycle_lbs == null) OFFSETS.recycle_lbs = 0;
 if (OFFSETS.compost_lbs == null) OFFSETS.compost_lbs = 0;
 if (!OFFSETS.recycle_cat) OFFSETS.recycle_cat = "goods";
@@ -2177,17 +2184,32 @@ for (const r of OFFSETS.rows) if (r.cat === "gs" || !(r.cat in OFFSET_CATS)) r.c
 const RECYCLE_T_PER_LBWK = 52 / 2000 * ASSUME["offsets.recycle"];   // EPA equivalencies, mixed recyclables vs landfill
 const COMPOST_T_PER_LBWK = 52 / 2000 * ASSUME["offsets.compost"];   // EPA WARM, food scraps diverted from landfill
 
+const OFFSET_TYPES = {
+  durable:   "Durable removal (geologic, DAC, mineralisation)",
+  biochar:   "Biochar",
+  forest:    "Forest / land-based",
+  avoidance: "Other avoidance (cookstoves, renewables, efficiency)",
+};
+const OFFSET_INTEGRITY = ASSUME["offsets.integrity"];
+
 function offsetTons() {
   const per = {travel: 0, home: 0, food: 0, goods: 0, services: 0};
+  let claimed = 0;
   for (const r of OFFSETS.rows) {
     const t = (+r.dollars || 0) / Math.max(+r.price || 0, 1);
-    per[r.cat in per ? r.cat : "goods"] += t;
+    // Credit by type, not at face value. A durably-removed tonne really does
+    // cancel an emitted one and is credited in full; an avoidance credit is
+    // credited at what the evidence supports (Probst 2024). See the
+    // offsets.integrity entry.
+    const k = OFFSET_INTEGRITY[r.type] != null ? OFFSET_INTEGRITY[r.type] : OFFSET_INTEGRITY.avoidance;
+    claimed += t;
+    per[r.cat in per ? r.cat : "goods"] += t * k;
   }
   // recycling displaces virgin production — goods by default, food if your
   // bin is mostly food packaging; compost avoids landfill methane from food
   per[OFFSETS.recycle_cat === "food" ? "food" : "goods"] += (+OFFSETS.recycle_lbs || 0) * RECYCLE_T_PER_LBWK;
   per.food += (+OFFSETS.compost_lbs || 0) * COMPOST_T_PER_LBWK;
-  return {per, total: per.travel + per.home + per.food + per.goods + per.services};
+  return {per, claimed, total: per.travel + per.home + per.food + per.goods + per.services};
 }
 
 // Short provider names collide with ordinary merchants: bare "charm" matched a
@@ -2222,13 +2244,26 @@ function renderOffsets() {
   if (!$("offsetrows")) return;
   $("offsetrows").innerHTML = OFFSETS.rows.map((r, i) => {
     const tons = (+r.dollars || 0) / Math.max(+r.price || 0, 1);
+    const type = r.type || "durable";
+    const k = OFFSET_INTEGRITY[type] != null ? OFFSET_INTEGRITY[type] : OFFSET_INTEGRITY.avoidance;
+    const credited = tons * k;
+    // A durable-removal claim below ~$100/t does not exist in the market: the
+    // durable floor is biochar at roughly $130. Flag the combination rather
+    // than the price alone, so legitimate biochar never trips the warning.
+    const suspect = type === "durable" && (+r.price || 0) < 100 && (+r.dollars || 0) > 0;
     return `<div class="tvrow">` +
       `<input type="text" value="${esc(r.label || "")}" data-i="${i}" data-k="label" placeholder="Provider" style="width:130px;font:inherit;font-size:0.78rem;border:1px solid var(--line);border-radius:7px;padding:5px 7px;background:var(--card);color:var(--ink)" aria-label="Provider">` +
       `<input type="number" min="0" step="50" value="${+r.dollars || 0}" data-i="${i}" data-k="dollars" aria-label="Dollars per year"><label>$/yr at</label>` +
-      `<input type="number" min="1" step="25" value="${+r.price || ASSUME["offsets.removal_price"]}" data-i="${i}" data-k="price" style="width:70px" aria-label="Price per tonne"><label>$/t →</label>` +
-      `<select data-i="${i}" data-k="cat" aria-label="Section">${Object.entries(OFFSET_CATS).map(([k, l]) =>
-        `<option value="${k}" ${r.cat === k ? "selected" : ""}>${l}</option>`).join("")}</select>` +
-      `<span class="rowkg">−${tons.toFixed(2)} t/yr</span>` +
+      `<input type="number" min="1" step="25" value="${+r.price || ASSUME["offsets.removal_price"]}" data-i="${i}" data-k="price" style="width:70px" aria-label="Price per tonne"><label>$/t</label>` +
+      `<select data-i="${i}" data-k="type" aria-label="Offset type" title="What you bought decides how much of it we credit — see methodology">${Object.entries(OFFSET_TYPES).map(([tk, l]) =>
+        `<option value="${tk}" ${type === tk ? "selected" : ""}>${l}</option>`).join("")}</select>` +
+      `<select data-i="${i}" data-k="cat" aria-label="Section">${Object.entries(OFFSET_CATS).map(([ck, l]) =>
+        `<option value="${ck}" ${r.cat === ck ? "selected" : ""}>${l}</option>`).join("")}</select>` +
+      `<span class="rowkg" title="${tons.toFixed(2)} t claimed, credited at ${(k*100).toFixed(0)}% for this type">` +
+        (k < 1 ? `${tons.toFixed(2)} claimed → −${credited.toFixed(2)} t/yr` : `−${credited.toFixed(2)} t/yr`) + `</span>` +
+      (suspect ? `<div style="flex-basis:100%;color:var(--warn);font-size:0.74rem;margin:2px 0 0 4px">` +
+        `⚠ Durable removal doesn't sell below ~$100/t — biochar starts near $130, bio-oil is ~$600, DAC ~$1,000. ` +
+        `If this was a forestry or cookstove credit, pick that type: Probst et al. (2024) found fewer than 16% of such credits represent real reductions.</div>` : "") +
       (OFFSETS.rows.length > 1 ? `<button class="del" data-i="${i}" title="Remove">✕</button>` : "") +
       `</div>`;
   }).join("");
@@ -2243,7 +2278,13 @@ function renderOffsets() {
 
   const off = offsetTons();
   $("kg-offsets").textContent = `−${(off.total - rT - cT).toFixed(2)} t/yr`;
-  $("kg-offsets-total").textContent = `−${off.total.toFixed(2)} t CO₂e/yr`;
+  // Show the discount explicitly when credited tonnes fall short of claimed —
+  // finding out that $3,000 of forestry credits buys 48 t rather than 300 is
+  // the entire point of typing the offsets.
+  const purchased = off.total - rT - cT;
+  $("kg-offsets-total").textContent = off.claimed > purchased + 0.01
+    ? `−${off.total.toFixed(2)} t CO₂e/yr (${off.claimed.toFixed(1)} t claimed)`
+    : `−${off.total.toFixed(2)} t CO₂e/yr`;
   vstack("fig-offsets", Object.entries(OFFSET_CATS).map(([k, l], i) =>
     ({label: l, kg: off.per[k] * 1000, color: PAL[i % 8]})).filter(p => p.kg > 0),
     kg => `−${(kg / 1000).toFixed(2)} t`);
@@ -2261,7 +2302,7 @@ function renderOffsets() {
     touched();
   });
   $("offsetrows").querySelectorAll(".del").forEach(b => b.onclick = () => { OFFSETS.rows.splice(+b.dataset.i, 1); touched(); });
-  $("offsetadd").onclick = () => { OFFSETS.rows.push({label: "", cat: "gs", dollars: 0, price: ASSUME["offsets.removal_price"]}); touched(); };
+  $("offsetadd").onclick = () => { OFFSETS.rows.push({label: "", cat: "gs", type: "durable", dollars: 0, price: ASSUME["offsets.removal_price"]}); touched(); };
   $("recyclelbs").onchange = () => { OFFSETS.recycle_lbs = Math.max(0, +$("recyclelbs").value || 0); touched(); };
   $("compostlbs").onchange = () => { OFFSETS.compost_lbs = Math.max(0, +$("compostlbs").value || 0); touched(); };
   $("recyclecat").onchange = () => { OFFSETS.recycle_cat = $("recyclecat").value; touched(); };

@@ -991,6 +991,38 @@ ASSUMPTIONS = [
     # ------------------------------------------------------------------
     # Offsets & credits
     # ------------------------------------------------------------------
+    A("offsets.integrity", "offsets", "Offsets are credited by type, not at face value",
+      "A tonne emitted and a tonne durably removed really do cancel — both the "
+      "social cost and the mortality cost are per tonne of atmospheric CO₂, so "
+      "burning fuel and then injecting the carbon into geology genuinely is no "
+      "net addition. The app credits that in full.\n\n"
+      "What it will not do is treat every purchase as if it were that. Probst "
+      "et al. (2024, *Nature Communications*) synthesised 65 studies across "
+      "2,346 projects and 972 million credits and found **fewer than 16% "
+      "represent real emission reductions** — 25% for avoided deforestation, "
+      "11% for cookstoves. So each offset row carries a type, and the tonnes "
+      "you claim are credited at what that type's evidence supports:\n\n"
+      "• **Durable removal** (geologic injection, mineralisation, direct air "
+      "capture) — credited at 100%. Measured, additional, and stored for "
+      "millennia.\n"
+      "• **Biochar** — 90%. Real and verified under Puro-style MRV, but "
+      "permanence is centuries rather than geologic, so a small haircut.\n"
+      "• **Forest and land-based** — 25%, the avoided-deforestation figure "
+      "from Probst.\n"
+      "• **Other avoidance** (cookstoves, renewables, efficiency) — 15%.\n\n"
+      "The totals show gross and net side by side rather than net alone. Not "
+      "to discourage removal, but because they are different levers: reducing "
+      "changes what you cause, offsetting pays to undo it, and one merged "
+      "number hides which you pulled.",
+      value={"durable": 1.00, "biochar": 0.90, "forest": 0.25, "avoidance": 0.15},
+      display="credited 100% durable · 90% biochar · 25% forest · 15% other",
+      bias="over",
+      sources=(("Probst et al. 2024, Nature Communications 15:9562",
+                "https://www.nature.com/articles/s41467-024-53645-z"),
+               ("Berkeley Carbon Trading Project, REDD+ quality assessment",
+                "https://gspp.berkeley.edu/research-and-impact/publications/quality-assessment-of-redd-carbon-credit-projects")),
+      code=("site/v2-template.html",)),
+
     A("offsets.user_entered", "offsets", "Offsets at face value, price as quality proxy",
       "You enter dollars/year and the provider's $/tonne; tonnes = dollars ÷ "
       "price, subtracted from the section you assign. The app takes your "
