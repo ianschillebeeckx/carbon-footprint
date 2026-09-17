@@ -1078,18 +1078,47 @@ ASSUMPTIONS = [
       code=("site/v2-template.html",)),
 
     A("impact.mortality", "impact", "Excess deaths (Bressler mortality cost)",
-      "Bressler (2021): under RCP6.1-like warming, sustained emissions cause "
-      "~2.26×10⁻⁴ excess deaths through 2100 per tonne of CO₂ — about one "
-      "death per 4,400 tonnes. The app shows deaths if your current rate is "
-      "sustained 50 years, each year's tonnes counting deaths through 2100 "
-      "via a closed-form fit (per-year mortality 226 micromorts/t declining "
-      "quadratically at 0.04028·k² as the horizon shrinks). Temperature-"
-      "mortality only — excludes famine, conflict, and other channels, so "
-      "it's a conservative floor.",
-      value={"umort_per_t": 226.0, "decay": 0.04028, "horizon_years": 50},
+      "Bressler (2021, *Nature Communications*) estimates that each tonne of "
+      "CO₂ causes about **2.26×10⁻⁴ excess deaths** through 2100 — one death "
+      "per roughly 4,400 tonnes. The card shows what your current rate would "
+      "cause if sustained for 50 years: tonnes × 226 micromorts × 50. A "
+      "micromort is a one-in-a-million chance of death.\n\n"
+      "**The scenario matters and we used to describe it wrongly.** The "
+      "estimate comes from DICE-2016's no-policy baseline, which reaches "
+      "**4.1 °C** above pre-industrial by 2100 — a pessimistic path, not a "
+      "middling one. Bressler's own later work describes that baseline as "
+      "\"quite pessimistic\". An earlier version of this note called it "
+      "\"RCP6.1-like\", which understated the warming it assumes.\n\n"
+      "**On uncertainty, in both directions.** The *scope* is conservative: "
+      "it counts temperature-related mortality only, excluding famine, "
+      "conflict, flooding and disease. But the *estimate* is not a floor — "
+      "the paper's own 90% interval runs −1.71×10⁻⁴ to +6.78×10⁻⁴, which "
+      "includes zero. An earlier version of this note called it a "
+      "\"conservative floor\", which was wrong: conservative in what it "
+      "counts, not in how certain it is.\n\n"
+      "For a 50 t/yr household sustained 50 years, the defensible range "
+      "across Bressler's own work spans roughly **0.3 to 1.5 deaths** around "
+      "a central 0.6: the 2021 interval gives −0.4 to 1.5, and his 2025 "
+      "update — new scenarios, an updated climate module and heat adaptation "
+      "— gives 1.37×10⁻⁴ (about 0.3 deaths), roughly 39% below the published "
+      "figure. That update remains a working paper; as of September 2026 no "
+      "peer-reviewed version is indexed, so the 2021 coefficient is what we "
+      "use. The card shows one decimal deliberately — a second would claim "
+      "precision this range cannot support.\n\n"
+      "One simplification worth recording: an earlier version applied an "
+      "undocumented quadratic decay (0.04028·k²) meant to reflect later "
+      "emission-years having less time to accumulate deaths before 2100. It "
+      "could not be reconstructed from either paper, reduced the total by "
+      "14%, and implied deaths accrue *faster* early — while Bressler's own "
+      "figures show them back-loaded. It has been dropped in favour of the "
+      "plain linear sum.",
+      value={"umort_per_t": 226.0, "horizon_years": 50},
       display="≈ 1 death / 4,400 t (50-yr horizon)",
-      bias="under",
-      sources=(("Bressler 2021, Nature Communications", "https://www.nature.com/articles/s41467-021-24487-w"),),
+      bias="varies",
+      sources=(("Bressler 2021, Nature Communications 12:4467",
+                "https://www.nature.com/articles/s41467-021-24487-w"),
+               ("Bressler 2025, Breaking Down the Mortality and Social Cost of Carbon (working paper)",
+                "https://static1.squarespace.com/static/59bf26af29f187c6f3a9fbbf/t/678f111666f6b97afdd39e9c/1737429272631/JMP.pdf")),
       code=("site/v2-template.html",)),
 
     A("impact.us_benchmark", "impact", "US household benchmark",

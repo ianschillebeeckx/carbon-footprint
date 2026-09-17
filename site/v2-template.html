@@ -240,7 +240,7 @@
   <div class="stat"><div class="k" id="imp-offset-k">To offset</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
     <button class="info" aria-label="About this number" data-tip="What permanently removing this much carbon would cost at a real durable-removal price (Charm Industrial bio-oil sequestration). The percentage is the surcharge on your G&amp;S spending if every purchase paid for its own removal.">?</button></div>
   <div class="stat"><div class="k" id="imp-deaths-k">Excess deaths</div><div class="v" id="imp-deaths">–</div><div class="sub">Bressler mortality cost, horizon 2100</div>
-    <button class="info" aria-label="About this number" data-tip="Excess global deaths if this rate is sustained, counting deaths through 2100 — calibrated to Bressler (2021). A micromort is a one-in-a-million chance of death. See methodology.">?</button></div>
+    <button class="info" aria-label="About this number" data-tip="Excess global deaths if this rate is sustained for 50 years, counting deaths through 2100 — Bressler (2021), 2.26×10⁻⁴ deaths per tonne. A micromort is a one-in-a-million chance of death. Shown to one decimal on purpose: the estimate counts heat-related deaths only (conservative in scope) but its own 90% interval is wide and includes zero, so the range across the literature is roughly 0.3–1.5 deaths for an average household. See methodology.">?</button></div>
 </div>
 
 <div class="maintabs">
@@ -569,10 +569,14 @@ function renderImpact() {
   $("imp-damage-pct").textContent = annualSpend ? `${(damage/annualSpend*100).toFixed(1)}% of G&S spending` : "";
   $("imp-offset").innerHTML = `$${fmt(offset)} <small>/yr</small>`;
   $("imp-offset-pct").textContent = annualSpend ? `+${(offset/annualSpend*100).toFixed(1)}% on G&S spending` : "";
-  // closed-form fit to Bressler (2021) — see the mortality entry on the methodology page
+  // Bressler (2021): tonnes x micromorts/t x years. One decimal, not two —
+  // the source's own 90% interval spans a factor of several and includes zero,
+  // so a second decimal would claim precision that isn't there. See the
+  // mortality entry on the methodology page for the range.
   const M = ASSUME["impact.mortality"];
-  const X = M.horizon_years, mm = tons * (M.umort_per_t * X - M.decay * (X-1)*X*(2*X-1)/6);
-  $("imp-deaths").innerHTML = `${(mm/1e6).toFixed(2)} <small>(${fmt(mm)} micromorts)</small>`;
+  const mm = tons * M.umort_per_t * M.horizon_years;
+  const deaths = mm / 1e6;
+  $("imp-deaths").innerHTML = `${deaths >= 0.1 ? deaths.toFixed(1) : "<0.1"} <small>(${fmt(mm)} micromorts)</small>`;
   $("imp-damage-k").textContent = `Climate damages · $${ASSUME["impact.scc"]}/t`;
   $("imp-offset-k").textContent = `To offset · $${ASSUME["offsets.removal_price"]}/t (Charm)`;
   $("imp-deaths-k").textContent = `Excess deaths · ${X} yrs`;
