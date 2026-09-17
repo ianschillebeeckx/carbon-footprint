@@ -1086,13 +1086,17 @@ const vehKg = v => {
   return miles / Math.max(+v.mpg || 22, 1) * (f.d + f.u) + miles * man;
 };
 
-function travelKg() {
-  const veh = TRAVEL.vehicles.reduce((a, v) => a + vehKg(v), 0);
-  const g = TRAVEL.ground;
+// The section models take their input as a parameter, defaulting to the user's.
+// That lets the US-average benchmark run through the SAME code the user's own
+// number comes from — a second implementation would drift the moment a factor
+// changed, which is the whole failure this codebase keeps designing out.
+function travelKg(T = TRAVEL) {
+  const veh = T.vehicles.reduce((a, v) => a + vehKg(v), 0);
+  const g = T.ground;
   const ground = g.mode === "simple"
     ? (+g.publictrans || 0) * TF.ground.publictrans
     : ["bus", "transit", "commuter", "intercity"].reduce((a, k) => a + (+g[k] || 0) * TF.ground[k], 0);
-  const a = TRAVEL.air;
+  const a = T.air;
   const air = a.mode === "flights"
     ? ["short", "medium", "long"].reduce((s, k) => s + (+a["n" + k] || 0) * TF.airTripMiles[k] * TF.air[k], 0)
     : ["short", "medium", "long"].reduce((s, k) => s + (+a[k] || 0) * TF.air[k], 0);
@@ -1481,15 +1485,18 @@ function hourlyRecompute() {
 }
 
 
-function homeKg() {
-  const e = HOME.elec, g = HOME.gas, o = HOME.oil;
+function homeKg(H = HOME, opts = {}) {
+  const e = H.elec, g = H.gas, o = H.oil;
   const kwh = e.mode === "kwh" ? (+e.kwh || 0) : (+e.dollars || 0) / HF.elecDollarsPerKwh;
-  const elec = HOURLY && HOURLY_RES ? HOURLY_RES.kg : kwh * elecResolve().kg;
+  // The benchmark passes usNational so it prices the US grid rather than this
+  // user's ZIP, and never picks up their uploaded interval data.
+  const elec = opts.usNational ? kwh * (G2 ? G2.us_kg : HF.elecPerKwh)
+    : (HOURLY && HOURLY_RES ? HOURLY_RES.kg : kwh * elecResolve().kg);
   const therms = g.mode === "therms" ? (+g.therms || 0) : (+g.dollars || 0) / HF.gasDollarsPerTherm;
   const gas = therms * HF.gasPerTherm;
   const gallons = o.mode === "gallons" ? (+o.gallons || 0) : (+o.dollars || 0) / HF.oilDollarsPerGallon;
   const oil = gallons * HF.oilPerGallon;
-  const sqft = (+HOME.sqft || 0) * HF.sqftPerYear;
+  const sqft = (+H.sqft || 0) * HF.sqftPerYear;
   return {elec, gas, oil, sqft, total: elec + gas + oil + sqft};
 }
 
@@ -1893,12 +1900,12 @@ for (const k of Object.keys(FF)) if (FOOD.sv[k] == null) FOOD.sv[k] = FF[k].def;
 
 const foodCalDay = k => (+FOOD.sv[k] || 0) * FF[k].cps / 7;   // per person, readout only
 
-function foodKg() {
+function foodKg(F = FOOD) {
   // servings/week x 52 x kg per serving x household size. Calories are not in
   // this calculation at all — they are a plausibility readout beside each row.
-  const size = Math.max(1, +FOOD.size || 1);
+  const size = Math.max(1, +F.size || 1);
   let total = 0;
-  for (const k of Object.keys(FF)) total += (+FOOD.sv[k] || 0) * 52 * FF[k].kg * size;
+  for (const k of Object.keys(FF)) total += (+F.sv[k] || 0) * 52 * FF[k].kg * size;
   return total;
 }
 
