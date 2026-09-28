@@ -1031,8 +1031,7 @@ ASSUMPTIONS = [
       "0.433, everything else 39.4% × 0.375. Restaurants use their own "
       "factors: **0.12–0.22 kg/$** (full-service 0.168, limited-service "
       "0.220, the rest of NAICS 722 at 0.117) — mostly the service, "
-      "diet-blind. An earlier version of this note quoted 0.23–0.36 for "
-      "restaurants, which contradicted the data in this repo.\n\n"
+      "diet-blind.\n\n"
       "A strong disagreement with the diet estimate usually means heavy "
       "dining out (undercounted there) or premium groceries (overcounted). "
       "Note also that spend-based estimates run structurally below process "
@@ -1080,13 +1079,19 @@ ASSUMPTIONS = [
                 "https://gspp.berkeley.edu/research-and-impact/publications/quality-assessment-of-redd-carbon-credit-projects")),
       code=("site/v2-template.html",)),
 
-    A("offsets.user_entered", "offsets", "Offsets at face value, price as quality proxy",
-      "You enter dollars/year and the provider's $/tonne; tonnes = dollars ÷ "
-      "price, subtracted from the section you assign. The app takes your "
-      "provider's claim at face value — but price is a decent permanence "
-      "proxy: durable removal (bio-oil ~$600/t, DAC ~$1,000/t) permanently "
-      "stores carbon, while $5–20/t avoidance credits often don't hold up. "
-      "Cheap credits will happily zero your footprint on paper.",
+    A("offsets.user_entered", "offsets", "What you enter, and what it buys",
+      "You enter dollars/year, the provider's $/tonne and what kind of credit "
+      "it is. Tonnes claimed = dollars ÷ price; what gets subtracted from your "
+      "total is that figure discounted by type — see offsets.integrity for the "
+      "rates and the evidence behind them. Both numbers are shown, so a "
+      "shortfall between what you paid for and what it is worth is visible "
+      "rather than buried.\n\n"
+      "Price is a useful cross-check on the type you picked, because the two "
+      "should agree. Durable removal is expensive and real — biochar starts "
+      "near $130/t, bio-oil runs ~$600, direct air capture ~$1,000 — so a "
+      "durable claim priced at $10/t is describing something that isn't sold "
+      "at that price. The form flags that combination rather than the price "
+      "alone, so legitimate cheap biochar never trips it.",
       bias="varies",
       code=("site/v2-template.html",)),
 
@@ -1176,15 +1181,13 @@ ASSUMPTIONS = [
       "estimate comes from DICE-2016's no-policy baseline, which reaches "
       "**4.1 °C** above pre-industrial by 2100 — a pessimistic path, not a "
       "middling one. Bressler's own later work describes that baseline as "
-      "\"quite pessimistic\". An earlier version of this note called it "
-      "\"RCP6.1-like\", which understated the warming it assumes.\n\n"
+      "\"quite pessimistic\".\n\n"
       "**On uncertainty, in both directions.** The *scope* is conservative: "
       "it counts temperature-related mortality only, excluding famine, "
       "conflict, flooding and disease. But the *estimate* is not a floor — "
       "the paper's own 90% interval runs −1.71×10⁻⁴ to +6.78×10⁻⁴, which "
-      "includes zero. An earlier version of this note called it a "
-      "\"conservative floor\", which was wrong: conservative in what it "
-      "counts, not in how certain it is.\n\n"
+      "includes zero — conservative in what it counts, not in how certain it "
+      "is.\n\n"
       "For a 50 t/yr household sustained 50 years, the defensible range "
       "across Bressler's own work spans roughly **0.3 to 1.5 deaths** around "
       "a central 0.6: the 2021 interval gives −0.4 to 1.5, and his 2025 "
