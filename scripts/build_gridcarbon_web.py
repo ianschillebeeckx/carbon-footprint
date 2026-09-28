@@ -121,7 +121,7 @@ def main():
             hdir = OUT.parent / "hourly"
             hdir.mkdir(parents=True, exist_ok=True)
             (hdir / f"{ba}.json").write_text(json.dumps(
-                {"ba": ba, "year": 2024, "note": "kg CO2e/kWh delivered, indexed by "
+                {"ba": ba, "year": SHAPE_YEAR, "note": "kg CO2e/kWh delivered, indexed by "
                  "local (standard-time) hour of year: (doy-1)*24+hour",
                  "I": hourly_local(df, ba)}, separators=(",", ":")))
             shaped += 1

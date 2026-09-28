@@ -746,17 +746,54 @@ ASSUMPTIONS = [
 
     A("elec.hourly_upload", "electricity", "Advanced: your meter replaces the assumed profile",
       "Uploading a year of utility interval data (Green Button CSV) replaces "
-      "the TMY3 assumption entirely: emissions become the exact sum of your "
-      "kWh in each hour × that hour's grid intensity, joined by calendar "
-      "position onto the 2024 intensity year. Parsing is robust to arbitrary "
-      "column layouts (deterministic detection, then an LLM column-mapper as "
-      "fallback, then unit/date-order probes against the data). Quality "
-      "gates: all 12 months present with ≥ 20 days each, and an annual total "
-      "between 50 and 200,000 kWh — otherwise the upload is rejected rather "
-      "than silently wrong.",
+      "the modelled load shape entirely: emissions become the exact sum of "
+      "your kWh in each hour × that hour's grid intensity. Parsing is robust "
+      "to arbitrary column layouts (deterministic detection, then an LLM "
+      "column-mapper as fallback, then unit/date-order probes against the "
+      "data). Quality gates: all 12 months present with ≥ 20 days each, and "
+      "an annual total between 50 and 200,000 kWh — otherwise the upload is "
+      "rejected rather than silently wrong.\n\n"
+      "**Your hours are matched by calendar position** — day-of-year and "
+      "hour — onto the intensity year. Where the two years start on different "
+      "weekdays that misaligns weekday against weekend on **32.9% of days**, "
+      "which sounds worse than it is: measured on our own data it moves the "
+      "annual factor by **at most 0.6%**. Residential load differs less "
+      "between weekday and weekend than intuition suggests, and the "
+      "misalignment runs both directions and largely cancels over a year. "
+      "This is the concern most people raise about the join, and it is the "
+      "smaller of the two — see the intensity vintage below, which is worth "
+      "more than ten times as much.",
       value={"min_days_per_month": 20, "min_kwh": 50, "max_kwh": 200000},
-      display="Σ kWh_h × I_h · 12 months × ≥20 days",
+      display="Σ kWh_h × I_h · 12 months × ≥20 days · join costs ≤0.6%",
+      bias="neutral",
+      sources=(("Measured on EIA-930 hourly generation, shifting the join by one day",
+                "https://www.eia.gov/electricity/gridmonitor/"),),
       code=("site/v2-template.html", "worker/src/index.js", "src/cf/hourly_mapper.py")),
+
+    A("elec.hourly_vintage", "electricity", "Your meter year against the grid's year",
+      "Your interval data carries its own year; the hourly intensity array is "
+      "a fixed one, set by the most recent year that can be both reconstructed "
+      "from EIA-930 and calibrated against a measured eGRID annual rate. When "
+      "those differ, the grid itself has moved underneath your data.\n\n"
+      "**This is the real error in the upload path, not the calendar join.** "
+      "Across the 61 balancing authorities, **7 drifted more than 10% in a "
+      "single year** — generation mix changes fast where coal retires or "
+      "solar is added in bulk. That is more than ten times the 0.6% the "
+      "weekday misalignment costs.\n\n"
+      "The direction is not symmetric. The US grid has been getting cleaner "
+      "year on year, so pricing a *later* year's meter data against an "
+      "earlier intensity array **overstates** your electricity — which is the "
+      "usual case, since the intensity year can only advance when eGRID "
+      "publishes. The shape and the calibration target must move together: "
+      "pairing a newer shape with an older measured rate makes the "
+      "calibration scalar absorb a year of real fleet change as reconstruction "
+      "error, which is why this vintage advances only when eGRID does.",
+      bias="over",
+      sources=(("EPA eGRID (calibration target; release cadence sets this vintage)",
+                "https://www.epa.gov/egrid"),
+               ("EIA-930 Hourly Electric Grid Monitor (shape source)",
+                "https://www.eia.gov/electricity/gridmonitor/")),
+      code=("scripts/build_gridcarbon_web.py", "zip2co2_2/gridcarbon/build.py")),
 
     # ------------------------------------------------------------------
     # Home (non-electric)
