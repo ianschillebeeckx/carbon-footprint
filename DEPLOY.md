@@ -25,15 +25,16 @@ hints.
 4. **Frontend**: no separate Pages project — the Worker serves the static
    `web/` app via its `[assets]` block, same origin as the API. `web/_headers`
    carries the CSP and cache headers and costs no Worker invocation.
-5. **Analytics** (`/api/e` -> D1; see ANALYTICS.md). The binding ships
-   commented out, because an unknown `database_id` fails the deploy and this
-   Worker deploys on push — until it is uncommented, `/api/e` accepts events
-   and drops them, which is a working site with analytics dark.
+5. **Analytics** (`/api/e` -> D1; see ANALYTICS.md). Done — the `cf_analytics`
+   database exists, the schema is applied, the binding is live and
+   `ANALYTICS_SALT` is set. To rebuild it from scratch on another account:
    - `npx wrangler d1 create cf_analytics`, then paste the id into
-     `worker/wrangler.toml` and uncomment the `[[d1_databases]]` block.
+     `worker/wrangler.toml`.
    - `npx wrangler d1 execute cf_analytics --remote --file worker/schema.sql`
    - Add the secret `ANALYTICS_SALT` (any long random string). Without it the
      visitor hash still rotates daily but is guessable from IP + UA.
+   - A binding whose `database_id` does not exist is a hard deploy failure, and
+     this Worker deploys on push, so create the database first.
 6. **Turnstile** (optional, bot check on upload): Cloudflare dashboard ->
    Turnstile -> add `carbon.outis.cc`. Put the **secret** in the Worker secret
    `TURNSTILE_SECRET` and the **sitekey** in `TURNSTILE_SITEKEY` at the top of

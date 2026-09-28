@@ -1,4 +1,7 @@
-name = "carbon-footprint-api"
+# Must match the deployed Worker: the git integration named it from the repo,
+# and a local `wrangler deploy` under any other name would create a second,
+# separate Worker rather than updating this one.
+name = "carbon-footprint"
 main = "src/index.js"
 compatibility_date = "2026-08-01"
 
@@ -20,23 +23,14 @@ binding = "ASSETS"
 [ai]
 binding = "AI"
 
-# Product analytics event store — COMMENTED OUT UNTIL THE DATABASE EXISTS.
-# A binding with an unknown database_id fails the deploy, and this Worker
-# deploys on git push, so it stays off until these three steps are done:
-#   1. npx wrangler d1 create cf_analytics
-#   2. npx wrangler d1 execute cf_analytics --remote --file schema.sql
-#   3. paste the id below and uncomment this block
-# Until then /api/e accepts events and drops them (the Worker writes to
-# whichever sinks are bound), so the site runs fine with analytics dark.
-#
-# D1 over Analytics Engine as the primary sink: real SQL, no sampling, and no
-# 90-day retention cliff, which matters more than write throughput at this
-# scale. Query straight into a notebook with:
-#   npx wrangler d1 execute cf_analytics --remote --json --command "SELECT ..."
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "cf_analytics"
-# database_id = "PASTE_THE_ID_FROM_STEP_1"
+# Product analytics event store (schema: worker/schema.sql, queries:
+# ANALYTICS.md). D1 over Analytics Engine as the primary sink: real SQL, no
+# sampling, and no 90-day retention cliff, which matter more than write
+# throughput at this scale.
+[[d1_databases]]
+binding = "DB"
+database_name = "cf_analytics"
+database_id = "93d134cd-61ef-4fcd-bafb-1e216ad4da1a"
 
 # Analytics Engine mirror — uncomment to turn on. The Worker writes to whichever
 # sinks are bound, so this is the entire migration if D1's row-write budget ever
