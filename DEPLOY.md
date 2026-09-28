@@ -25,9 +25,12 @@ hints.
 4. **Frontend**: no separate Pages project — the Worker serves the static
    `web/` app via its `[assets]` block, same origin as the API. `web/_headers`
    carries the CSP and cache headers and costs no Worker invocation.
-5. **Analytics** (`/api/e` -> D1; see ANALYTICS.md):
-   - `npx wrangler d1 create cf_analytics` and paste the id into
-     `worker/wrangler.toml`.
+5. **Analytics** (`/api/e` -> D1; see ANALYTICS.md). The binding ships
+   commented out, because an unknown `database_id` fails the deploy and this
+   Worker deploys on push — until it is uncommented, `/api/e` accepts events
+   and drops them, which is a working site with analytics dark.
+   - `npx wrangler d1 create cf_analytics`, then paste the id into
+     `worker/wrangler.toml` and uncomment the `[[d1_databases]]` block.
    - `npx wrangler d1 execute cf_analytics --remote --file worker/schema.sql`
    - Add the secret `ANALYTICS_SALT` (any long random string). Without it the
      visitor hash still rotates daily but is guessable from IP + UA.
