@@ -12,11 +12,45 @@
 (function () {
   "use strict";
   var EP = "/api/e", MAX_Q = 40, FLUSH_MS = 15000, PAGE = "privacy";
+  var UID_KEY = "cf_uid", OPTOUT_KEY = "cf_no_analytics", UID_TTL_DAYS = 180;
   var t0 = Date.now();
   // Session id: per page load, held in a closure. Never written to the device,
   // so it is not storage and not an identifier that outlives the tab.
   var sid = Math.random().toString(36).slice(2, 10) + t0.toString(36);
   var q = [], seq = 0, timer = null, dead = false;
+
+  // Full opt-out: localStorage.setItem("cf_no_analytics", "1") in the console
+  // stops the tracker entirely. Documented on the privacy page.
+  function optedOut() {
+    try { return !!localStorage.getItem(OPTOUT_KEY); } catch (e) { return false; }
+  }
+
+  // Durable first-party identifier, so retention is measurable per browser
+  // rather than inferred from a server-side hash that fragments on every
+  // network change and merges everyone behind one NAT.
+  //
+  // The expiry is fixed from creation, not refreshed on use: an active visitor
+  // is re-identified after UID_TTL_DAYS rather than tracked indefinitely, which
+  // caps how long any one browser stays linkable and bounds cohort length to
+  // something an analysis would actually use.
+  //
+  // Global Privacy Control is a machine-readable objection, so those visitors
+  // never get an identifier written or read. They still count toward daily
+  // uniques through the server-side rotating hash, which is unchanged — the
+  // aggregate numbers stay right, only the per-browser linkage is dropped.
+  function uid() {
+    try { if (navigator.globalPrivacyControl) return ""; } catch (e) {}
+    try {
+      var raw = localStorage.getItem(UID_KEY);
+      var o = raw ? JSON.parse(raw) : null;
+      if (o && o.v && +o.exp > Date.now()) return o.v;
+      var v;
+      try { v = crypto.randomUUID(); }
+      catch (e) { v = Date.now().toString(36) + Math.random().toString(36).slice(2, 12); }
+      localStorage.setItem(UID_KEY, JSON.stringify({v: v, exp: Date.now() + UID_TTL_DAYS * 864e5}));
+      return v;
+    } catch (e) { return ""; }   // private browsing, blocked storage, full quota
+  }
 
   // "Returning" without storing anything new: the app already keeps the user's
   // own figures in localStorage because that IS the product. Their presence is
@@ -33,13 +67,17 @@
     try { return document.referrer ? new URL(document.referrer).host.slice(0, 80) : ""; }
     catch (e) { return ""; }
   }
-  var REF = refHost(), RET = returning();
+  // Before anything touches storage: an opted-out visitor must not have an
+  // identifier written for them, so this gate precedes uid().
+  if (optedOut()) return;   // leaves window.track as the page's no-op stub
+
+  var REF = refHost(), RET = returning(), UID = uid();
 
   function send(beacon) {
     if (!q.length || dead) return;
     var body;
     try {
-      body = JSON.stringify({s: sid, p: PAGE, r: REF, u: RET,
+      body = JSON.stringify({s: sid, p: PAGE, r: REF, u: RET, i: UID,
                              v: window.innerWidth || 0, e: q});
     } catch (e) { q = []; return; }
     q = [];
@@ -213,20 +251,31 @@ window width, your country as Cloudflare reports it, a random session id that ex
 memory and is gone when you close it, and a small number of non-identifying properties — which tab,
 how many seconds on it, how many transactions were in a file (the count, never the contents).</p>
 <div class="box">
-  <b>How a visitor is counted without identifying one.</b> The server derives a short hash from your IP
-  address, your browser's user-agent string, the current UTC date, and a secret. The IP address is never
-  written down. Because the date is part of the hash, today's value cannot be matched to yesterday's —
-  so daily visitor counts work and tracking a person over time does not. This is a deliberate trade: it
-  gives up long-range retention measurement in exchange for not building a profile.
+  <b>There is a first-party identifier, and here is exactly what it is.</b> A random id is stored in this
+  browser under <code>cf_uid</code>, and it <b>expires 180 days after it is created</b> — not renewed
+  each visit, so it lapses on a fixed schedule whether or not you keep coming back. It lets us tell
+  whether people return, which is the clearest signal of whether this tool is worth anyone's time. It is
+  random, tied to no account, and meaningless anywhere else: it is not shared with anybody, not sent to
+  any third party, and cannot follow you to another site.
+  <p style="margin:10px 0 0">A second, separate count comes from a short hash of your IP address, your
+  user-agent string, the current UTC date and a secret. The IP address is never written down, and because
+  the date is part of the hash it cannot be matched across days. That covers daily visitor counts for
+  people who have no <code>cf_uid</code> at all.</p>
 </div>
+<p><b>Two ways to turn this off,</b> both of which leave the app working exactly as it does now:</p>
+<ul>
+  <li>Send <b>Global Privacy Control</b> (built into some browsers, or via an extension). No
+  <code>cf_uid</code> is created or read — you are only ever counted in the daily aggregate.</li>
+  <li>Run <code>localStorage.setItem("cf_no_analytics", "1")</code> in this browser's console, or block
+  <code>/api/e</code>. That stops analytics entirely.</li>
+</ul>
+<p>Clearing this browser's site data deletes <code>cf_uid</code> along with everything else, and a fresh
+one is created on your next visit.</p>
 <p><b>Never collected:</b> your name, email address, or any account identifier (none is ever asked for);
 merchant names, amounts, dates or account names in analytics events; the contents of any file; your IP
-address in stored form; anything you typed into an input; and any identifier that persists across days
-or follows you to another site.</p>
-<p>Bot and crawler traffic is discarded at the Worker rather than recorded. If you send a
-<code>Do Not Track</code> or Global Privacy Control signal, note that the design above collects no
-personal data to opt out of — but blocking <code>/api/e</code> in your browser or an extension stops
-analytics entirely, and the app works exactly the same without it.</p>
+address in stored form; anything you typed into an input; and any identifier shared with a third party
+or capable of following you to another site.</p>
+<p>Bot and crawler traffic is discarded at the Worker rather than recorded.</p>
 
 <h2>Abuse protection</h2>
 <p>The classification endpoint is rate-limited per IP address per day and capped account-wide, to keep

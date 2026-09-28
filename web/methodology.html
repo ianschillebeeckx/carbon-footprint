@@ -12,11 +12,45 @@
 (function () {
   "use strict";
   var EP = "/api/e", MAX_Q = 40, FLUSH_MS = 15000, PAGE = "methodology";
+  var UID_KEY = "cf_uid", OPTOUT_KEY = "cf_no_analytics", UID_TTL_DAYS = 180;
   var t0 = Date.now();
   // Session id: per page load, held in a closure. Never written to the device,
   // so it is not storage and not an identifier that outlives the tab.
   var sid = Math.random().toString(36).slice(2, 10) + t0.toString(36);
   var q = [], seq = 0, timer = null, dead = false;
+
+  // Full opt-out: localStorage.setItem("cf_no_analytics", "1") in the console
+  // stops the tracker entirely. Documented on the privacy page.
+  function optedOut() {
+    try { return !!localStorage.getItem(OPTOUT_KEY); } catch (e) { return false; }
+  }
+
+  // Durable first-party identifier, so retention is measurable per browser
+  // rather than inferred from a server-side hash that fragments on every
+  // network change and merges everyone behind one NAT.
+  //
+  // The expiry is fixed from creation, not refreshed on use: an active visitor
+  // is re-identified after UID_TTL_DAYS rather than tracked indefinitely, which
+  // caps how long any one browser stays linkable and bounds cohort length to
+  // something an analysis would actually use.
+  //
+  // Global Privacy Control is a machine-readable objection, so those visitors
+  // never get an identifier written or read. They still count toward daily
+  // uniques through the server-side rotating hash, which is unchanged — the
+  // aggregate numbers stay right, only the per-browser linkage is dropped.
+  function uid() {
+    try { if (navigator.globalPrivacyControl) return ""; } catch (e) {}
+    try {
+      var raw = localStorage.getItem(UID_KEY);
+      var o = raw ? JSON.parse(raw) : null;
+      if (o && o.v && +o.exp > Date.now()) return o.v;
+      var v;
+      try { v = crypto.randomUUID(); }
+      catch (e) { v = Date.now().toString(36) + Math.random().toString(36).slice(2, 12); }
+      localStorage.setItem(UID_KEY, JSON.stringify({v: v, exp: Date.now() + UID_TTL_DAYS * 864e5}));
+      return v;
+    } catch (e) { return ""; }   // private browsing, blocked storage, full quota
+  }
 
   // "Returning" without storing anything new: the app already keeps the user's
   // own figures in localStorage because that IS the product. Their presence is
@@ -33,13 +67,17 @@
     try { return document.referrer ? new URL(document.referrer).host.slice(0, 80) : ""; }
     catch (e) { return ""; }
   }
-  var REF = refHost(), RET = returning();
+  // Before anything touches storage: an opted-out visitor must not have an
+  // identifier written for them, so this gate precedes uid().
+  if (optedOut()) return;   // leaves window.track as the page's no-op stub
+
+  var REF = refHost(), RET = returning(), UID = uid();
 
   function send(beacon) {
     if (!q.length || dead) return;
     var body;
     try {
-      body = JSON.stringify({s: sid, p: PAGE, r: REF, u: RET,
+      body = JSON.stringify({s: sid, p: PAGE, r: REF, u: RET, i: UID,
                              v: window.innerWidth || 0, e: q});
     } catch (e) { q = []; return; }
     q = [];
@@ -435,7 +473,9 @@ The advanced hourly-electricity upload sends about <b>24 rows</b> of your CSV �
 
 The server keeps requester IP addresses for roughly a day, in order to rate-limit the classification and parsing endpoints.
 
-Usage analytics are first-party and cookieless: no third-party script, no advertising pixel, and no identifier stored on your device — which is why there is no cookie banner. Each event carries a name (<code>page_view</code>, <code>tab_view</code>, <code>upload_done</code>), the page, the referring site's host, your window width, your country, a session id that exists only in the tab's memory, and counts such as how many tabs you filled in or how many transactions a file held. Never the contents: no merchant name, amount, date, or anything typed into an input. A visitor is counted by hashing your IP address, user agent, the UTC date and a secret — the IP is never written down, and because the date is inside the hash, today's value cannot be matched to yesterday's. That deliberately gives up long-range retention measurement in exchange for not building a profile.</p><p class="meta">Sources: <a href="https://carbon.outis.cc/privacy" target="_blank" rel="noopener">Privacy page</a> &nbsp;|&nbsp; Code &amp; data: <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/build_web.py" target="_blank" rel="noopener"><code>build_web.py</code></a> · <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/analytics.py" target="_blank" rel="noopener"><code>analytics.py</code></a> · <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/worker/src/index.js" target="_blank" rel="noopener"><code>index.js</code></a></p></article>
+Usage analytics are first-party: no third-party script, no advertising pixel, nothing shared with anyone. Each event carries a name (<code>page_view</code>, <code>tab_view</code>, <code>upload_done</code>), the page, the referring site's host, your window width, your country, a session id that exists only in the tab's memory, and counts such as how many tabs you filled in or how many transactions a file held. Never the contents: no merchant name, amount, date, or anything typed into an input.
+
+There is one <b>persistent identifier</b>: a random id in this browser's localStorage (<code>cf_uid</code>) that <b>expires 180 days after it is created</b> and is not renewed by visiting again. It exists to measure whether people come back, which is the most direct evidence available that this tool is useful to anyone. It is random, tied to no account, and cannot follow you to another site. Separately, daily reach is counted by hashing IP address, user agent, the UTC date and a secret: the IP is never written down and the hash cannot be matched across days, so it covers visitors who have no <code>cf_uid</code> at all. Sending Global Privacy Control suppresses the identifier, and setting <code>cf_no_analytics</code> in localStorage stops analytics outright; the app is unchanged either way.</p><p class="meta">Sources: <a href="https://carbon.outis.cc/privacy" target="_blank" rel="noopener">Privacy page</a> &nbsp;|&nbsp; Code &amp; data: <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/build_web.py" target="_blank" rel="noopener"><code>build_web.py</code></a> · <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/analytics.py" target="_blank" rel="noopener"><code>analytics.py</code></a> · <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/worker/src/index.js" target="_blank" rel="noopener"><code>index.js</code></a></p></article>
 
 </main>
 <footer>Generated from <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/src/cf/assumptions.py" target="_blank" rel="noopener">src/cf/assumptions.py</a>

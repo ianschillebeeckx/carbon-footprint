@@ -15,7 +15,11 @@ CREATE TABLE IF NOT EXISTS events (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
   ts        INTEGER NOT NULL,   -- server receipt, epoch ms (client clocks lie)
   day       TEXT    NOT NULL,   -- YYYY-MM-DD UTC, the natural grouping key
-  visitor   TEXT    NOT NULL,   -- SHA-256(ip + ua + day + salt), 16 hex chars
+  visitor   TEXT    NOT NULL,   -- SHA-256(ip + ua + day + salt), 16 hex chars;
+                                --   daily reach, cannot be joined across days
+  uid       TEXT,               -- first-party localStorage id, 180-day expiry;
+                                --   the retention key. Empty for Global Privacy
+                                --   Control, private browsing, blocked storage
   session   TEXT    NOT NULL,   -- per page-load, client-generated, memory only
   seq       INTEGER NOT NULL,   -- event order within the session
   name      TEXT    NOT NULL,
@@ -34,3 +38,4 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS ix_events_day_name ON events (day, name);
 CREATE INDEX IF NOT EXISTS ix_events_session  ON events (session, seq);
 CREATE INDEX IF NOT EXISTS ix_events_visitor  ON events (visitor, day);
+CREATE INDEX IF NOT EXISTS ix_events_uid      ON events (uid, day);

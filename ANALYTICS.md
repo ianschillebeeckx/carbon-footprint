@@ -12,16 +12,33 @@ Nothing a user typed is ever an argument to `track()`.
 ## Why not an off-the-shelf tool
 
 The product promise is that your financial data stays on your device. A
-third-party analytics script contradicts that, and a persistent third-party
-identifier means a consent banner — which is itself a funnel step that loses
-visitors before they see anything. So the tracker is ours, it sets no cookie,
-and the only identifier is computed server-side and expires at midnight UTC.
+third-party analytics script contradicts that. So the tracker is ours: same
+origin, no third party, nothing shared with anyone.
 
-The deliberate cost: **long-horizon retention is not measurable.** Because the
-UTC date is inside the visitor hash, today's id cannot be joined to yesterday's.
-Day-over-day return behaviour comes from the `returning` flag instead, which is
-derived from whether this browser already holds app state — data the app keeps
-for functional reasons anyway, so it costs no new identifier.
+## Two identities, for two different questions
+
+| | `uid` | `visitor` |
+|---|---|---|
+| Where it lives | `localStorage.cf_uid`, client | derived per request, server |
+| Lifetime | 180 days from creation, not renewed | one UTC day |
+| Answers | retention, cohorts, repeat visits | daily reach |
+| Missing for | GPC, private browsing, blocked storage | nobody |
+
+`uid` is a real first-party identifier, not a hash pretending otherwise. It was
+chosen over stretching the visitor hash to a longer period because that hash
+degrades badly as the window grows: Chrome ships a major version roughly every
+four weeks and the version is in the UA string, so a month-long hash silently
+re-identifies a large share of users; network switching fragments one person
+into many; and NAT merges many people into one. Those errors are negligible
+over a day and uncorrectable over a month, in both directions at once.
+
+**Use `uid` for retention and `visitor` for reach.** They disagree by design —
+`uid` undercounts (anyone opting out or clearing storage), `visitor` both over-
+and under-counts at the margins. Neither is ever derived from anything typed.
+
+Two escape hatches, both documented on the privacy page: Global Privacy Control
+suppresses `uid` while aggregate counts continue through `visitor`, and
+`localStorage.cf_no_analytics` stops the tracker entirely.
 
 ## Schema
 
@@ -31,6 +48,7 @@ for functional reasons anyway, so it costs no new identifier.
 |---|---|
 | `ts` / `day` | Server receipt time; `day` is UTC `YYYY-MM-DD` |
 | `visitor` | `SHA-256(ip + ua + day + salt)`, 16 hex. Rotates daily. IP never stored |
+| `uid` | First-party localStorage id, 180-day expiry. The retention key. Empty when suppressed |
 | `session` | Per page load, generated in the tab's memory, never written to the device |
 | `seq` | Event order within a session |
 | `name` | Event name (below) |
@@ -182,6 +200,49 @@ SELECT COUNT(DISTINCT session) AS sessions_correcting,
        COUNT(*)                AS corrections,
        json_extract(props,'$.kind') AS kind
 FROM events WHERE name='merchant_correct' GROUP BY kind;
+```
+
+**Retention — of the browsers first seen on day D, how many came back?**
+This is the query the `uid` exists for, and the most direct evidence available
+that the thing is worth building on.
+
+```sql
+WITH first_seen AS (
+  SELECT uid, MIN(day) AS cohort FROM events WHERE uid != '' GROUP BY uid
+),
+activity AS (
+  SELECT DISTINCT e.uid, f.cohort, e.day,
+         CAST(julianday(e.day) - julianday(f.cohort) AS INTEGER) AS day_n
+  FROM events e JOIN first_seen f ON f.uid = e.uid
+  WHERE e.uid != ''
+)
+SELECT cohort,
+       COUNT(DISTINCT CASE WHEN day_n = 0 THEN uid END) AS cohort_size,
+       COUNT(DISTINCT CASE WHEN day_n BETWEEN 1 AND 7  THEN uid END) AS returned_d1_7,
+       COUNT(DISTINCT CASE WHEN day_n BETWEEN 8 AND 30 THEN uid END) AS returned_d8_30
+FROM activity GROUP BY cohort ORDER BY cohort DESC;
+```
+
+**Do people who return actually get further?** If returners do not fill in more
+than first-timers, the app is not holding anyone — which is worth knowing before
+building anything new.
+
+```sql
+WITH last_end AS (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY session ORDER BY seq DESC) AS rn
+  FROM events WHERE name = 'session_end'
+),
+visit_no AS (
+  SELECT uid, day, DENSE_RANK() OVER (PARTITION BY uid ORDER BY day) AS nth_day
+  FROM (SELECT DISTINCT uid, day FROM events WHERE uid != '')
+)
+SELECT CASE WHEN v.nth_day = 1 THEN 'first visit' ELSE 'returned' END AS visit,
+       COUNT(*)                                          AS sessions,
+       ROUND(AVG(json_extract(e.props,'$.n_filled')), 2) AS avg_tabs_filled
+FROM last_end e
+JOIN visit_no v ON v.uid = e.uid AND v.day = e.day
+WHERE e.rn = 1 AND e.uid != ''
+GROUP BY visit;
 ```
 
 **Traffic sources.**

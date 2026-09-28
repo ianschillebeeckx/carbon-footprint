@@ -13,11 +13,18 @@ runs after it (see the ReferenceError in git history). The stub makes an
 un-injected page degrade to doing nothing instead of breaking.
 
 Privacy shape, mirrored in site/privacy-template.html and the `data` section of
-the assumptions registry: no cookie, no persistent identifier, no third-party
-request. The browser sends an event name, a per-page-load session id held only
-in memory, a referrer host, and a viewport width. The Worker adds a visitor
-hash that rotates at midnight UTC. Nothing a user typed is ever an argument to
-track().
+the assumptions registry. No cookie and no third-party request. The browser
+sends an event name, a per-page-load session id held only in memory, a referrer
+host, a viewport width, and a first-party identifier in localStorage that
+expires 180 days after it is created. The Worker adds a visitor hash that
+rotates daily, which still carries anyone the identifier does not cover.
+Nothing a user typed is ever an argument to track().
+
+The identifier exists to make retention measurable — whether people come back
+is the clearest read on whether the thing is useful — and it is a real
+identifier, not a hash pretending otherwise. Two escape hatches: Global Privacy
+Control suppresses it (aggregate counts continue through the server hash), and
+`localStorage.cf_no_analytics` stops the tracker outright.
 """
 
 import json
@@ -29,11 +36,45 @@ TRACKER_JS = r"""
 (function () {
   "use strict";
   var EP = "/api/e", MAX_Q = 40, FLUSH_MS = 15000, PAGE = __PAGE__;
+  var UID_KEY = "cf_uid", OPTOUT_KEY = "cf_no_analytics", UID_TTL_DAYS = 180;
   var t0 = Date.now();
   // Session id: per page load, held in a closure. Never written to the device,
   // so it is not storage and not an identifier that outlives the tab.
   var sid = Math.random().toString(36).slice(2, 10) + t0.toString(36);
   var q = [], seq = 0, timer = null, dead = false;
+
+  // Full opt-out: localStorage.setItem("cf_no_analytics", "1") in the console
+  // stops the tracker entirely. Documented on the privacy page.
+  function optedOut() {
+    try { return !!localStorage.getItem(OPTOUT_KEY); } catch (e) { return false; }
+  }
+
+  // Durable first-party identifier, so retention is measurable per browser
+  // rather than inferred from a server-side hash that fragments on every
+  // network change and merges everyone behind one NAT.
+  //
+  // The expiry is fixed from creation, not refreshed on use: an active visitor
+  // is re-identified after UID_TTL_DAYS rather than tracked indefinitely, which
+  // caps how long any one browser stays linkable and bounds cohort length to
+  // something an analysis would actually use.
+  //
+  // Global Privacy Control is a machine-readable objection, so those visitors
+  // never get an identifier written or read. They still count toward daily
+  // uniques through the server-side rotating hash, which is unchanged — the
+  // aggregate numbers stay right, only the per-browser linkage is dropped.
+  function uid() {
+    try { if (navigator.globalPrivacyControl) return ""; } catch (e) {}
+    try {
+      var raw = localStorage.getItem(UID_KEY);
+      var o = raw ? JSON.parse(raw) : null;
+      if (o && o.v && +o.exp > Date.now()) return o.v;
+      var v;
+      try { v = crypto.randomUUID(); }
+      catch (e) { v = Date.now().toString(36) + Math.random().toString(36).slice(2, 12); }
+      localStorage.setItem(UID_KEY, JSON.stringify({v: v, exp: Date.now() + UID_TTL_DAYS * 864e5}));
+      return v;
+    } catch (e) { return ""; }   // private browsing, blocked storage, full quota
+  }
 
   // "Returning" without storing anything new: the app already keeps the user's
   // own figures in localStorage because that IS the product. Their presence is
@@ -50,13 +91,17 @@ TRACKER_JS = r"""
     try { return document.referrer ? new URL(document.referrer).host.slice(0, 80) : ""; }
     catch (e) { return ""; }
   }
-  var REF = refHost(), RET = returning();
+  // Before anything touches storage: an opted-out visitor must not have an
+  // identifier written for them, so this gate precedes uid().
+  if (optedOut()) return;   // leaves window.track as the page's no-op stub
+
+  var REF = refHost(), RET = returning(), UID = uid();
 
   function send(beacon) {
     if (!q.length || dead) return;
     var body;
     try {
-      body = JSON.stringify({s: sid, p: PAGE, r: REF, u: RET,
+      body = JSON.stringify({s: sid, p: PAGE, r: REF, u: RET, i: UID,
                              v: window.innerWidth || 0, e: q});
     } catch (e) { q = []; return; }
     q = [];

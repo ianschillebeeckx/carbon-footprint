@@ -10,12 +10,16 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
 // identifier, no third-party request — so no consent banner, which matters
 // because a banner is itself a funnel step that loses visitors.
 //
-// The browser never sends anything that identifies it. `visitor` is derived
-// here from IP + user agent + the UTC date + a secret salt, and the IP is
-// discarded immediately; because the date is in the hash, yesterday's id for
-// the same person is uncorrelatable with today's. That buys daily uniques and
-// within-day funnels and deliberately gives up long-horizon retention — the
-// new-vs-returning flag the client sends covers the rest.
+// Two identities, deliberately. `uid` is a first-party identifier the browser
+// keeps in localStorage for 180 days from creation; it is what makes retention
+// measurable, and it is absent for anyone sending Global Privacy Control, using
+// private browsing, or blocking storage. `visitor` is derived here from IP +
+// user agent + the UTC date + a secret salt, with the IP discarded immediately;
+// because the date is in the hash it cannot be joined across days, so it counts
+// daily uniques for everyone including those without a uid.
+//
+// Use uid for retention and cohorts; use visitor for daily reach. Neither is
+// ever derived from anything a person typed.
 // ---------------------------------------------------------------------------
 
 const BOT_RE = /bot|crawl|spider|slurp|headless|preview|scan|monitor|curl|wget|python-requests|facebookexternalhit|bingpreview|lighthouse/i;
@@ -55,17 +59,17 @@ function toRow(e, base) {
 async function writeEvents(env, rows) {
   if (env.DB) {
     const stmt = env.DB.prepare(
-      "INSERT INTO events (ts,day,visitor,session,seq,name,page,ref,country,vw,is_returning,props) " +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+      "INSERT INTO events (ts,day,visitor,uid,session,seq,name,page,ref,country,vw,is_returning,props) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
     await env.DB.batch(rows.map((r) => stmt.bind(
-      r.ts, r.day, r.visitor, r.session, r.seq, r.name,
+      r.ts, r.day, r.visitor, r.uid, r.session, r.seq, r.name,
       r.page, r.ref, r.country, r.vw, r.is_returning, r.props)));
   }
   if (env.AE) {
     for (const r of rows) {
       env.AE.writeDataPoint({
         indexes: [r.visitor],
-        blobs: [r.name, r.page, r.session, r.ref, r.country, r.props],
+        blobs: [r.name, r.page, r.session, r.ref, r.country, r.props, r.uid],
         doubles: [r.vw, r.is_returning, r.seq],
       });
     }
@@ -328,6 +332,7 @@ async function handle(request, env, ctx) {
       const base = {
         ts: now, day,
         visitor: await visitorHash(request, env, day),
+        uid: String(body.i || "").slice(0, 64),
         session: String(body.s || "").slice(0, 32),
         page: String(body.p || "").slice(0, 24),
         ref: String(body.r || "").slice(0, 80),
