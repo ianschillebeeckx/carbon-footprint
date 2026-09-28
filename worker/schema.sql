@@ -6,15 +6,19 @@
 --
 -- What is deliberately NOT here: IP addresses, user agents, URLs with query
 -- strings, merchant names, amounts, or anything a user typed. `visitor` is a
--- salted hash that rotates at midnight UTC, so it identifies a person within a
--- day and is uncorrelatable across days by construction.
+-- salted hash that rotates at midnight US Pacific, so it identifies a person
+-- within a day and is uncorrelatable across days by construction. `uid` is the
+-- durable identifier; see ANALYTICS.md for which to use when.
 --
 -- Apply:  npx wrangler d1 execute cf_analytics --remote --file worker/schema.sql
 
 CREATE TABLE IF NOT EXISTS events (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
   ts        INTEGER NOT NULL,   -- server receipt, epoch ms (client clocks lie)
-  day       TEXT    NOT NULL,   -- YYYY-MM-DD UTC, the natural grouping key
+  day       TEXT    NOT NULL,   -- YYYY-MM-DD in US Pacific, NOT UTC: midnight
+                                --   UTC is 5pm Pacific, mid-peak-evening, and
+                                --   a boundary there splits one person's
+                                --   session across two reporting days
   visitor   TEXT    NOT NULL,   -- SHA-256(ip + ua + day + salt), 16 hex chars;
                                 --   daily reach, cannot be joined across days
   uid       TEXT,               -- first-party localStorage id, 180-day expiry;

@@ -20,7 +20,7 @@ origin, no third party, nothing shared with anyone.
 | | `uid` | `visitor` |
 |---|---|---|
 | Where it lives | `localStorage.cf_uid`, client | derived per request, server |
-| Lifetime | 180 days from creation, not renewed | one UTC day |
+| Lifetime | 180 days from creation, not renewed | one site day (US Pacific) |
 | Answers | retention, cohorts, repeat visits | daily reach |
 | Missing for | GPC, private browsing, blocked storage | nobody |
 
@@ -46,7 +46,7 @@ suppresses `uid` while aggregate counts continue through `visitor`, and
 
 | Column | Meaning |
 |---|---|
-| `ts` / `day` | Server receipt time; `day` is UTC `YYYY-MM-DD` |
+| `ts` / `day` | Server receipt time (epoch ms, UTC); `day` is `YYYY-MM-DD` in **US Pacific**, not UTC — midnight UTC is 5pm Pacific and would split peak evening usage across two reporting days |
 | `visitor` | `SHA-256(ip + ua + day + salt)`, 16 hex. Rotates daily. IP never stored |
 | `uid` | First-party localStorage id, 180-day expiry. The retention key. Empty when suppressed |
 | `session` | Per page load, generated in the tab's memory, never written to the device |

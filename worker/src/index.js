@@ -6,15 +6,14 @@
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 // ---------------------------------------------------------------------------
-// First-party product analytics. Same origin, no cookie, no persistent
-// identifier, no third-party request — so no consent banner, which matters
-// because a banner is itself a funnel step that loses visitors.
+// First-party product analytics. Same origin, no cookie, no third-party
+// request, nothing shared with anyone.
 //
 // Two identities, deliberately. `uid` is a first-party identifier the browser
 // keeps in localStorage for 180 days from creation; it is what makes retention
 // measurable, and it is absent for anyone sending Global Privacy Control, using
 // private browsing, or blocking storage. `visitor` is derived here from IP +
-// user agent + the UTC date + a secret salt, with the IP discarded immediately;
+// user agent + the site day + a secret salt, with the IP discarded immediately;
 // because the date is in the hash it cannot be joined across days, so it counts
 // daily uniques for everyone including those without a uid.
 //
@@ -25,6 +24,30 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
 const BOT_RE = /bot|crawl|spider|slurp|headless|preview|scan|monitor|curl|wget|python-requests|facebookexternalhit|bingpreview|lighthouse/i;
 const MAX_EVENTS = 50;      // per request; the client batches at 40
 const MAX_PROPS = 12;       // per event
+
+// The reporting day is a US Pacific calendar day, not a UTC one. This app is
+// US-specific top to bottom (EPA factors, eGRID, NAICS, BLS CE), and midnight
+// UTC is 5pm Pacific / 8pm Eastern — straight through peak evening usage. A
+// boundary there splits one person's evening across two days, inflating daily
+// uniques and breaking visitor-level joins exactly when the site is busiest.
+// Midnight Pacific falls between 12am and 3am everywhere in the contiguous US.
+const DAY_TZ = "America/Los_Angeles";
+const DAY_FMT = (() => {
+  try {
+    // en-CA renders as YYYY-MM-DD, which is the format we want to store.
+    return new Intl.DateTimeFormat("en-CA", { timeZone: DAY_TZ,
+      year: "numeric", month: "2-digit", day: "2-digit" });
+  } catch (e) { return null; }   // no ICU timezone data — fall back below
+})();
+
+function siteDay(ts) {
+  if (DAY_FMT) {
+    try { return DAY_FMT.format(ts); } catch (e) { /* fall through */ }
+  }
+  // Fixed -8 fallback: puts the boundary between midnight and 1am Pacific
+  // year-round, which is the same low-traffic window DST or not.
+  return new Date(ts - 8 * 3600e3).toISOString().slice(0, 10);
+}
 
 async function visitorHash(request, env, day) {
   const ip = request.headers.get("CF-Connecting-IP") || "";
@@ -124,6 +147,9 @@ const NON_PURCHASE_HINTS = new Set([
   "taxes", "mortgage", "heloc", "loan repayment", "balance adjustments",
 ]);
 
+// NB: the abuse counters below key on the UTC date, not siteDay(). They are
+// bounded by their own ~25h TTL rather than by a calendar day, so which hour
+// they roll over on carries no reporting meaning — unlike the analytics day.
 async function ipAllowed(env, ip) {
   const key = `rl:${ip}:${new Date().toISOString().slice(0, 10)}`;
   const n = parseInt((await env.MERCHANT_CACHE.get(key)) || "0", 10);
@@ -328,7 +354,7 @@ async function handle(request, env, ctx) {
       const evs = Array.isArray(body && body.e) ? body.e.slice(0, MAX_EVENTS) : [];
       if (!evs.length) return ok;
       const now = Date.now();
-      const day = new Date(now).toISOString().slice(0, 10);
+      const day = siteDay(now);
       const base = {
         ts: now, day,
         visitor: await visitorHash(request, env, day),

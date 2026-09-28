@@ -1389,7 +1389,7 @@ ASSUMPTIONS = [
       "people come back, which is the most direct evidence available that "
       "this tool is useful to anyone. It is random, tied to no account, and "
       "cannot follow you to another site. Separately, daily reach is counted "
-      "by hashing IP address, user agent, the UTC date and a secret: the IP "
+      "by hashing IP address, user agent, the current date and a secret: the IP "
       "is never written down and the hash cannot be matched across days, so "
       "it covers visitors who have no `cf_uid` at all. Sending Global Privacy "
       "Control suppresses the identifier, and setting "
