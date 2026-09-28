@@ -15,119 +15,7 @@
 <meta property="og:image" content="https://carbon.outis.cc/card.svg">
 <meta name="twitter:card" content="summary_large_image">
 <script>window.track = function () {};</script>
-<script>
-(function () {
-  "use strict";
-  var EP = "/api/e", MAX_Q = 40, FLUSH_MS = 15000, PAGE = "landing";
-  var t0 = Date.now();
-  // Session id: per page load, held in a closure. Never written to the device,
-  // so it is not storage and not an identifier that outlives the tab.
-  var sid = Math.random().toString(36).slice(2, 10) + t0.toString(36);
-  var q = [], seq = 0, timer = null, dead = false;
-
-  // "Returning" without storing anything new: the app already keeps the user's
-  // own figures in localStorage because that IS the product. Their presence is
-  // a free new-vs-returning signal and costs no extra identifier.
-  function returning() {
-    try {
-      var k = ["cf_data", "cf_travel", "cf_home", "cf_food", "cf_offsets"], i;
-      for (i = 0; i < k.length; i++) if (localStorage.getItem(k[i])) return 1;
-    } catch (e) {}
-    return 0;
-  }
-  // Host only. A full referrer URL can carry a search query or a session token.
-  function refHost() {
-    try { return document.referrer ? new URL(document.referrer).host.slice(0, 80) : ""; }
-    catch (e) { return ""; }
-  }
-  var REF = refHost(), RET = returning();
-
-  function send(beacon) {
-    if (!q.length || dead) return;
-    var body;
-    try {
-      body = JSON.stringify({s: sid, p: PAGE, r: REF, u: RET,
-                             v: window.innerWidth || 0, e: q});
-    } catch (e) { q = []; return; }
-    q = [];
-    try {
-      if (beacon && navigator.sendBeacon) {
-        navigator.sendBeacon(EP, new Blob([body], {type: "application/json"}));
-      } else {
-        fetch(EP, {method: "POST", body: body, keepalive: true,
-                   headers: {"Content-Type": "application/json"}}).catch(function () {});
-      }
-    } catch (e) {}
-  }
-
-  window.track = function (name, props) {
-    try {
-      if (dead) return;
-      var ev = {n: String(name).slice(0, 40), t: Date.now() - t0, q: seq++};
-      if (props) for (var k in props) if (Object.prototype.hasOwnProperty.call(props, k)) ev[k] = props[k];
-      q.push(ev);
-      if (q.length >= MAX_Q) send(false);
-      else if (!timer) timer = setTimeout(function () { timer = null; send(false); }, FLUSH_MS);
-    } catch (e) {}
-  };
-
-  // Flush on the way out. visibilitychange is the only event that fires
-  // reliably on mobile backgrounding; pagehide covers bfcache navigation.
-  //
-  // A session that is backgrounded and resumed emits session_end more than
-  // once, on purpose: the alternative is firing once and losing everything a
-  // visitor did after the first tab-away, and unload events are too unreliable
-  // to bet the whole funnel position on. Later rows supersede earlier ones, so
-  // any query that aggregates session_end must take the highest seq per
-  // session — ANALYTICS.md does this in a `last_end` CTE.
-  document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "hidden") { window.track("session_end", sessionShape()); send(true); }
-  });
-  window.addEventListener("pagehide", function () { send(true); });
-
-  // Funnel position computed from state rather than reconstructed from clicks:
-  // one row that says exactly how far this person got, robust to dropped
-  // beacons and to events we forgot to add.
-  function sessionShape() {
-    var out = {dur: Math.round((Date.now() - t0) / 1000)};
-    try {
-      var filled = [], t = JSON.parse(localStorage.getItem("cf_travel") || "null");
-      if (t && ((t.vehicles || []).some(function (v) { return +v.miles > 0; }) ||
-                (t.air && (+t.air.short || +t.air.medium || +t.air.long)))) filled.push("travel");
-      var h = JSON.parse(localStorage.getItem("cf_home") || "null");
-      if (h && (+(h.elec || {}).kwh > 0 || +(h.elec || {}).dollars > 0)) filled.push("home");
-      if (localStorage.getItem("cf_food")) filled.push("food");
-      if (localStorage.getItem("cf_offsets")) filled.push("offsets");
-      var d = JSON.parse(localStorage.getItem("cf_data") || "null");
-      if (d && d.transactions && d.transactions.length) {
-        filled.push("gs");
-        out.txns = d.transactions.length;
-      }
-      out.filled = filled.join(",");
-      out.n_filled = filled.length;
-    } catch (e) {}
-    return out;
-  }
-
-  // Error reporting rides the same pipe. This is the highest-value signal on a
-  // public launch: a thrown exception here has already been shown to stop every
-  // autosave in the app with no visible symptom, and a stranger will simply
-  // leave rather than report it.
-  window.addEventListener("error", function (e) {
-    try {
-      window.track("error", {msg: String(e.message || "").slice(0, 160),
-                             src: String(e.filename || "").split("/").pop().slice(0, 40),
-                             line: e.lineno || 0});
-    } catch (x) {}
-  });
-  window.addEventListener("unhandledrejection", function (e) {
-    try {
-      var r = e.reason;
-      window.track("error", {msg: ("unhandled: " + ((r && r.message) || r)).slice(0, 160)});
-    } catch (x) {}
-  });
-})();
-</script>
+<!--ANALYTICS-->
 <style>
   :root {
     --ground:#F7F8F5; --card:#FFFFFF; --ink:#262B21; --muted:#6C7465; --leaf:#3E7C3A;
@@ -223,16 +111,16 @@
   <div class="goals">
     <div class="goal"><span class="n">01</span><div><b>See your footprint</b>
       <span>Tonnes of CO₂e per year across Travel, Home, Food, and Goods &amp; Services, next to a
-      US-average household — ~32 t CO2e / household / yr, computed from US-average inputs. That benchmark is computed by this same model
+      US-average household — {{impact.us_benchmark}}. That benchmark is computed by this same model
       rather than quoted from someone else's survey, so the bar and the tick can't disagree.</span></div></div>
     <div class="goal"><span class="n">02</span><div><b>Understand the stakes</b>
-      <span>Each tonne causes roughly $270 in climate damages, mostly borne by other
-      people. Sustained emissions cause measurable excess deaths — ≈ 1 death / 4,400 t (50-yr horizon), on Bressler's
+      <span>Each tonne causes roughly ${{impact.scc!}} in climate damages, mostly borne by other
+      people. Sustained emissions cause measurable excess deaths — {{impact.mortality}}, on Bressler's
       2021 mortality cost.</span></div></div>
     <div class="goal"><span class="n">03</span><div><b>Find your levers</b>
       <span>Which categories actually dominate for you, what cutting them would change, and what
       permanently removing the rest would cost at a real durable-removal price
-      ($600 a tonne) — not a $5 credit that doesn't hold up.</span></div></div>
+      (${{offsets.removal_price!}} a tonne) — not a $5 credit that doesn't hold up.</span></div></div>
   </div>
 
   <h3 class="sec">Pick a route</h3>
@@ -256,8 +144,8 @@
 
   <h3 class="sec">Why the numbers are worth trusting</h3>
   <div class="facts">
-    <div class="fact"><div class="v">54</div><div class="k">assumptions published, each with its value, rationale, sources and the direction it biases your total</div></div>
-    <div class="fact"><div class="v">972</div><div class="k">NAICS commodities priced from EPA supply-chain factors, browsable in full</div></div>
+    <div class="fact"><div class="v">__N_ASSUMPTIONS__</div><div class="k">assumptions published, each with its value, rationale, sources and the direction it biases your total</div></div>
+    <div class="fact"><div class="v">__N_NAICS__</div><div class="k">NAICS commodities priced from EPA supply-chain factors, browsable in full</div></div>
     <div class="fact"><div class="v">Hourly</div><div class="k">grid intensity per balancing authority, so electricity is priced when you actually used it</div></div>
   </div>
   <p style="color:var(--muted);font-size:0.88rem;margin-top:14px">Nothing here is a black box. The

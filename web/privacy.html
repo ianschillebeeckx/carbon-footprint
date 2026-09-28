@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Carbon Ledger — Privacy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="What Carbon Ledger stores, what leaves your device, and what it deliberately does not collect.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://carbon.outis.cc/privacy">
+<script>window.track = function () {};</script>
+<script>
+(function () {
+  "use strict";
+  var EP = "/api/e", MAX_Q = 40, FLUSH_MS = 15000, PAGE = "privacy";
+  var t0 = Date.now();
+  // Session id: per page load, held in a closure. Never written to the device,
+  // so it is not storage and not an identifier that outlives the tab.
+  var sid = Math.random().toString(36).slice(2, 10) + t0.toString(36);
+  var q = [], seq = 0, timer = null, dead = false;
+
+  // "Returning" without storing anything new: the app already keeps the user's
+  // own figures in localStorage because that IS the product. Their presence is
+  // a free new-vs-returning signal and costs no extra identifier.
+  function returning() {
+    try {
+      var k = ["cf_data", "cf_travel", "cf_home", "cf_food", "cf_offsets"], i;
+      for (i = 0; i < k.length; i++) if (localStorage.getItem(k[i])) return 1;
+    } catch (e) {}
+    return 0;
+  }
+  // Host only. A full referrer URL can carry a search query or a session token.
+  function refHost() {
+    try { return document.referrer ? new URL(document.referrer).host.slice(0, 80) : ""; }
+    catch (e) { return ""; }
+  }
+  var REF = refHost(), RET = returning();
+
+  function send(beacon) {
+    if (!q.length || dead) return;
+    var body;
+    try {
+      body = JSON.stringify({s: sid, p: PAGE, r: REF, u: RET,
+                             v: window.innerWidth || 0, e: q});
+    } catch (e) { q = []; return; }
+    q = [];
+    try {
+      if (beacon && navigator.sendBeacon) {
+        navigator.sendBeacon(EP, new Blob([body], {type: "application/json"}));
+      } else {
+        fetch(EP, {method: "POST", body: body, keepalive: true,
+                   headers: {"Content-Type": "application/json"}}).catch(function () {});
+      }
+    } catch (e) {}
+  }
+
+  window.track = function (name, props) {
+    try {
+      if (dead) return;
+      var ev = {n: String(name).slice(0, 40), t: Date.now() - t0, q: seq++};
+      if (props) for (var k in props) if (Object.prototype.hasOwnProperty.call(props, k)) ev[k] = props[k];
+      q.push(ev);
+      if (q.length >= MAX_Q) send(false);
+      else if (!timer) timer = setTimeout(function () { timer = null; send(false); }, FLUSH_MS);
+    } catch (e) {}
+  };
+
+  // Flush on the way out. visibilitychange is the only event that fires
+  // reliably on mobile backgrounding; pagehide covers bfcache navigation.
+  //
+  // A session that is backgrounded and resumed emits session_end more than
+  // once, on purpose: the alternative is firing once and losing everything a
+  // visitor did after the first tab-away, and unload events are too unreliable
+  // to bet the whole funnel position on. Later rows supersede earlier ones, so
+  // any query that aggregates session_end must take the highest seq per
+  // session — ANALYTICS.md does this in a `last_end` CTE.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") { window.track("session_end", sessionShape()); send(true); }
+  });
+  window.addEventListener("pagehide", function () { send(true); });
+
+  // Funnel position computed from state rather than reconstructed from clicks:
+  // one row that says exactly how far this person got, robust to dropped
+  // beacons and to events we forgot to add.
+  function sessionShape() {
+    var out = {dur: Math.round((Date.now() - t0) / 1000)};
+    try {
+      var filled = [], t = JSON.parse(localStorage.getItem("cf_travel") || "null");
+      if (t && ((t.vehicles || []).some(function (v) { return +v.miles > 0; }) ||
+                (t.air && (+t.air.short || +t.air.medium || +t.air.long)))) filled.push("travel");
+      var h = JSON.parse(localStorage.getItem("cf_home") || "null");
+      if (h && (+(h.elec || {}).kwh > 0 || +(h.elec || {}).dollars > 0)) filled.push("home");
+      if (localStorage.getItem("cf_food")) filled.push("food");
+      if (localStorage.getItem("cf_offsets")) filled.push("offsets");
+      var d = JSON.parse(localStorage.getItem("cf_data") || "null");
+      if (d && d.transactions && d.transactions.length) {
+        filled.push("gs");
+        out.txns = d.transactions.length;
+      }
+      out.filled = filled.join(",");
+      out.n_filled = filled.length;
+    } catch (e) {}
+    return out;
+  }
+
+  // Error reporting rides the same pipe. This is the highest-value signal on a
+  // public launch: a thrown exception here has already been shown to stop every
+  // autosave in the app with no visible symptom, and a stranger will simply
+  // leave rather than report it.
+  window.addEventListener("error", function (e) {
+    try {
+      window.track("error", {msg: String(e.message || "").slice(0, 160),
+                             src: String(e.filename || "").split("/").pop().slice(0, 40),
+                             line: e.lineno || 0});
+    } catch (x) {}
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    try {
+      var r = e.reason;
+      window.track("error", {msg: ("unhandled: " + ((r && r.message) || r)).slice(0, 160)});
+    } catch (x) {}
+  });
+})();
+</script>
+<style>
+  :root {
+    --ground:#F7F8F5; --card:#FFFFFF; --ink:#262B21; --muted:#6C7465; --leaf:#3E7C3A;
+    --chip:#E6EEE1; --line:#D9DED2; --warn:#A15C00; --warnbg:#F6EDDD;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ground:#161A15; --card:#1E241D; --ink:#E4E8DD; --muted:#98A18F; --leaf:#7DB979;
+            --chip:#263124; --line:#333B31; --warn:#D9A45B; --warnbg:#2E2718; }
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--ground); color: var(--ink); margin: 0; padding: 0 16px;
+         font-family: "Avenir Next", Seravek, system-ui, sans-serif; line-height: 1.55; }
+  main { max-width: 760px; margin: 0 auto 80px; }
+  header.top { max-width: 760px; margin: 0 auto; display: flex; align-items: baseline; gap: 14px;
+               flex-wrap: wrap; padding: 14px 0 10px; border-bottom: 1px solid var(--line); }
+  header.top h1 { font-size: 1.02rem; font-weight: 600; margin: 0; flex: 1; }
+  a { color: var(--leaf); text-underline-offset: 2px; }
+  header.top a { font-size: 0.8rem; }
+  h2 { font-size: 1.05rem; font-weight: 600; margin: 38px 0 10px; }
+  p, li { font-size: 0.92rem; }
+  p.lead { color: var(--muted); font-size: 0.95rem; }
+  ul { padding-left: 22px; }
+  li { margin: 6px 0; }
+  code { font-family: var(--mono); font-size: 0.85em; background: var(--chip); border-radius: 4px; padding: 1px 5px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 0.86rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .tw { overflow-x: auto; }
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 16px 0; }
+  .box.warn { background: var(--warnbg); border-color: var(--warn); }
+  footer { max-width: 760px; margin: 0 auto; padding: 20px 0 60px; border-top: 1px solid var(--line);
+           color: var(--muted); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Carbon Ledger — Privacy</h1>
+  <a href="/">home</a>
+  <a href="app">app</a>
+  <a href="methodology.html">methodology</a>
+</header>
+<main>
+
+<p class="lead">Carbon Ledger is a static web app with almost no server. There is no account, no login,
+and no database of users. This page says exactly what is stored, what crosses the network, and what is
+deliberately not collected.</p>
+
+<h2>Your financial data stays on your device</h2>
+<p>When you upload a transactions CSV, the file is read and parsed <b>in your browser</b>. It is not
+uploaded anywhere. The parsed results — transactions, the industry each merchant was mapped to, and
+your Travel, Home, Food and Offsets inputs — are written to your browser's <code>localStorage</code>
+under keys beginning <code>cf_</code>. That is the only copy in existence.</p>
+<div class="box">
+  <b>Consequences worth knowing.</b> Nobody can recover your data for you, because nobody else has it.
+  Clearing your browser data, using private browsing, or switching device or browser means starting
+  over. <b>Reset all</b> in the app deletes every <code>cf_</code> key immediately.
+</div>
+
+<h2>What does leave your device</h2>
+<div class="tw"><table>
+<thead><tr><th>What</th><th>Goes to</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Normalized merchant name + the statement category, e.g. <code>"BLUE BOTTLE" · Coffee Shops</code></td>
+    <td>This site's Cloudflare Worker, then a shared cache</td>
+    <td>To look up which NAICS industry that merchant has already been mapped to</td></tr>
+<tr><td>The same merchant name + category, only for merchants nobody has classified before</td>
+    <td>Anthropic's API</td>
+    <td>To classify a merchant the shared cache has never seen</td></tr>
+<tr><td>The first ~25 rows of an interval-usage CSV, if you use the advanced electricity upload</td>
+    <td>Anthropic's API</td>
+    <td>To identify which columns hold the timestamp and the usage reading. The readings themselves are processed locally</td></tr>
+<tr><td>Event names and counts (see below)</td>
+    <td>This site's Cloudflare Worker</td>
+    <td>To see which parts of the app get used and which break</td></tr>
+</tbody>
+</table></div>
+<p><b>Amounts, dates, account names and the file itself are never sent.</b> The merchant→industry
+mapping is cached and shared across everyone who uses the app, which is what makes classification fast
+and nearly free — so a merchant name you upload may be stored in that cache. It is stored with no
+connection to you, and it contains no amount and no date.</p>
+
+<h2>Analytics: what is collected</h2>
+<p>Usage analytics are first-party — served from this domain, written by this site's own Worker.
+There is no Google Analytics, no advertising pixel, no third-party script of any kind, and no cookie.
+That is also why you were not asked to dismiss a cookie banner.</p>
+<p>Each event records: the event name (such as <code>page_view</code>, <code>tab_view</code>,
+<code>upload_done</code>), which page it came from, the referring site's host name, your browser's
+window width, your country as Cloudflare reports it, a random session id that exists only in the tab's
+memory and is gone when you close it, and a small number of non-identifying properties — which tab,
+how many seconds on it, how many transactions were in a file (the count, never the contents).</p>
+<div class="box">
+  <b>How a visitor is counted without identifying one.</b> The server derives a short hash from your IP
+  address, your browser's user-agent string, the current UTC date, and a secret. The IP address is never
+  written down. Because the date is part of the hash, today's value cannot be matched to yesterday's —
+  so daily visitor counts work and tracking a person over time does not. This is a deliberate trade: it
+  gives up long-range retention measurement in exchange for not building a profile.
+</div>
+<p><b>Never collected:</b> your name, email address, or any account identifier (none is ever asked for);
+merchant names, amounts, dates or account names in analytics events; the contents of any file; your IP
+address in stored form; anything you typed into an input; and any identifier that persists across days
+or follows you to another site.</p>
+<p>Bot and crawler traffic is discarded at the Worker rather than recorded. If you send a
+<code>Do Not Track</code> or Global Privacy Control signal, note that the design above collects no
+personal data to opt out of — but blocking <code>/api/e</code> in your browser or an extension stops
+analytics entirely, and the app works exactly the same without it.</p>
+
+<h2>Abuse protection</h2>
+<p>The classification endpoint is rate-limited per IP address per day and capped account-wide, to keep
+one visitor from running up the shared API bill. The counters are keyed by a short-lived record that
+expires within about a day. If the upload step ever shows a Cloudflare Turnstile challenge, that is a
+bot check run by Cloudflare; it sets no advertising identifier.</p>
+
+<h2>Hosting and retention</h2>
+<p>The site runs on Cloudflare Workers. Cloudflare processes requests as the infrastructure provider
+and keeps its own operational request logs under its terms. Analytics events written by this app are
+kept in a Cloudflare D1 database in the same account; the daily visitor hash means rows older than a day
+can no longer be linked to a current visitor regardless of how long they are kept.</p>
+<p>Anthropic's API is used for merchant classification. Merchant names sent there are subject to
+Anthropic's <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener">privacy
+policy</a> and commercial terms.</p>
+
+<h2>Changes and contact</h2>
+<p>This app is open source. If a claim on this page is wrong, that is a bug worth filing:
+<a href="https://github.com/ianschillebeeckx/carbon-footprint/issues" target="_blank" rel="noopener">open
+an issue</a>. The code that implements every statement above is in
+<a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/worker/src/index.js" target="_blank" rel="noopener">worker/src/index.js</a>
+and <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/analytics.py" target="_blank" rel="noopener">scripts/analytics.py</a>,
+so you do not have to take this page's word for it.</p>
+
+</main>
+<footer>Last updated 2026-09-28 · <a href="/">Carbon Ledger</a> ·
+<a href="methodology.html">methodology</a> ·
+<a href="https://github.com/ianschillebeeckx/carbon-footprint" target="_blank" rel="noopener">source</a></footer>
+</body>
+</html>

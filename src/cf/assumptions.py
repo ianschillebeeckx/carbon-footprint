@@ -1375,8 +1375,22 @@ ASSUMPTIONS = [
       "rows are real timestamped readings, which say something about when you "
       "are home. The file itself never leaves the browser.\n\n"
       "The server keeps requester IP addresses for roughly a day, in order to "
-      "rate-limit the classification and parsing endpoints.",
-      code=("scripts/build_web.py", "worker/src/index.js")),
+      "rate-limit the classification and parsing endpoints.\n\n"
+      "Usage analytics are first-party and cookieless: no third-party script, "
+      "no advertising pixel, and no identifier stored on your device — which "
+      "is why there is no cookie banner. Each event carries a name "
+      "(`page_view`, `tab_view`, `upload_done`), the page, the referring "
+      "site's host, your window width, your country, a session id that exists "
+      "only in the tab's memory, and counts such as how many tabs you filled "
+      "in or how many transactions a file held. Never the contents: no "
+      "merchant name, amount, date, or anything typed into an input. A "
+      "visitor is counted by hashing your IP address, user agent, the UTC "
+      "date and a secret — the IP is never written down, and because the date "
+      "is inside the hash, today's value cannot be matched to yesterday's. "
+      "That deliberately gives up long-range retention measurement in "
+      "exchange for not building a profile.",
+      sources=(("Privacy page", "https://carbon.outis.cc/privacy.html"),),
+      code=("scripts/build_web.py", "scripts/analytics.py", "worker/src/index.js")),
 ]
 
 REGISTRY = {a.id: a for a in ASSUMPTIONS}

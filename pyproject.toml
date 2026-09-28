@@ -6,6 +6,9 @@ requires-python = ">=3.10"
 dependencies = [
     "monarchmoney-enhanced",
     "pyyaml",
+    # scripts/build_web.py parses the generated app JavaScript before writing
+    # it; without this the build degrades to counting brackets.
+    "esprima",
 ]
 
 [project.scripts]

@@ -1,0 +1,11 @@
+# Carbon Ledger — the landing, methodology and factor pages are the public
+# surface worth indexing. /app is the tool itself and serves <meta name="robots"
+# content="noindex">: it must stay crawlable for that tag to be read at all, so
+# it is deliberately not Disallow-ed here — Disallow would leave the URL
+# indexable-without-content, which is the outcome we are avoiding.
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /data/
+
+Sitemap: https://carbon.outis.cc/sitemap.xml

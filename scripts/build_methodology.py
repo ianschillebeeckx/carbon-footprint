@@ -1,18 +1,22 @@
-"""Render the methodology pages from the assumptions registry.
+"""Render the public pages from the assumptions registry.
 
+  web/index.html        — the landing page (site/landing-template.html)
   web/methodology.html  — every assumption: value, rationale, bias, sources,
                           code links (site/methodology-template.html + registry)
   web/naics.html        — the full browsable EPA/USEEIO factor table
+  web/privacy.html      — what is stored and what leaves the device
 
-The page and the app consume the same registry (src/cf/assumptions.py), so a
+The pages and the app consume the same registry (src/cf/assumptions.py), so a
 value can't drift between code and writeup. Enforcement here:
   - every <!--SECTION:x--> marker must exist for every section that has entries
   - every registry entry is rendered exactly once
   - every {{id}} inline placeholder must resolve
+  - every page gets the analytics tracker substituted for <!--ANALYTICS-->
 
 Run:  .venv/bin/python scripts/build_methodology.py   (also called by build_web.py)
 """
 
+import datetime
 import html
 import json
 import re
@@ -21,14 +25,54 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from cf.assumptions import ASSUMPTIONS, REGISTRY, SECTIONS, REPO  # noqa: E402
 from cf import classify  # noqa: E402
 from cf.naics_prep import CATEGORIES  # noqa: E402
+from analytics import tracker  # noqa: E402
 
 TEMPLATE = ROOT / "site" / "methodology-template.html"
+TEMPLATE_LANDING = ROOT / "site" / "landing-template.html"
+TEMPLATE_PRIVACY = ROOT / "site" / "privacy-template.html"
 OUT = ROOT / "web" / "methodology.html"
 OUT_NAICS = ROOT / "web" / "naics.html"
+OUT_LANDING = ROOT / "web" / "index.html"
+OUT_PRIVACY = ROOT / "web" / "privacy.html"
+
+ANALYTICS_MARKER = "<!--ANALYTICS" + "-->"   # split so this line isn't itself a marker
+STUB = "window.track = function () {};"
+
+
+def with_tracker(s: str, page: str) -> str:
+    """Substitute the shared tracker for the page's analytics marker.
+
+    Exactly one occurrence, and it must come after the no-op `window.track`
+    stub: a second occurrence (in prose, say) would take the substitution and
+    leave the tracker sitting *above* the stub, which then overwrites it with
+    the no-op and silently disables analytics on that page forever.
+    """
+    n = s.count(ANALYTICS_MARKER)
+    assert n == 1, f"{page}: expected 1 analytics marker, found {n}"
+    stub = s.find(STUB)
+    assert 0 <= stub < s.find(ANALYTICS_MARKER), f"{page}: marker must follow the track() stub"
+    return s.replace(ANALYTICS_MARKER, tracker(page), 1)
+
+
+def inline_registry(s: str, where: str) -> str:
+    """Resolve {{id}} to an entry's display string and {{id!}} to its raw value.
+
+    The display form carries units ("$270 / t CO₂e") and reads well as an
+    appositive; the raw form is for prose that supplies its own units. Both
+    assert the id exists, so a renamed entry breaks the build rather than
+    shipping an empty sentence.
+    """
+    def one(m):
+        aid, raw = m.group(1), bool(m.group(2))
+        assert aid in REGISTRY, f"unknown assumption id in {where}: {{{{{aid}}}}}"
+        a = REGISTRY[aid]
+        return html.escape(str(a.value) if raw else (a.display or str(a.value)))
+    return re.sub(r"\{\{([a-z0-9_.]+)(!)?\}\}", one, s)
 
 BIAS_LABEL = {"under": "understates", "over": "overstates",
               "neutral": "neutral", "varies": "varies"}
@@ -81,18 +125,41 @@ def build_methodology() -> None:
     missing = {a.id for a in ASSUMPTIONS} - rendered
     assert not missing, f"assumptions with unknown section, never rendered: {missing}"
 
-    def inline_value(m):
-        aid = m.group(1)
-        assert aid in REGISTRY, f"unknown assumption id in template: {{{{{aid}}}}}"
-        a = REGISTRY[aid]
-        return html.escape(a.display or str(a.value))
-    s = re.sub(r"\{\{([a-z0-9_.]+)\}\}", inline_value, s)
+    s = inline_registry(s, "methodology-template.html")
     leftovers = re.findall(r"<!--SECTION:[^>]+-->|\{\{[^}]+\}\}", s)
     assert not leftovers, f"unresolved placeholders: {leftovers}"
+    s = with_tracker(s, "methodology")
 
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(s)
     print(f"Built {OUT}: {len(s):,} bytes, {len(rendered)} assumptions")
+
+
+def build_landing() -> None:
+    """The public front door. Its pitch is the app's splash content, and its
+    numbers come from the same registry, so the two can't tell different stories
+    — the splash is what a visitor sees when they reach the app directly."""
+    s = TEMPLATE_LANDING.read_text()
+    s = s.replace("__N_ASSUMPTIONS__", str(len(ASSUMPTIONS)))
+    s = s.replace("__N_NAICS__", f"{len(classify.naics_all()):,}")
+    s = inline_registry(s, "landing-template.html")
+    leftovers = re.findall(r"__[A-Z_]+__|\{\{[^}]+\}\}", s)
+    assert not leftovers, f"unresolved landing placeholders: {leftovers}"
+    s = with_tracker(s, "landing")
+    OUT_LANDING.parent.mkdir(exist_ok=True)
+    OUT_LANDING.write_text(s)
+    print(f"Built {OUT_LANDING}: {len(s):,} bytes (landing)")
+
+
+def build_privacy() -> None:
+    s = TEMPLATE_PRIVACY.read_text()
+    s = s.replace("__UPDATED__", datetime.date.today().isoformat())
+    s = inline_registry(s, "privacy-template.html")
+    leftovers = re.findall(r"__[A-Z_]+__|\{\{[^}]+\}\}", s)
+    assert not leftovers, f"unresolved privacy placeholders: {leftovers}"
+    s = with_tracker(s, "privacy")
+    OUT_PRIVACY.write_text(s)
+    print(f"Built {OUT_PRIVACY}: {len(s):,} bytes (privacy)")
 
 
 NAICS_PAGE = """<!doctype html>
@@ -101,6 +168,11 @@ NAICS_PAGE = """<!doctype html>
 <meta charset="utf-8">
 <title>Carbon Ledger — Industry factor table</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Every NAICS commodity Carbon Ledger can assign, with its EPA supply-chain emission factor in kg CO2e per dollar.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://carbon.outis.cc/naics.html">
+<script>window.track = function () {};</script>
+<!--ANALYTICS-->
 <style>
   :root { --ground:#F7F8F5; --card:#FFFFFF; --ink:#262B21; --muted:#6C7465; --leaf:#3E7C3A;
           --chip:#E6EEE1; --line:#D9DED2; --mono: ui-monospace, "SF Mono", Menlo, monospace; }
@@ -130,7 +202,8 @@ NAICS_PAGE = """<!doctype html>
 <header class="top">
   <h1>Carbon Ledger — Industry factor table</h1>
   <a href="methodology.html">← methodology</a>
-  <a href="index.html">app</a>
+  <a href="app">app</a>
+  <a href="/">home</a>
 </header>
 <main>
 <p class="lead">All __COUNT__ NAICS commodities the app can assign, with their EPA supply-chain factor
@@ -166,7 +239,17 @@ function render() {
     `<tr><td class="c">${r.code}</td><td>${esc(r.title)}${r.basket ? " · 🧺 basket" : ""}</td>` +
     `<td class="cat">${esc(r.cat)}</td><td class="f">${r.factor.toFixed(3)}</td></tr>`).join("");
 }
-document.getElementById("q").oninput = render;
+let qTimer = null;
+document.getElementById("q").oninput = () => {
+  render();
+  // Debounced so one event per search, not one per keystroke: what people look
+  // up here is a direct read on which industries the classifier missed.
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => {
+    const q = document.getElementById("q").value.trim();
+    if (q.length >= 3) track("naics_search", {q: q.slice(0, 40), hits: +document.getElementById("count").textContent.split(" ")[0] || 0});
+  }, 1200);
+};
 for (const th of document.querySelectorAll("th")) th.onclick = () => {
   const k = th.dataset.k;
   sortAsc = k === sortK ? !sortAsc : true;
@@ -192,6 +275,7 @@ def build_naics() -> None:
         })
     page = NAICS_PAGE.replace("__COUNT__", str(len(rows))) \
                      .replace("__ROWS__", json.dumps(rows, separators=(",", ":")))
+    page = with_tracker(page, "naics")
     OUT_NAICS.write_text(page)
     print(f"Built {OUT_NAICS}: {len(page):,} bytes, {len(rows)} codes")
 
@@ -199,3 +283,5 @@ def build_naics() -> None:
 if __name__ == "__main__":
     build_methodology()
     build_naics()
+    build_landing()
+    build_privacy()

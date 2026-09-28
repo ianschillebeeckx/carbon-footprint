@@ -1,0 +1,25 @@
+# Response headers for the static assets. Applied by Cloudflare's asset server,
+# so they cost no Worker invocation.
+#
+# CSP notes: every page inlines its own <script> and <style> (one file per page
+# is the whole build), so 'unsafe-inline' is unavoidable here. What the policy
+# still buys is the part that matters for an app holding someone's financial
+# data — connect-src and default-src pin every request to this origin, so no
+# injected script could exfiltrate localStorage to another host, and
+# frame-ancestors stops the page being framed and clickjacked.
+# challenges.cloudflare.com is Turnstile, the bot check on the upload step.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'
+
+# Reference data: content-addressed by deploy, never edited in place, and the
+# hourly grid profiles alone are ~3 MB. Worth a long cache.
+/data/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/favicon.svg
+  Cache-Control: public, max-age=604800

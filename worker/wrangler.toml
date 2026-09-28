@@ -20,6 +20,26 @@ binding = "ASSETS"
 [ai]
 binding = "AI"
 
+# Product analytics event store. Create once:
+#   npx wrangler d1 create cf_analytics          (paste the id below)
+#   npx wrangler d1 execute cf_analytics --remote --file schema.sql
+# D1 over Analytics Engine as the primary sink: real SQL, no sampling, and no
+# 90-day retention cliff, which matters more than write throughput at this
+# scale. Query straight into a notebook with:
+#   npx wrangler d1 execute cf_analytics --remote --json --command "SELECT ..."
+[[d1_databases]]
+binding = "DB"
+database_name = "cf_analytics"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Analytics Engine mirror — uncomment to turn on. The Worker writes to whichever
+# sinks are bound, so this is the entire migration if D1's row-write budget ever
+# becomes the constraint. Caveat when querying AE: it samples at volume, so the
+# event count is SUM(_sample_interval), never COUNT(*).
+# [[analytics_engine_datasets]]
+# binding = "AE"
+# dataset = "cf_events"
+
 # Persistent request logs (dashboard: Worker -> Logs). Free tier is ample.
 [observability]
 enabled = true
@@ -30,6 +50,14 @@ enabled = true
 ALLOWED_ORIGIN = "https://carbon.outis.cc"
 CLASSIFY_MODEL = "claude-haiku-4-5"
 DAILY_IP_LIMIT = "20"
+# Account-wide ceiling on merchants sent to the LLM per day. DAILY_IP_LIMIT
+# bounds one visitor; this bounds the bill on a day that goes unexpectedly
+# well (or badly). Roughly: 20k merchants/day is single-digit dollars on Haiku.
+DAILY_LLM_BUDGET = "20000"
 
-# Secrets (set via dashboard or `npx wrangler secret put ANTHROPIC_API_KEY`):
-#   ANTHROPIC_API_KEY
+# Secrets (set via dashboard or `npx wrangler secret put <NAME>`):
+#   ANTHROPIC_API_KEY   — console.anthropic.com
+#   ANALYTICS_SALT      — any long random string; rotating it breaks the link
+#                         between past and future visitor hashes, by design
+#   TURNSTILE_SECRET    — optional; until it is set the Worker accepts uploads
+#                         without a token and the frontend renders no widget

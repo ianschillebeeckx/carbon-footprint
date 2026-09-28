@@ -5,6 +5,103 @@
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
+// ---------------------------------------------------------------------------
+// First-party product analytics. Same origin, no cookie, no persistent
+// identifier, no third-party request — so no consent banner, which matters
+// because a banner is itself a funnel step that loses visitors.
+//
+// The browser never sends anything that identifies it. `visitor` is derived
+// here from IP + user agent + the UTC date + a secret salt, and the IP is
+// discarded immediately; because the date is in the hash, yesterday's id for
+// the same person is uncorrelatable with today's. That buys daily uniques and
+// within-day funnels and deliberately gives up long-horizon retention — the
+// new-vs-returning flag the client sends covers the rest.
+// ---------------------------------------------------------------------------
+
+const BOT_RE = /bot|crawl|spider|slurp|headless|preview|scan|monitor|curl|wget|python-requests|facebookexternalhit|bingpreview|lighthouse/i;
+const MAX_EVENTS = 50;      // per request; the client batches at 40
+const MAX_PROPS = 12;       // per event
+
+async function visitorHash(request, env, day) {
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  const ua = request.headers.get("User-Agent") || "";
+  const salt = env.ANALYTICS_SALT || "unsalted";
+  const buf = new TextEncoder().encode(`${ip}|${ua}|${day}|${salt}`);
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", buf));
+  return [...digest.slice(0, 8)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Fixed columns are the dimensions every event carries; everything else lands
+// in a JSON blob queried with json_extract(props,'$.tab'). Keeps the schema
+// stable while letting new events add fields without a migration.
+function toRow(e, base) {
+  const props = {};
+  let n = 0;
+  for (const k of Object.keys(e)) {
+    if (k === "n" || k === "q") continue;
+    if (n++ >= MAX_PROPS) break;
+    const v = e[k];
+    props[String(k).slice(0, 24)] =
+      typeof v === "number" ? v : String(v == null ? "" : v).slice(0, 120);
+  }
+  return { ...base, name: String(e.n || "").slice(0, 40), seq: +e.q || 0,
+           props: JSON.stringify(props) };
+}
+
+// Two sinks, both optional bindings: D1 is the primary (real SQL, no sampling,
+// indefinite retention) and Analytics Engine mirrors it when the binding
+// exists. Adding [[analytics_engine_datasets]] to wrangler.toml is the whole
+// migration if D1's row-write budget is ever the constraint.
+async function writeEvents(env, rows) {
+  if (env.DB) {
+    const stmt = env.DB.prepare(
+      "INSERT INTO events (ts,day,visitor,session,seq,name,page,ref,country,vw,is_returning,props) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+    await env.DB.batch(rows.map((r) => stmt.bind(
+      r.ts, r.day, r.visitor, r.session, r.seq, r.name,
+      r.page, r.ref, r.country, r.vw, r.is_returning, r.props)));
+  }
+  if (env.AE) {
+    for (const r of rows) {
+      env.AE.writeDataPoint({
+        indexes: [r.visitor],
+        blobs: [r.name, r.page, r.session, r.ref, r.country, r.props],
+        doubles: [r.vw, r.is_returning, r.seq],
+      });
+    }
+  }
+}
+
+// Turnstile gate. Open when the secret isn't set, so the Worker keeps working
+// before the keys exist and the frontend only renders the widget when it was
+// given a sitekey — the control can be switched on without a lockstep deploy.
+async function turnstileOk(env, request, token) {
+  if (!env.TURNSTILE_SECRET) return true;
+  if (!token) return false;
+  const form = new FormData();
+  form.append("secret", env.TURNSTILE_SECRET);
+  form.append("response", String(token).slice(0, 2048));
+  form.append("remoteip", request.headers.get("CF-Connecting-IP") || "");
+  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                          { method: "POST", body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!data.success) console.log("turnstile_fail", { codes: data["error-codes"] });
+  return !!data.success;
+}
+
+// Account-wide ceiling on LLM spend for the day. The per-IP limit bounds one
+// visitor; this bounds the bill when many of them (or one of them behind many
+// addresses) show up at once.
+async function budgetOk(env, n) {
+  const cap = parseInt(env.DAILY_LLM_BUDGET || "0", 10);
+  if (!cap) return true;
+  const key = `budget:${new Date().toISOString().slice(0, 10)}`;
+  const used = parseInt((await env.MERCHANT_CACHE.get(key)) || "0", 10);
+  if (used >= cap) { console.log("budget_exhausted", { used, cap }); return false; }
+  await env.MERCHANT_CACHE.put(key, String(used + n), { expirationTtl: 90000 });
+  return true;
+}
+
 function cors(env, extra = {}) {
   return {
     "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN,
@@ -201,9 +298,9 @@ function buildParseHourlyPrompt(sample) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     try {
-      return await handle(request, env);
+      return await handle(request, env, ctx);
     } catch (e) {
       console.error("unhandled", { path: new URL(request.url).pathname, error: String(e.message || e).slice(0, 300) });
       return new Response(JSON.stringify({ error: String(e.message || e).slice(0, 300) }),
@@ -212,9 +309,37 @@ export default {
   },
 };
 
-async function handle(request, env) {
+async function handle(request, env, ctx) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(env) });
+
+    // POST /api/e {s, p, r, u, v, e: [{n, t, q, ...props}]} -> 204
+    // Always 204, even on garbage input: analytics must never surface an error
+    // to the page, and a failed write is a lost row, not a broken app.
+    if (url.pathname === "/api/e" && request.method === "POST") {
+      const ok = new Response(null, { status: 204, headers: cors(env) });
+      if (BOT_RE.test(request.headers.get("User-Agent") || "")) return ok;
+      let body;
+      try { body = await request.json(); } catch (e) { return ok; }
+      const evs = Array.isArray(body && body.e) ? body.e.slice(0, MAX_EVENTS) : [];
+      if (!evs.length) return ok;
+      const now = Date.now();
+      const day = new Date(now).toISOString().slice(0, 10);
+      const base = {
+        ts: now, day,
+        visitor: await visitorHash(request, env, day),
+        session: String(body.s || "").slice(0, 32),
+        page: String(body.p || "").slice(0, 24),
+        ref: String(body.r || "").slice(0, 80),
+        country: request.headers.get("CF-IPCountry") || "",
+        vw: Math.min(+body.v || 0, 20000),
+        is_returning: body.u ? 1 : 0,
+      };
+      const rows = evs.map((e) => toRow(e, base));
+      ctx.waitUntil(writeEvents(env, rows).catch((e) =>
+        console.log("analytics_write_failed", { error: String(e.message || e).slice(0, 120), n: rows.length })));
+      return ok;
+    }
 
     // POST /api/cache/lookup {keys: [{merchant, hint}]} -> {found: {key: assignment}}
     if (url.pathname === "/api/cache/lookup" && request.method === "POST") {
@@ -295,7 +420,11 @@ async function handle(request, env) {
           { status: 429, headers: { ...JSON_HEADERS, ...cors(env) } });
       }
       const t0 = Date.now();
-      const { merchants = [] } = await request.json();
+      const { merchants = [], turnstile = null } = await request.json();
+      if (!(await turnstileOk(env, request, turnstile))) {
+        return new Response(JSON.stringify({ error: "verification failed — reload and try again" }),
+          { status: 403, headers: { ...JSON_HEADERS, ...cors(env) } });
+      }
       const assignments = {};
       const toClassify = [];
       for (const m of merchants.slice(0, 120)) {
@@ -307,6 +436,10 @@ async function handle(request, env) {
         const hit = await env.MERCHANT_CACHE.get(cacheKey(m.merchant, m.hint));
         if (hit) assignments[key] = JSON.parse(hit);
         else toClassify.push(m);
+      }
+      if (toClassify.length && !(await budgetOk(env, toClassify.length))) {
+        return new Response(JSON.stringify({ error: "the shared classifier has hit today's budget — try again tomorrow" }),
+          { status: 429, headers: { ...JSON_HEADERS, ...cors(env) } });
       }
       for (let i = 0; i < toClassify.length; i += 40) {
         const batch = toClassify.slice(i, i + 40);

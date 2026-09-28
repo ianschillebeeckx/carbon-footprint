@@ -4,6 +4,123 @@
 <meta charset="utf-8">
 <title>Carbon Ledger — Methodology</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Every constant Carbon Ledger uses: its value, why it was chosen, the source it came from, and the direction it biases your footprint.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://carbon.outis.cc/methodology.html">
+<script>window.track = function () {};</script>
+<script>
+(function () {
+  "use strict";
+  var EP = "/api/e", MAX_Q = 40, FLUSH_MS = 15000, PAGE = "methodology";
+  var t0 = Date.now();
+  // Session id: per page load, held in a closure. Never written to the device,
+  // so it is not storage and not an identifier that outlives the tab.
+  var sid = Math.random().toString(36).slice(2, 10) + t0.toString(36);
+  var q = [], seq = 0, timer = null, dead = false;
+
+  // "Returning" without storing anything new: the app already keeps the user's
+  // own figures in localStorage because that IS the product. Their presence is
+  // a free new-vs-returning signal and costs no extra identifier.
+  function returning() {
+    try {
+      var k = ["cf_data", "cf_travel", "cf_home", "cf_food", "cf_offsets"], i;
+      for (i = 0; i < k.length; i++) if (localStorage.getItem(k[i])) return 1;
+    } catch (e) {}
+    return 0;
+  }
+  // Host only. A full referrer URL can carry a search query or a session token.
+  function refHost() {
+    try { return document.referrer ? new URL(document.referrer).host.slice(0, 80) : ""; }
+    catch (e) { return ""; }
+  }
+  var REF = refHost(), RET = returning();
+
+  function send(beacon) {
+    if (!q.length || dead) return;
+    var body;
+    try {
+      body = JSON.stringify({s: sid, p: PAGE, r: REF, u: RET,
+                             v: window.innerWidth || 0, e: q});
+    } catch (e) { q = []; return; }
+    q = [];
+    try {
+      if (beacon && navigator.sendBeacon) {
+        navigator.sendBeacon(EP, new Blob([body], {type: "application/json"}));
+      } else {
+        fetch(EP, {method: "POST", body: body, keepalive: true,
+                   headers: {"Content-Type": "application/json"}}).catch(function () {});
+      }
+    } catch (e) {}
+  }
+
+  window.track = function (name, props) {
+    try {
+      if (dead) return;
+      var ev = {n: String(name).slice(0, 40), t: Date.now() - t0, q: seq++};
+      if (props) for (var k in props) if (Object.prototype.hasOwnProperty.call(props, k)) ev[k] = props[k];
+      q.push(ev);
+      if (q.length >= MAX_Q) send(false);
+      else if (!timer) timer = setTimeout(function () { timer = null; send(false); }, FLUSH_MS);
+    } catch (e) {}
+  };
+
+  // Flush on the way out. visibilitychange is the only event that fires
+  // reliably on mobile backgrounding; pagehide covers bfcache navigation.
+  //
+  // A session that is backgrounded and resumed emits session_end more than
+  // once, on purpose: the alternative is firing once and losing everything a
+  // visitor did after the first tab-away, and unload events are too unreliable
+  // to bet the whole funnel position on. Later rows supersede earlier ones, so
+  // any query that aggregates session_end must take the highest seq per
+  // session — ANALYTICS.md does this in a `last_end` CTE.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") { window.track("session_end", sessionShape()); send(true); }
+  });
+  window.addEventListener("pagehide", function () { send(true); });
+
+  // Funnel position computed from state rather than reconstructed from clicks:
+  // one row that says exactly how far this person got, robust to dropped
+  // beacons and to events we forgot to add.
+  function sessionShape() {
+    var out = {dur: Math.round((Date.now() - t0) / 1000)};
+    try {
+      var filled = [], t = JSON.parse(localStorage.getItem("cf_travel") || "null");
+      if (t && ((t.vehicles || []).some(function (v) { return +v.miles > 0; }) ||
+                (t.air && (+t.air.short || +t.air.medium || +t.air.long)))) filled.push("travel");
+      var h = JSON.parse(localStorage.getItem("cf_home") || "null");
+      if (h && (+(h.elec || {}).kwh > 0 || +(h.elec || {}).dollars > 0)) filled.push("home");
+      if (localStorage.getItem("cf_food")) filled.push("food");
+      if (localStorage.getItem("cf_offsets")) filled.push("offsets");
+      var d = JSON.parse(localStorage.getItem("cf_data") || "null");
+      if (d && d.transactions && d.transactions.length) {
+        filled.push("gs");
+        out.txns = d.transactions.length;
+      }
+      out.filled = filled.join(",");
+      out.n_filled = filled.length;
+    } catch (e) {}
+    return out;
+  }
+
+  // Error reporting rides the same pipe. This is the highest-value signal on a
+  // public launch: a thrown exception here has already been shown to stop every
+  // autosave in the app with no visible symptom, and a stranger will simply
+  // leave rather than report it.
+  window.addEventListener("error", function (e) {
+    try {
+      window.track("error", {msg: String(e.message || "").slice(0, 160),
+                             src: String(e.filename || "").split("/").pop().slice(0, 40),
+                             line: e.lineno || 0});
+    } catch (x) {}
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    try {
+      var r = e.reason;
+      window.track("error", {msg: ("unhandled: " + ((r && r.message) || r)).slice(0, 160)});
+    } catch (x) {}
+  });
+})();
+</script>
 <style>
   :root {
     --ground:#F7F8F5; --card:#FFFFFF; --ink:#262B21; --muted:#6C7465; --leaf:#3E7C3A;
@@ -46,8 +163,9 @@
 <body>
 <header class="top">
   <h1>Carbon Ledger — Methodology</h1>
-  <a href="index.html">← back to the app</a>
+  <a href="app">← back to the app</a>
   <a href="naics.html">industry table</a>
+  <a href="privacy.html">privacy</a>
   <a href="https://github.com/ianschillebeeckx/carbon-footprint" target="_blank" rel="noopener">source on GitHub</a>
 </header>
 <main>
@@ -315,7 +433,9 @@ What does leave the browser: <b>merchant names and bank category hints</b>, sent
 
 The advanced hourly-electricity upload sends about <b>24 rows</b> of your CSV — the header block plus rows spread through the file, each truncated — so a model can work out the column layout. Those spread rows are real timestamped readings, which say something about when you are home. The file itself never leaves the browser.
 
-The server keeps requester IP addresses for roughly a day, in order to rate-limit the classification and parsing endpoints.</p><p class="meta">Code &amp; data: <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/build_web.py" target="_blank" rel="noopener"><code>build_web.py</code></a> · <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/worker/src/index.js" target="_blank" rel="noopener"><code>index.js</code></a></p></article>
+The server keeps requester IP addresses for roughly a day, in order to rate-limit the classification and parsing endpoints.
+
+Usage analytics are first-party and cookieless: no third-party script, no advertising pixel, and no identifier stored on your device — which is why there is no cookie banner. Each event carries a name (<code>page_view</code>, <code>tab_view</code>, <code>upload_done</code>), the page, the referring site's host, your window width, your country, a session id that exists only in the tab's memory, and counts such as how many tabs you filled in or how many transactions a file held. Never the contents: no merchant name, amount, date, or anything typed into an input. A visitor is counted by hashing your IP address, user agent, the UTC date and a secret — the IP is never written down, and because the date is inside the hash, today's value cannot be matched to yesterday's. That deliberately gives up long-range retention measurement in exchange for not building a profile.</p><p class="meta">Sources: <a href="https://carbon.outis.cc/privacy.html" target="_blank" rel="noopener">Privacy page</a> &nbsp;|&nbsp; Code &amp; data: <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/build_web.py" target="_blank" rel="noopener"><code>build_web.py</code></a> · <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/analytics.py" target="_blank" rel="noopener"><code>analytics.py</code></a> · <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/worker/src/index.js" target="_blank" rel="noopener"><code>index.js</code></a></p></article>
 
 </main>
 <footer>Generated from <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/src/cf/assumptions.py" target="_blank" rel="noopener">src/cf/assumptions.py</a>

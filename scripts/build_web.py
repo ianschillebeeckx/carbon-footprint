@@ -1,4 +1,4 @@
-"""Build the static web app (web/index.html) from site/v2-template.html.
+"""Build the static web app (web/app.html) from site/v2-template.html.
 
 One source template serves two backends: the local Python server injects
 data/state server-side; this script produces the Cloudflare version where
@@ -18,14 +18,32 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, "src")
+sys.path.insert(0, "scripts")
 from cf import assumptions, classify  # noqa: E402
 from cf.naics_prep import CATEGORIES  # noqa: E402
+from analytics import tracker  # noqa: E402
+
+STUB = "window.track = function () {};"
+
+
+def build_methodology_marker() -> str:
+    # Split so this source line is not itself a marker occurrence.
+    return "<!--ANALYTICS" + "-->"
 
 TEMPLATE = Path("site/v2-template.html")
-OUT = Path("web/index.html")
+# The app lives at /app; web/index.html is the landing page, built by
+# scripts/build_methodology.py from the same registry.
+OUT = Path("web/app.html")
 INDEX = Path("data/naics_index.json")
 
+# Cloudflare Turnstile sitekey for the upload step. Public by design (the
+# secret is a Worker secret). Empty string = no widget rendered and no token
+# sent; the Worker accepts uploads without one until TURNSTILE_SECRET is set,
+# so the two halves can be switched on independently.
+TURNSTILE_SITEKEY = ""
+
 n_replacements = 0
+CHECK = "unchecked"
 
 
 def sub(s: str, old: str, new: str, count: int = 1) -> str:
@@ -97,7 +115,8 @@ def build() -> None:
         .replace("__HEALTH_RE__", js_regex(classify.HEALTH_INSURER)) \
         .replace("__HEALTH_MIX__", json.dumps(classify.HEALTH_INSURANCE_MIX)) \
     .replace("__HINT_RULES__", json.dumps(classify.HINT_RULES)) \
-        .replace("__REMAP__", json.dumps(remap, separators=(",", ":")))
+        .replace("__REMAP__", json.dumps(remap, separators=(",", ":"))) \
+        .replace("__TURNSTILE__", json.dumps(TURNSTILE_SITEKEY))
 
     # ---- static reference data: inline at build time (as the server does) ----
     s = sub(s, "/*__ASSUME__*/null", json.dumps(assumptions.js_values(), separators=(",", ":")))
@@ -150,6 +169,8 @@ def build() -> None:
   try {
     applyCorrectionW(merchant, hint, {naics, mix, basket, category,
       source: confirm ? "confirmed" : "manual", all_categories: !!allCats});
+    track("merchant_correct", {kind: confirm ? "confirm" : mix ? "split" : basket ? "basket" : "recode",
+                               scope: allCats ? "merchant" : "hint"});
   } catch (e) { alert("Correction failed: " + (e.message || e)); return false; }
   renderAll();
   return true;
@@ -168,10 +189,16 @@ def build() -> None:
   const f = e.target.files[0];
   if (!f) return;
   $("upload-msg").textContent = "Classifying — usually a few seconds…";
+  const t0 = Date.now();
   try {
-    await webUpload(await f.text());
+    const stats = await webUpload(await f.text());
+    track("upload_done", {...stats, ms: Date.now() - t0});
     location.reload();
   } catch (err) {
+    // The failure reason is the single most actionable event on this page:
+    // upload is the one step where a stranger hits a wall we can actually fix,
+    // and they will leave rather than tell us which wall it was.
+    track("upload_fail", {reason: String(err.message || err).slice(0, 80), ms: Date.now() - t0});
     $("upload-msg").textContent = "Failed: " + (err.message || err);
   }
   e.target.value = "";
@@ -198,12 +225,46 @@ def build() -> None:
             "sent, to a shared classification cache and, for merchants not already known, to "
             "Anthropic's API; amounts, dates, and accounts stay local.")
 
+    # Check the app's own script BEFORE the tracker lands, so a "use strict"
+    # regex can't latch onto the tracker's copy in the <head> instead.
+    check_js(re.search(r'"use strict";(.*?)</script>', s, re.S).group(1), "app script")
+
+    # ---- analytics last: the tracker opens its own "use strict", and every
+    # transformation above anchors on exact strings that must not have moved ----
+    marker = build_methodology_marker()
+    assert s.count(marker) == 1, f"expected 1 analytics marker, found {s.count(marker)}"
+    assert 0 <= s.find(STUB) < s.find(marker), "analytics marker must follow the track() stub"
+    s = sub(s, marker, tracker("app"))
+
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(s)
-    js = re.search(r'"use strict";(.*?)</script>', s, re.S).group(1)
-    for a, b in (("{", "}"), ("(", ")"), ("[", "]")):
-        assert js.count(a) == js.count(b), f"unbalanced {a}{b}: {js.count(a)} vs {js.count(b)}"
-    print(f"Built {OUT}: {len(s):,} bytes, {n_replacements} transformations, JS balanced")
+    print(f"Built {OUT}: {len(s):,} bytes, {n_replacements} transformations, {CHECK}")
+
+
+def check_js(js: str, what: str) -> None:
+    """Parse the generated JavaScript, falling back to bracket balance.
+
+    A template substitution that lands in the wrong place usually produces
+    syntactically valid nonsense, so balance counting only catches the crudest
+    breakage. Parsing catches the rest. esprima-python is an ES2017 parser and
+    the app uses ES2020 ?? and ?., so both are rewritten to equivalents first —
+    this validates structure, not those two operators.
+    """
+    global CHECK
+    try:
+        import esprima
+    except ImportError:
+        for a, b in (("{", "}"), ("(", ")"), ("[", "]")):
+            assert js.count(a) == js.count(b), f"{what}: unbalanced {a}{b}: {js.count(a)} vs {js.count(b)}"
+        CHECK = "JS balanced (install esprima for a real parse)"
+        return
+    src = js.replace("??", "||").replace("?.[", "[").replace("?.(", "(")
+    src = re.sub(r"\?\.(?=[A-Za-z_$])", ".", src)
+    try:
+        esprima.parseScript(src)
+    except Exception as e:
+        raise AssertionError(f"{what}: generated JavaScript does not parse: {e}") from None
+    CHECK = "JS parses"
 
 
 def js_regex(py_pattern) -> str:
@@ -230,6 +291,37 @@ const HEALTH_RE = __HEALTH_RE__;
 const HEALTH_MIX = __HEALTH_MIX__;
 const HINT_RULES = __HINT_RULES__;
 const NAICS_REMAP = __REMAP__;
+const TURNSTILE_SITEKEY = __TURNSTILE__;
+
+// Bot check on the one endpoint that costs money. Inert when no sitekey was
+// built in, and the Worker accepts a null token until its secret is set, so
+// the widget and the enforcement can be switched on in either order.
+let tsLoad = null;
+function turnstileToken() {
+  if (!TURNSTILE_SITEKEY) return Promise.resolve(null);
+  if (!tsLoad) {
+    tsLoad = new Promise((res, rej) => {
+      const el = document.createElement("script");
+      el.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      el.async = true;
+      el.onload = res;
+      el.onerror = () => rej(new Error("bot check could not load — disable blockers for this site"));
+      document.head.appendChild(el);
+    });
+  }
+  return tsLoad.then(() => new Promise((res, rej) => {
+    // Rendered visibly: a Managed sitekey may need to show a challenge, and a
+    // hidden one would leave the upload hanging with nothing to click.
+    const box = $("tswidget");
+    box.hidden = false;
+    box.innerHTML = "";
+    window.turnstile.render(box, {
+      sitekey: TURNSTILE_SITEKEY,
+      callback: t => { box.hidden = true; res(t); },
+      "error-callback": () => { box.hidden = true; rej(new Error("bot check failed — reload and try again")); },
+    });
+  }));
+}
 
 function deflatorFor(d) {
   const y = parseInt((d || "").slice(0, 4), 10);
@@ -475,12 +567,14 @@ async function webUpload(text) {
     const {found} = await res.json();
     Object.assign(assignments, found);
   }
+  const cached = toResolve.filter(m => assignments[`${m.merchant}|${m.hint}`]).length;
   const unknown = toResolve.filter(m => !assignments[`${m.merchant}|${m.hint}`]);
   for (let i = 0; i < unknown.length; i += 120) {
     const chunk = unknown.slice(i, i + 120);
     $("upload-msg").textContent = `Classifying new merchants ${i + 1}–${Math.min(i + 120, unknown.length)} of ${unknown.length}…`;
     const res = await fetch("/api/classify", {method: "POST",
-      headers: {"Content-Type": "application/json"}, body: JSON.stringify({merchants: chunk})});
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({merchants: chunk, turnstile: await turnstileToken()})});
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
       throw new Error(d.error || `classification failed (${res.status})`);
@@ -498,6 +592,9 @@ async function webUpload(text) {
                          months, count: txns.length, dataset: WEB_META.dataset, deflators: WEB_META.deflators},
                   categories: WEB_CATEGORIES, transactions: out};
   localStorage.setItem("cf_data", JSON.stringify(result));
+  // Counts only — never a merchant name, an amount or a date.
+  return {txns: txns.length, merchants: merchants.size, cached, llm: unknown.length,
+          months: Math.round(months)};
 }
 // ---- end web runtime ----
 '''
@@ -510,3 +607,5 @@ if __name__ == "__main__":
     import build_methodology
     build_methodology.build_methodology()
     build_methodology.build_naics()
+    build_methodology.build_landing()
+    build_methodology.build_privacy()

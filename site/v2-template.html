@@ -4,6 +4,20 @@
 <meta charset="utf-8">
 <title>Carbon Ledger</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Your household carbon footprint from what you actually do — your spending, miles, utility bills and diet — instead of survey averages. Your data stays on your device.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<!-- The tool itself: everything on it is computed in the visitor's browser
+     from their own data, so there is nothing here for a search result to show.
+     The landing page at / is the indexable surface. -->
+<meta name="robots" content="noindex, follow">
+<!-- No-op until the build substitutes the tracker for the marker below.
+     Load-bearing: the local server serves this template unreplaced, and an
+     undefined track() at a call site would throw — which in this app stops
+     every autosave that runs after it, with no visible symptom. The marker
+     must appear exactly once per file, so never name it in prose.
+     See scripts/analytics.py. -->
+<script>window.track = function () {};</script>
+<!--ANALYTICS-->
 <style>
   :root {
     --ground:#F7F8F5; --card:#FFFFFF; --ink:#262B21; --muted:#6C7465; --leaf:#3E7C3A;
@@ -199,7 +213,7 @@
     <h2>Carbon Ledger</h2>
     <p class="splead">Your household carbon footprint, built from what you actually do — your spending, your miles, your utility bills, your diet — instead of survey averages.</p>
     <div class="spgoal"><span class="n">1</span><div><b>See your footprint</b>
-      <span>Tonnes of CO₂e per year across Travel, Home, Food, and Goods &amp; Services, side by side with the ~50-tonne average US household.</span></div></div>
+      <span>Tonnes of CO₂e per year across Travel, Home, Food, and Goods &amp; Services, side by side with the <span id="sp-avg">–</span>-tonne average US household.</span></div></div>
     <div class="spgoal"><span class="n">2</span><div><b>Understand the stakes</b>
       <span>Each tonne causes roughly <span id="sp-scc">$240</span> in climate damages, mostly borne by other people — and sustained emissions cause measurable excess deaths (about one death per <span id="sp-deaths">4,400</span> tonnes; Bressler 2021).</span></div></div>
     <div class="spgoal"><span class="n">3</span><div><b>Find your levers</b>
@@ -230,6 +244,10 @@
   <button class="info" aria-label="What to upload" data-tip="A CSV export of your bank/credit-card transactions — Monarch Money's export works as-is. Required columns: Merchant (or Description/Name/Payee) and Amount (negative = spending, positive = refunds/income). Date and Category columns improve results: dates enable the monthly chart and inflation adjustment, and the category is a strong hint for classification. Export ~12 months across ALL accounts and include everything — transfers, card payments, and income are detected and excluded automatically.">?</button>
   <label class="filebtn" for="csvfile">Upload Transactions</label>
   <input id="csvfile" type="file" accept=".csv,text/csv" hidden>
+  <!-- Turnstile mount. Stays empty and hidden unless the web build was given a
+       sitekey; rendered visibly when used, because a Managed challenge needs
+       somewhere to appear rather than hanging the upload invisibly. -->
+  <div id="tswidget" hidden></div>
 </header>
 
 <div id="impact">
@@ -482,6 +500,16 @@ const HOME_SAVED = /*__HOME__*/null;                // persisted home inputs
 const FOOD_SAVED = /*__FOOD__*/null;                // persisted food inputs
 
 const $ = id => document.getElementById(id);
+
+// Fires once per tab per session. "Opened Travel" and "started filling Travel
+// in" are different funnel steps and only the second one predicts finishing;
+// every tab's touched() calls this, and the Set keeps it to one event.
+const edited = new Set();
+function firstEdit(tab) {
+  if (edited.has(tab)) return;
+  edited.add(tab);
+  track("input_edit", {tab});
+}
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
 const fmt = n => n.toLocaleString("en-US", {maximumFractionDigits: 0});
 
@@ -1214,7 +1242,7 @@ function renderTravel() {
   renderTravelFig();
   renderTravelX();
 
-  const touched = () => { renderTravel(); renderImpact(); saveTravel(); };
+  const touched = () => { firstEdit("travel"); renderTravel(); renderImpact(); saveTravel(); };
   $("vehrows").querySelectorAll("input,select").forEach(el => el.onchange = () => {
     TRAVEL.vehicles[+el.dataset.i][el.dataset.k] = el.type === "number" ? +el.value : +el.value;
     touched();
@@ -1261,7 +1289,7 @@ HOME.elec.zip = HOME.elec.zip || "";
 // weighted by an OpenEI TMY3 residential load shape. Physical grid average for
 // everyone — no provider dimension (see the ? tip for why).
 let G2 = null;
-fetch("data/gridcarbon.json").then(r => r.ok ? r.json() : null).then(d => {
+fetch("/data/gridcarbon.json").then(r => r.ok ? r.json() : null).then(d => {
   if (!d) return;
   G2 = d;
   hourlyRecompute();          // apply a saved hourly upload once BAs are known
@@ -1455,7 +1483,7 @@ async function parseHourlyCsv(text) {
 
 function hourlyIntensity(ba, cb) {
   if (G2H[ba.ba]) { cb(G2H[ba.ba]); return; }
-  fetch(`data/hourly/${ba.ba}.json`).then(r => r.ok ? r.json() : null).then(d => {
+  fetch(`/data/hourly/${ba.ba}.json`).then(r => r.ok ? r.json() : null).then(d => {
     if (d) { G2H[ba.ba] = d.I; cb(d.I); }
     else cb(null);
   }).catch(() => cb(null));
@@ -1769,7 +1797,7 @@ $("advfile").onchange = async ev => {
 };
 $("advsample").onclick = async () => {
   try {
-    const r = await fetch("data/sample_hourly_portland.csv");
+    const r = await fetch("/data/sample_hourly_portland.csv");
     const p = await parseHourlyCsv(await r.text());
     HOME.elec.zip = "97202";   // SE Portland — the example is a PGE story; always demo on PGE
     saveHome();
@@ -1839,7 +1867,7 @@ function renderHome() {
   renderHomeFig();
   renderHomeX();
 
-  const touched = () => { renderHome(); renderImpact(); saveHome(); };
+  const touched = () => { firstEdit("home"); renderHome(); renderImpact(); saveHome(); };
   document.querySelectorAll("#pane-home [data-h]").forEach(el => el.onchange = () => {
     const [obj, key] = el.dataset.h.split(".");
     HOME[obj][key] = +el.value || 0;
@@ -1976,7 +2004,7 @@ function renderFood() {
     $("foodxrows").textContent = "Upload a transactions CSV to see the spend-based cross-check.";
   }
 
-  const touched = () => { renderFood(); renderImpact(); saveFood(); };
+  const touched = () => { firstEdit("food"); renderFood(); renderImpact(); saveFood(); };
   $("foodsize").onchange = () => { FOOD.size = Math.max(1, +$("foodsize").value || 1); touched(); };
   $("foodrows").querySelectorAll("input").forEach(el => el.onchange = () => {
     FOOD.sv[el.dataset.f] = Math.max(0, +el.value || 0);
@@ -2340,7 +2368,7 @@ function renderOffsets() {
     : scan.map(m => `Found <b>${esc(m.merchant)}</b>: $${fmt(m.total)} across ${m.n} transaction${m.n > 1 ? "s" : ""}` +
         (m.counted ? ` — <span style="color:var(--warn)">still counted as consumption in G&S; mark it Non-purchase there</span>` : " (not counted in G&amp;S ✓)")).join("<br>");
 
-  const touched = () => { renderOffsets(); renderImpact(); saveOffsets(); };
+  const touched = () => { firstEdit("offsets"); renderOffsets(); renderImpact(); saveOffsets(); };
   $("offsetrows").querySelectorAll("input,select").forEach(el => el.onchange = () => {
     const r = OFFSETS.rows[+el.dataset.i];
     // Only the two money fields are numeric. Listing the string fields instead
@@ -2359,12 +2387,21 @@ function renderOffsets() {
 }
 
 // ---------- main tabs ----------
+// Dwell is measured between switches rather than sampled: the question the tab
+// events exist to answer is which section people abandon, and that shows up as
+// a short dwell followed by a switch away, not as a click count.
+let tabCur = "gs", tabT0 = Date.now();
 function setMainTab(t) {
   for (const key of ["travel", "home", "food", "gs", "offsets", "total"]) {
     $("mtab-" + key).className = key === t ? "active" : "";
     (key === "gs" ? document.querySelector(".panes") : $("pane-" + key)).hidden = key !== t;
   }
   if (t === "total") renderTotal();
+  if (t !== tabCur) {
+    track("tab_view", {tab: t, from: tabCur, dwell: Math.round((Date.now() - tabT0) / 1000)});
+    tabCur = t;
+    tabT0 = Date.now();
+  }
 }
 ["travel", "home", "food", "gs", "offsets", "total"].forEach(key => $("mtab-" + key).onclick = () => setMainTab(key));
 
@@ -2555,22 +2592,56 @@ renderAll();
 
 // ---------- first-run splash ----------
 // headline numbers come from the assumptions registry, not hand-typed prose
+// The benchmark comes from usAvg() rather than a literal so the splash, the
+// amber tick on the Total chart and the methodology page can never disagree.
+$("sp-avg").textContent = Math.round(Object.values(usAvg()).reduce((a, v) => a + v, 0) / 1000);
 $("sp-scc").textContent = `$${ASSUME["impact.scc"]}`;
 $("sp-deaths").textContent = fmt(Math.round(1e6 / ASSUME["impact.mortality"].umort_per_t / 100) * 100);
 $("sp-removal").textContent = `$${ASSUME["offsets.removal_price"]}`;
-function closeSplash(tab) {
+function closeSplash(tab, route) {
   $("splash").hidden = true;
   try { localStorage.setItem("cf_splash", "1"); } catch (e) {}
+  if (route) track("route_choose", {route, at: "splash"});
   if (tab) setMainTab(tab);
 }
-$("about").onclick = () => { $("splash").hidden = false; };
-$("sp-quick").onclick = () => closeSplash("travel");
-$("sp-full").onclick = () => closeSplash();
-$("sp-skip").onclick = () => closeSplash();
-$("splash").onclick = e => { if (e.target === $("splash")) closeSplash(); };
+$("about").onclick = () => { $("splash").hidden = false; track("splash_view", {at: "about"}); };
+$("sp-quick").onclick = () => closeSplash("travel", "quick");
+$("sp-full").onclick = () => closeSplash(null, "full");
+$("sp-skip").onclick = () => closeSplash(null, "skip");
+$("splash").onclick = e => { if (e.target === $("splash")) closeSplash(null, "dismiss"); };
+
+// ---------- instrumentation ----------
+// Arriving from the landing page carries ?start=: the visitor already chose a
+// route there, and showing them the same three choices again is a funnel step
+// that can only lose them.
+const START = new URLSearchParams(location.search).get("start");
 let splashSeen = null;
 try { splashSeen = localStorage.getItem("cf_splash"); } catch (e) {}
-if (!DATA && !splashSeen) $("splash").hidden = false;
+track("page_view", {start: START || "", has_data: DATA ? 1 : 0});
+if (START) {
+  try { localStorage.setItem("cf_splash", "1"); } catch (e) {}
+  track("route_choose", {route: START, at: "landing"});
+  if (START === "quick") setMainTab("travel");
+} else if (!DATA && !splashSeen) {
+  $("splash").hidden = false;
+  track("splash_view", {at: "first_run"});
+}
+
+// Outside the upload handler on purpose: scripts/build_web.py swaps that whole
+// block for the client-side pipeline and asserts its exact text, so keeping the
+// listener separate means instrumenting it doesn't churn the build assertion.
+$("csvfile").addEventListener("change", e => {
+  if (e.target.files && e.target.files[0]) track("upload_start", {kb: Math.round(e.target.files[0].size / 1024)});
+});
+// Delegated, because most of these elements are rendered after this runs:
+// which explanations people open is the best read on which numbers they don't
+// believe, and a tooltip nobody opens is a number nobody questioned.
+document.addEventListener("click", e => {
+  const a = e.target.closest('a[href^="methodology"], a[href^="naics"], a[href^="privacy"]');
+  if (a) track("doc_open", {doc: a.getAttribute("href").split(/[#.]/)[0], from: tabCur});
+  const b = e.target.closest("button.info");
+  if (b) track("tip_open", {tip: (b.getAttribute("aria-label") || "").slice(0, 40), tab: tabCur});
+});
 </script>
 </body>
 </html>
