@@ -12,8 +12,10 @@
 <meta property="og:title" content="Carbon Ledger — your footprint, from what you actually do">
 <meta property="og:description" content="Build your household carbon footprint from your own spending, miles, utility bills and diet instead of survey averages. Every assumption sourced and published. Your data never leaves your device.">
 <meta property="og:url" content="https://carbon.outis.cc/">
-<meta property="og:image" content="https://carbon.outis.cc/card.svg">
-<meta name="twitter:card" content="summary_large_image">
+<!-- No og:image until there is a real one. Crawlers largely ignore SVG for
+     preview cards, so pointing at a vector file yields a card with a blank
+     slot rather than no slot; "summary" degrades to a clean text card. -->
+<meta name="twitter:card" content="summary">
 <script>window.track = function () {};</script>
 <script>
 (function () {
@@ -200,9 +202,9 @@
 <body>
 <header class="top">
   <h1>Carbon Ledger</h1>
-  <a href="methodology.html">methodology</a>
-  <a href="naics.html">factor table</a>
-  <a href="privacy.html">privacy</a>
+  <a href="methodology">methodology</a>
+  <a href="naics">factor table</a>
+  <a href="privacy">privacy</a>
   <a href="app">open the app →</a>
 </header>
 
@@ -261,7 +263,7 @@
     <div class="fact"><div class="v">Hourly</div><div class="k">grid intensity per balancing authority, so electricity is priced when you actually used it</div></div>
   </div>
   <p style="color:var(--muted);font-size:0.88rem;margin-top:14px">Nothing here is a black box. The
-  <a href="methodology.html">methodology page</a> lists every constant the model uses and where it came
+  <a href="methodology">methodology page</a> lists every constant the model uses and where it came
   from, including the ones that make the answer <i>worse</i> for the model — where it's known to run
   high, where it's known to run low, and why. If you think a number is wrong, it is a link away from
   being checkable.</p>
@@ -278,13 +280,13 @@
       identifier, nothing you typed. That's why there's no cookie banner.</li>
       <li>Clearing this browser's data deletes everything, because that is the only copy.</li>
     </ul>
-    <p style="margin:10px 0 0">Full detail on the <a href="privacy.html">privacy page</a>.</p>
+    <p style="margin:10px 0 0">Full detail on the <a href="privacy">privacy page</a>.</p>
   </div>
 </main>
 
 <footer>
   Carbon Ledger — <a href="https://github.com/ianschillebeeckx/carbon-footprint" target="_blank" rel="noopener">source on GitHub</a> ·
-  <a href="methodology.html">methodology</a> · <a href="privacy.html">privacy</a> ·
+  <a href="methodology">methodology</a> · <a href="privacy">privacy</a> ·
   Found something wrong? <a href="https://github.com/ianschillebeeckx/carbon-footprint/issues" target="_blank" rel="noopener">open an issue</a>.
 </footer>
 

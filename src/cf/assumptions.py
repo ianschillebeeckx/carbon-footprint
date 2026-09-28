@@ -1389,7 +1389,7 @@ ASSUMPTIONS = [
       "is inside the hash, today's value cannot be matched to yesterday's. "
       "That deliberately gives up long-range retention measurement in "
       "exchange for not building a profile.",
-      sources=(("Privacy page", "https://carbon.outis.cc/privacy.html"),),
+      sources=(("Privacy page", "https://carbon.outis.cc/privacy"),),
       code=("scripts/build_web.py", "scripts/analytics.py", "worker/src/index.js")),
 ]
 

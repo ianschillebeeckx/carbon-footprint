@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Every constant Carbon Ledger uses: its value, why it was chosen, the source it came from, and the direction it biases your footprint.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="canonical" href="https://carbon.outis.cc/methodology.html">
+<link rel="canonical" href="https://carbon.outis.cc/methodology">
 <script>window.track = function () {};</script>
 <script>
 (function () {
@@ -164,8 +164,8 @@
 <header class="top">
   <h1>Carbon Ledger — Methodology</h1>
   <a href="app">← back to the app</a>
-  <a href="naics.html">industry table</a>
-  <a href="privacy.html">privacy</a>
+  <a href="naics">industry table</a>
+  <a href="privacy">privacy</a>
   <a href="https://github.com/ianschillebeeckx/carbon-footprint" target="_blank" rel="noopener">source on GitHub</a>
 </header>
 <main>
@@ -219,7 +219,7 @@ A self-reported confidence is a <b>ranking signal, not a probability</b>. The li
 <p class="secintro">Spend-based accounting: each transaction is classified to a NAICS industry and its
 2022-dollar spend is multiplied by that industry's economy-wide carbon intensity. Powerful because a
 bank export covers everything you buy; blunt because a dollar is a dollar — the model can't see brands
-or your specific cart. The full factor table is browsable at <a href="naics.html">the industry
+or your specific cart. The full factor table is browsable at <a href="naics">the industry
 table</a>.</p>
 <article class="a" id="a-gs.epa_factors"><h3><a class="anchor" href="#a-gs.epa_factors">§</a> EPA supply-chain factors (USEEIO) <span class="val">972 NAICS codes, kg CO₂e / 2024 USD</span> <span class="bias b-neutral" title="Direction of error for your footprint">neutral</span></h3><p class="r">Every dollar of classified spending is multiplied by the Supply Chain GHG Emission Factor for its NAICS commodity — <b>v1.4.0, kg CO₂e per 2024 dollar at purchaser price, with margins</b>: the cradle-to-shelf average for that commodity across the whole US economy, including transport, wholesale and retail. These are economy-wide averages from the USEEIO input-output model — they can't see brands, so a dollar of artisanal furniture and a dollar of IKEA carry the same factor. All 972 usable codes are browsable on the <a href="naics.html">industry table</a>.
 
@@ -435,7 +435,7 @@ The advanced hourly-electricity upload sends about <b>24 rows</b> of your CSV �
 
 The server keeps requester IP addresses for roughly a day, in order to rate-limit the classification and parsing endpoints.
 
-Usage analytics are first-party and cookieless: no third-party script, no advertising pixel, and no identifier stored on your device — which is why there is no cookie banner. Each event carries a name (<code>page_view</code>, <code>tab_view</code>, <code>upload_done</code>), the page, the referring site's host, your window width, your country, a session id that exists only in the tab's memory, and counts such as how many tabs you filled in or how many transactions a file held. Never the contents: no merchant name, amount, date, or anything typed into an input. A visitor is counted by hashing your IP address, user agent, the UTC date and a secret — the IP is never written down, and because the date is inside the hash, today's value cannot be matched to yesterday's. That deliberately gives up long-range retention measurement in exchange for not building a profile.</p><p class="meta">Sources: <a href="https://carbon.outis.cc/privacy.html" target="_blank" rel="noopener">Privacy page</a> &nbsp;|&nbsp; Code &amp; data: <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/build_web.py" target="_blank" rel="noopener"><code>build_web.py</code></a> · <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/analytics.py" target="_blank" rel="noopener"><code>analytics.py</code></a> · <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/worker/src/index.js" target="_blank" rel="noopener"><code>index.js</code></a></p></article>
+Usage analytics are first-party and cookieless: no third-party script, no advertising pixel, and no identifier stored on your device — which is why there is no cookie banner. Each event carries a name (<code>page_view</code>, <code>tab_view</code>, <code>upload_done</code>), the page, the referring site's host, your window width, your country, a session id that exists only in the tab's memory, and counts such as how many tabs you filled in or how many transactions a file held. Never the contents: no merchant name, amount, date, or anything typed into an input. A visitor is counted by hashing your IP address, user agent, the UTC date and a secret — the IP is never written down, and because the date is inside the hash, today's value cannot be matched to yesterday's. That deliberately gives up long-range retention measurement in exchange for not building a profile.</p><p class="meta">Sources: <a href="https://carbon.outis.cc/privacy" target="_blank" rel="noopener">Privacy page</a> &nbsp;|&nbsp; Code &amp; data: <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/build_web.py" target="_blank" rel="noopener"><code>build_web.py</code></a> · <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/scripts/analytics.py" target="_blank" rel="noopener"><code>analytics.py</code></a> · <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/worker/src/index.js" target="_blank" rel="noopener"><code>index.js</code></a></p></article>
 
 </main>
 <footer>Generated from <a href="https://github.com/ianschillebeeckx/carbon-footprint/blob/main/src/cf/assumptions.py" target="_blank" rel="noopener">src/cf/assumptions.py</a>

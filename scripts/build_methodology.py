@@ -170,7 +170,7 @@ NAICS_PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Every NAICS commodity Carbon Ledger can assign, with its EPA supply-chain emission factor in kg CO2e per dollar.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="canonical" href="https://carbon.outis.cc/naics.html">
+<link rel="canonical" href="https://carbon.outis.cc/naics">
 <script>window.track = function () {};</script>
 <!--ANALYTICS-->
 <style>
@@ -201,7 +201,7 @@ NAICS_PAGE = """<!doctype html>
 <body>
 <header class="top">
   <h1>Carbon Ledger — Industry factor table</h1>
-  <a href="methodology.html">← methodology</a>
+  <a href="methodology">← methodology</a>
   <a href="app">app</a>
   <a href="/">home</a>
 </header>
@@ -210,7 +210,7 @@ NAICS_PAGE = """<!doctype html>
 (kg CO₂e per 2022 dollar at purchaser price, retail margins included) and the category they roll up
 into. From <a href="https://catalog.data.gov/dataset/supply-chain-greenhouse-gas-emission-factors-v1-3-by-naics-6"
 target="_blank" rel="noopener">EPA Supply Chain GHG Emission Factors v1.3.0</a> — see the
-<a href="methodology.html#a-gs.epa_factors">methodology entry</a> for what these factors do and don't
+<a href="methodology#a-gs.epa_factors">methodology entry</a> for what these factors do and don't
 capture. Click a column header to sort.</p>
 <input id="q" type="search" placeholder="Filter: code, title, keyword (toll, veterinary, streaming…)">
 <span class="count" id="count"></span>

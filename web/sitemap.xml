@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Extensionless: the asset server 307s /x.html -> /x, so the .html forms
+     would list URLs that redirect away from themselves. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://carbon.outis.cc/</loc><priority>1.0</priority></url>
-  <url><loc>https://carbon.outis.cc/methodology.html</loc><priority>0.8</priority></url>
-  <url><loc>https://carbon.outis.cc/naics.html</loc><priority>0.5</priority></url>
-  <url><loc>https://carbon.outis.cc/privacy.html</loc><priority>0.3</priority></url>
+  <url><loc>https://carbon.outis.cc/methodology</loc><priority>0.8</priority></url>
+  <url><loc>https://carbon.outis.cc/naics</loc><priority>0.5</priority></url>
+  <url><loc>https://carbon.outis.cc/privacy</loc><priority>0.3</priority></url>
 </urlset>
