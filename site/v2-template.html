@@ -253,8 +253,8 @@
 <div id="impact">
   <div class="stat"><div class="k">Footprint</div><div class="v" id="imp-tons">–</div><div class="sub" id="imp-split"></div>
     <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (spending × EPA industry carbon intensity) + Travel + Home + Food (physical models). Every factor's rationale and source is on the methodology page (link in the header).">?</button></div>
-  <div class="stat"><div class="k" id="imp-damage-k">Climate damages</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
-    <button class="info" aria-label="About this number" data-tip="The social cost of these emissions: discounted future damages — storms, floods, wildfire, crop loss — mostly borne by other people. EPA's central estimate; see methodology.">?</button></div>
+  <div class="stat"><div class="k" id="imp-damage-k">Damage to others</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
+    <button class="info" aria-label="About this number" data-tip="What these emissions will cost in damage — storms, floods, wildfire, crop loss — added up over the future and discounted to today. Almost none of it lands on you: the harm falls largely on other countries and on people not yet born, and nobody sends you the bill. That is what makes it a cost to others rather than an expense of yours. EPA's central estimate; see methodology.">?</button></div>
   <div class="stat"><div class="k" id="imp-offset-k">To offset</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
     <button class="info" aria-label="About this number" data-tip="What permanently removing this much carbon would cost at a real durable-removal price (Charm Industrial bio-oil sequestration). The percentage is the surcharge on your G&amp;S spending if every purchase paid for its own removal.">?</button></div>
   <div class="stat"><div class="k" id="imp-deaths-k">Excess deaths</div><div class="v" id="imp-deaths">–</div><div class="sub">Bressler mortality cost, horizon 2100</div>
@@ -605,7 +605,7 @@ function renderImpact() {
   const mm = tons * M.umort_per_t * M.horizon_years;
   const deaths = mm / 1e6;
   $("imp-deaths").innerHTML = `${deaths >= 0.1 ? deaths.toFixed(1) : "<0.1"} <small>(${fmt(mm)} micromorts)</small>`;
-  $("imp-damage-k").textContent = `Climate damages · $${ASSUME["impact.scc"]}/t`;
+  $("imp-damage-k").textContent = `Damage to others · $${ASSUME["impact.scc"]}/t`;
   $("imp-offset-k").textContent = `To offset · $${ASSUME["offsets.removal_price"]}/t (Charm)`;
   $("imp-deaths-k").textContent = `Excess deaths · ${M.horizon_years} yrs`;
   renderTotal();
