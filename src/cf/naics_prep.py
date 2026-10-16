@@ -80,6 +80,13 @@ PREFIX_CATEGORY = {
     "45911": "goods_entertainment",
     "33992": "goods_entertainment",           # sporting/athletic goods mfg
     "33993": "goods_entertainment",           # dolls, toys, games mfg
+    # Bicycles and e-bikes. 336* has no prefix rule, so this code fell through
+    # to the "excluded" default — defensible for 3361xx cars, whose manufacture
+    # the travel model amortises per mile, but wrong here: nothing in the travel
+    # model covers a bicycle, so the purchase was counted nowhere. The code also
+    # spans motorcycles, which do belong to travel, but consumer motorcycle
+    # spend overwhelmingly transacts through dealers (441227), already mapped.
+    "336991": "goods_entertainment",          # motorcycle, bicycle & parts mfg
     "441330": "goods_auto_parts",             # auto parts retailers
     "326211": "goods_auto_parts",             # tires
     "3391": "goods_medical",                  # medical equipment & supplies mfg

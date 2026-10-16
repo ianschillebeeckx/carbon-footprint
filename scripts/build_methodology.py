@@ -18,6 +18,7 @@ Run:  .venv/bin/python scripts/build_methodology.py   (also called by build_web.
 
 import datetime
 import html
+import subprocess
 import json
 import re
 import sys
@@ -151,9 +152,28 @@ def build_landing() -> None:
     print(f"Built {OUT_LANDING}: {len(s):,} bytes (landing)")
 
 
+def privacy_updated() -> str:
+    """When the privacy TEMPLATE last changed, not when the build ran.
+
+    date.today() re-dated the page on every unrelated rebuild, so it claimed
+    the policy had been revised when only the NAICS table or a factor had
+    moved. A document whose "last updated" cannot be trusted is worse than one
+    with no date on it.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "log", "-1", "--format=%ad", "--date=short", "--", str(TEMPLATE_PRIVACY)],
+            cwd=ROOT, capture_output=True, text=True, timeout=10)
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return datetime.date.today().isoformat()   # not a git checkout
+
+
 def build_privacy() -> None:
     s = TEMPLATE_PRIVACY.read_text()
-    s = s.replace("__UPDATED__", datetime.date.today().isoformat())
+    s = s.replace("__UPDATED__", privacy_updated())
     s = inline_registry(s, "privacy-template.html")
     leftovers = re.findall(r"__[A-Z_]+__|\{\{[^}]+\}\}", s)
     assert not leftovers, f"unresolved privacy placeholders: {leftovers}"
