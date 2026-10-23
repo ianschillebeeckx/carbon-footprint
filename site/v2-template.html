@@ -2382,7 +2382,7 @@ function renderOffsets() {
     // than the price alone, so legitimate biochar never trips the warning.
     const suspect = type === "durable" && (+r.price || 0) < 100 && (+r.dollars || 0) > 0;
     return `<div class="tvrow">` +
-      `<input type="text" value="${esc(r.label || "")}" data-i="${i}" data-k="label" placeholder="Provider" style="width:130px;font:inherit;font-size:0.78rem;border:1px solid var(--line);border-radius:7px;padding:5px 7px;background:var(--card);color:var(--ink)" aria-label="Provider">` +
+      `<input type="text" value="${esc(r.label || "")}" data-i="${i}" data-k="label" placeholder="Provider" style="width:260px;max-width:100%;font:inherit;font-size:0.78rem;border:1px solid var(--line);border-radius:7px;padding:5px 7px;background:var(--card);color:var(--ink)" aria-label="Provider">` +
       `<input type="number" min="0" step="50" value="${+r.dollars || 0}" data-i="${i}" data-k="dollars" aria-label="Dollars per year"><label>$/yr at</label>` +
       `<input type="number" min="1" step="25" value="${+r.price || ASSUME["offsets.removal_price"]}" data-i="${i}" data-k="price" style="width:70px" aria-label="Price per tonne"><label>$/t</label>` +
       `<select data-i="${i}" data-k="type" aria-label="Offset type" title="What you bought decides how much of it we credit — see methodology">${Object.entries(OFFSET_TYPES).map(([tk, l]) =>
