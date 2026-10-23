@@ -2364,10 +2364,18 @@ function renderOffsets() {
         `<option value="${ck}" ${r.cat === ck ? "selected" : ""}>${l}</option>`).join("")}</select>` +
       `<span class="rowkg" title="${tons.toFixed(2)} t claimed, credited at ${(k*100).toFixed(0)}% for this type">` +
         (k < 1 ? `${tons.toFixed(2)} claimed → −${credited.toFixed(2)} t/yr` : `−${credited.toFixed(2)} t/yr`) + `</span>` +
+      (OFFSETS.rows.length > 1 ? `<button class="del" data-i="${i}" title="Remove">✕</button>` : "") +
+      // Free text, saved with the row and never sent anywhere. A credit's
+      // provenance — vintage, registry ID, or simply why this figure is what
+      // it is — is the thing you cannot reconstruct a year later, and the
+      // numbers above do not record it.
+      `<input type="text" value="${esc(r.note || "")}" data-i="${i}" data-k="note" ` +
+        `placeholder="Note — provider, vintage, registry ID, or why this figure is what it is" ` +
+        `style="flex-basis:100%;margin:3px 0 0;font:inherit;font-size:0.74rem;border:1px solid var(--line);` +
+        `border-radius:7px;padding:4px 7px;background:var(--card);color:var(--muted)" aria-label="Note for this row">` +
       (suspect ? `<div style="flex-basis:100%;color:var(--warn);font-size:0.74rem;margin:2px 0 0 4px">` +
         `⚠ Durable removal doesn't sell below ~$100/t — biochar starts near $130, bio-oil is ~$600, DAC ~$1,000. ` +
         `If this was a forestry or cookstove credit, pick that type: Probst et al. (2024) found fewer than 16% of such credits represent real reductions.</div>` : "") +
-      (OFFSETS.rows.length > 1 ? `<button class="del" data-i="${i}" title="Remove">✕</button>` : "") +
       `</div>`;
   }).join("");
 
@@ -2410,7 +2418,7 @@ function renderOffsets() {
     touched();
   });
   $("offsetrows").querySelectorAll(".del").forEach(b => b.onclick = () => { OFFSETS.rows.splice(+b.dataset.i, 1); touched(); });
-  $("offsetadd").onclick = () => { OFFSETS.rows.push({label: "", cat: "gs", type: "durable", dollars: 0, price: ASSUME["offsets.removal_price"]}); touched(); };
+  $("offsetadd").onclick = () => { OFFSETS.rows.push({label: "", cat: "gs", type: "durable", dollars: 0, price: ASSUME["offsets.removal_price"], note: ""}); touched(); };
   $("recyclelbs").onchange = () => { OFFSETS.recycle_lbs = Math.max(0, +$("recyclelbs").value || 0); touched(); };
   $("compostlbs").onchange = () => { OFFSETS.compost_lbs = Math.max(0, +$("compostlbs").value || 0); touched(); };
   $("recyclecat").onchange = () => { OFFSETS.recycle_cat = $("recyclecat").value; touched(); };
