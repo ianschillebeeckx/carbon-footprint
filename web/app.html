@@ -404,9 +404,9 @@
   <div class="stat"><div class="k">Footprint</div><div class="v" id="imp-tons">–</div><div class="sub" id="imp-split"></div>
     <button class="info" aria-label="About this number" data-tip="Goods &amp; Services (spending × EPA industry carbon intensity) + Travel + Home + Food (physical models). Every factor's rationale and source is on the methodology page (link in the header).">?</button></div>
   <div class="stat"><div class="k" id="imp-damage-k">Damage to others</div><div class="v" id="imp-damage">–</div><div class="sub" id="imp-damage-pct"></div>
-    <button class="info" aria-label="About this number" data-tip="What these emissions will cost in damage — storms, floods, wildfire, crop loss — added up over the future and discounted to today. Almost none of it lands on you: the harm falls largely on other countries and on people not yet born, and nobody sends you the bill. That is what makes it a cost to others rather than an expense of yours. EPA's central estimate; see methodology.">?</button></div>
+    <button class="info" aria-label="About this number" data-tip="What these emissions will cost in damage — storms, floods, wildfire, crop loss — added up over the future and discounted to today. Almost none of it lands on you: the harm falls largely on other countries and on people not yet born, and nobody sends you the bill. That is what makes it a cost to others rather than an expense of yours. The percentage is that cost against every dollar of spending in your transactions that bought something — including the groceries, fuel, flights and utility bills counted in the other tabs, since those dollars are what produced those emissions. Money movement (transfers, card payments, income) is left out. It only sees spending you actually uploaded, so a CSV missing an account will read high. EPA's central estimate; see methodology.">?</button></div>
   <div class="stat"><div class="k" id="imp-offset-k">To offset</div><div class="v" id="imp-offset">–</div><div class="sub" id="imp-offset-pct"></div>
-    <button class="info" aria-label="About this number" data-tip="What permanently removing this much carbon would cost at a real durable-removal price (Charm Industrial bio-oil sequestration). The percentage is the surcharge on your G&amp;S spending if every purchase paid for its own removal.">?</button></div>
+    <button class="info" aria-label="About this number" data-tip="What permanently removing this much carbon would cost at a real durable-removal price (Charm Industrial bio-oil sequestration). The percentage is the surcharge on your spending if every dollar paid for its own removal — measured against all spending that bought something, not just Goods &amp; Services, because the tonnes being removed come from travel, home and food as well. Money movement is excluded. Once you enter offsets you get two figures: the surcharge on your whole footprint, and the smaller one still outstanding after what you have already bought.">?</button></div>
   <div class="stat"><div class="k" id="imp-deaths-k">Excess deaths</div><div class="v" id="imp-deaths">–</div><div class="sub">Bressler mortality cost, horizon 2100</div>
     <button class="info" aria-label="About this number" data-tip="Excess global deaths if this rate is sustained for 50 years, counting deaths through 2100 — Bressler (2021), 2.26×10⁻⁴ deaths per tonne. A micromort is a one-in-a-million chance of death. Shown to one decimal on purpose: the estimate counts heat-related deaths only (conservative in scope) but its own 90% interval is wide and includes zero, so the range across the literature is roughly 0.3–1.5 deaths for an average household. See methodology.">?</button></div>
 </div>
@@ -1054,16 +1054,23 @@ function stats() {
       if (t.factor != null) per[t.category].kg += spend22 * t.factor;
     }
   }
-  let totalKg = 0, totalDollars = 0;
+  let totalKg = 0, totalDollars = 0, consumptionDollars = 0;
   for (const c of CAT_ORDER) {
+    // Everything that bought something, for the damage and offset rates. The
+    // "excluded" rollup belongs here: its dollars — fuel, flights, utilities,
+    // groceries, restaurants — are precisely what produced the travel, home
+    // and food emissions those rates are computed over. Only "ignored" is left
+    // out, because money movement bought nothing. (Uncoded money-movement rows
+    // never reach `per` at all; the guard covers a row a user re-tagged.)
+    if (c !== "ignored") consumptionDollars += per[c].dollars;
     if (c === "excluded") continue;
     totalKg += per[c].kg * catAdj(c); totalDollars += per[c].dollars;
   }
-  return { per, months, totalKg, totalDollars };
+  return { per, months, totalKg, totalDollars, consumptionDollars };
 }
 
 function renderImpact() {
-  const { per, months, totalKg, totalDollars } = stats();
+  const { per, months, totalKg, totalDollars, consumptionDollars } = stats();
   const gsTons = totalKg / months * 12 / 1000;
   const travelTons = travelKg().total / 1000;
   const homeTons = homeKg().total / 1000;
@@ -1071,7 +1078,11 @@ function renderImpact() {
   const grossTons = gsTons + travelTons + homeTons + foodTons;
   const offTons = offsetTons().total;
   const tons = Math.max(0, grossTons - offTons);
-  const annualSpend = totalDollars / months * 12;
+  // The footprint spans travel, home, food and G&S, so dividing its damage by
+  // G&S spending alone put a whole-household numerator over a partial
+  // denominator and overstated both rates — most visibly for a household whose
+  // flights and utilities are large and whose G&S spend is small.
+  const annualSpend = consumptionDollars / months * 12;
   $("imp-tons").innerHTML = `${tons.toFixed(1)} <small>t CO₂e/yr${offTons > 0 ? " net" : ""}</small>`;
   const pct = v => grossTons > 0 ? `${Math.round(v / grossTons * 100)}%` : "–";
   $("imp-split").textContent = `G&S ${pct(gsTons)} · travel ${pct(travelTons)} · home ${pct(homeTons)} · food ${pct(foodTons)}` +
@@ -1082,11 +1093,20 @@ function renderImpact() {
   $("mtab-gs").innerHTML = `Goods &amp; Services <small>${gsTons.toFixed(1)}t</small>`;
   $("mtab-offsets").innerHTML = `Offsets <small>−${offTons.toFixed(1)}t</small>`;
   $("mtab-total").innerHTML = `Total <small>${tons.toFixed(1)}t</small>`;
-  const damage = tons * ASSUME["impact.scc"], offset = tons * ASSUME["offsets.removal_price"];
+  const SCC = ASSUME["impact.scc"], REMOVAL = ASSUME["offsets.removal_price"];
+  const damage = tons * SCC, offset = tons * REMOVAL;
+  // Both rates are shown gross and net. Buying offsets shrinks the numerator
+  // without touching the denominator, so a single figure falls for a reason
+  // that has nothing to do with spending — which reads as the rate improving
+  // when what actually happened is that some of it was paid off.
+  const rate = v => `${(v / annualSpend * 100).toFixed(1)}%`;
+  const both = (gross, net, lead, tail) => !annualSpend ? ""
+    : offTons > 0 ? `${lead}${rate(gross)}${tail} · ${rate(net)} after offsets`
+                  : `${lead}${rate(gross)}${tail}`;
   $("imp-damage").innerHTML = `$${fmt(damage)} <small>/yr</small>`;
-  $("imp-damage-pct").textContent = annualSpend ? `${(damage/annualSpend*100).toFixed(1)}% of G&S spending` : "";
+  $("imp-damage-pct").textContent = both(grossTons * SCC, damage, "", " of spending");
   $("imp-offset").innerHTML = `$${fmt(offset)} <small>/yr</small>`;
-  $("imp-offset-pct").textContent = annualSpend ? `+${(offset/annualSpend*100).toFixed(1)}% on G&S spending` : "";
+  $("imp-offset-pct").textContent = both(grossTons * REMOVAL, offset, "+", " on spending");
   // Bressler (2021): tonnes x micromorts/t x years. One decimal, not two —
   // the source's own 90% interval spans a factor of several and includes zero,
   // so a second decimal would claim precision that isn't there. See the
@@ -1117,7 +1137,14 @@ function renderCats() {
     if (info.section !== section) {
       section = info.section;
       const h = document.createElement("h2");
-      if (section === "Excluded") h.textContent = "Out of scope";
+      if (section === "Excluded") {
+        h.innerHTML = `<span>Out of scope</span>` +
+          `<button class="info" aria-label="How to classify out-of-scope transactions" data-tip="Two different things live here, and the difference matters.&#10;&#10;` +
+          `EXCLUDED — counted elsewhere: real purchases whose emissions are modelled physically in another tab — groceries and restaurants (Food), fuel and airfare (Travel), utilities and rent (Home). Leave these coded. They are kept out of the Goods ` +
+          `&amp; Services total so nothing is counted twice, but their dollars stay in your spending, which is the denominator for the damage and offset rates at the top.&#10;&#10;` +
+          `IGNORED — transfers, payments, income: money movement that bought nothing. Card payments, transfers between your own accounts, paychecks, refunds of principal.&#10;&#10;` +
+          `Tagging a real purchase as Ignored to get it out of Goods &amp; Services also removes it from your spending total, which inflates those percentages. Use Excluded for anything you actually bought.">?</button>`;
+      }
       else {
         const money = (secTotal[section] / months).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
         const kgmo = Math.round(secKg[section] / months);
