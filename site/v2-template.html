@@ -514,6 +514,24 @@ const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"
 const fmt = n => n.toLocaleString("en-US", {maximumFractionDigits: 0});
 
 const CATS = CATS_STATIC || (DATA ? DATA.categories : {});
+
+// Sales tax. A statement shows what the card was charged, tax included; the
+// EPA factor's denominator excludes it (USEEIO purchaser value = producers'
+// value + transport + wholesale + retail, with no tax term), so charged
+// dollars x factor attributes emissions to tax that bought nothing physical.
+//
+// Applied to Goods AGGREGATES only — section totals, the charts, the Total tab
+// and everything downstream of the footprint. The per-category rows keep EPA's
+// published kg/$ and their own raw emissions, so the chain from one
+// transaction to one published factor stays checkable by hand. The cost is
+// that a goods section total is ~7% below the sum of the rows above it, which
+// is what the Goods tooltip exists to explain.
+//
+// Services are untouched: US sales tax falls on tangible personal property and
+// most states, California included, exempt services almost entirely.
+const SALES_TAX = ASSUME["gs.sales_tax"];
+const secAdj = sec => sec === "Goods" ? 1 / (1 + SALES_TAX) : 1;
+const catAdj = cat => secAdj(CATS[cat] && CATS[cat].section);
 const CAT_ORDER = Object.keys(CATS);
 const isLow = t => t.unmapped || (t.source !== "manual" && t.source !== "confirmed" &&
   (t.source === "vector" || (t.source === "llm" && t.confidence != null && t.confidence < ASSUME["method.lowconf"]) || t.margin_warn));
@@ -567,7 +585,7 @@ function stats() {
   let totalKg = 0, totalDollars = 0;
   for (const c of CAT_ORDER) {
     if (c === "excluded") continue;
-    totalKg += per[c].kg; totalDollars += per[c].dollars;
+    totalKg += per[c].kg * catAdj(c); totalDollars += per[c].dollars;
   }
   return { per, months, totalKg, totalDollars };
 }
@@ -615,10 +633,11 @@ function renderCats() {
   const { per, months } = stats();
   const host = $("catlist");
   host.innerHTML = "";
-  const secTotal = {};
+  const secTotal = {}, secKg = {};
   for (const c of CAT_ORDER) {
     const sec = CATS[c].section;
     secTotal[sec] = (secTotal[sec] || 0) + per[c].dollars;
+    secKg[sec] = (secKg[sec] || 0) + per[c].kg * catAdj(c);
   }
   let section = null;
   for (const c of CAT_ORDER) {
@@ -627,7 +646,15 @@ function renderCats() {
       section = info.section;
       const h = document.createElement("h2");
       if (section === "Excluded") h.textContent = "Out of scope";
-      else h.innerHTML = `<span>${esc(section)}</span><span class="htot">${(secTotal[section] / months).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})} $/mo</span>`;
+      else {
+        const money = (secTotal[section] / months).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        const kgmo = Math.round(secKg[section] / months);
+        h.innerHTML = `<span>${esc(section)}</span>` +
+          (section === "Goods"
+            ? `<button class="info" aria-label="Why the Goods total is below the sum of its rows" data-tip="Sales tax. Your statement shows what the card was charged, tax included, but the EPA industry factor is priced per pre-tax dollar — so multiplying the charged amount by it would count emissions for tax dollars, which bought nothing physical. This section total divides goods spending by ${(1 + SALES_TAX).toFixed(3)} (a ${(SALES_TAX * 100).toFixed(1)}% US-average combined state and local rate). The rows below are left on the published factor so you can still check any one of them against EPA, which is why they add up to about ${(SALES_TAX * 100).toFixed(0)}% more than this line. Services are not adjusted: US sales tax falls on goods, and most states exempt services. See the methodology page.">?</button>`
+            : "") +
+          `<span class="htot">${money} $/mo · ${kgmo.toLocaleString("en-US")} kg/mo</span>`;
+      }
       host.appendChild(h);
     }
     const d = per[c].dollars / months, kg = per[c].kg / months;
@@ -2192,7 +2219,10 @@ function usAvg() {
     const e = byCode.get(code);
     if (!e || e.category === "excluded" || e.category === "ignored") continue;
     const sec = CATS[e.category] && CATS[e.category].section;
-    if (sec === "Goods") goods += US_IN.gs_basket[code] * e.factor;
+    // The BLS CE basket records what households actually paid, tax included,
+    // so it takes the same divisor — correcting one side only would put the
+    // user's bar and this tick on different bases.
+    if (sec === "Goods") goods += US_IN.gs_basket[code] * e.factor * secAdj("Goods");
     else services += US_IN.gs_basket[code] * e.factor;
   }
   _usAvgGrid = grid;
@@ -2202,7 +2232,7 @@ function usAvg() {
 function renderTotal() {
   if (!$("fig-total")) return;
   const { per, months } = stats();
-  const gsAnnual = c => per[c] ? per[c].kg / months * 12 : 0;
+  const gsAnnual = c => per[c] ? per[c].kg / months * 12 * catAdj(c) : 0;
   const secSegs = section => CAT_ORDER
     .filter(c => DATA && CATS[c].section === section && gsAnnual(c) > 0)
     .map((c, i) => ({kg: gsAnnual(c), color: PAL[i % 8], title: CATS[c].label}));
@@ -2422,8 +2452,8 @@ function monthlyEmissions() {
       (byMonth[m] = byMonth[m] || {})[cat] = (byMonth[m][cat] || 0) + kg;
       byCat[cat] = (byCat[cat] || 0) + kg;
     };
-    if (t.mix) for (const p of t.mix) add(p.category, spend22 * p.weight * p.factor);
-    else if (t.factor != null) add(t.category, spend22 * t.factor);
+    if (t.mix) for (const p of t.mix) add(p.category, spend22 * p.weight * p.factor * catAdj(p.category));
+    else if (t.factor != null) add(t.category, spend22 * t.factor * catAdj(t.category));
   }
   return {byMonth, byCat};
 }

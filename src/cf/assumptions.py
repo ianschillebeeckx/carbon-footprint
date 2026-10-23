@@ -170,6 +170,49 @@ ASSUMPTIONS = [
     # ------------------------------------------------------------------
     # Goods & Services
     # ------------------------------------------------------------------
+    A("gs.sales_tax", "gs", "Sales tax taken off goods spending",
+      "Your statement shows what the card was charged, which includes sales "
+      "tax. The factor's denominator does not: USEEIO defines purchaser's "
+      "value as producers' value plus transportation, wholesale and retail "
+      "margins, with no tax term — the published factor file decomposes "
+      "exactly that way (`without margins` + `margins` = `with margins`). "
+      "Multiplying the charged amount by the factor therefore attributes "
+      "emissions to tax dollars, which bought nothing physical. Goods "
+      "spending is divided by 1.075 before the factor is applied.\n\n"
+      "**Why only goods.** Sales tax in the US falls on tangible personal "
+      "property. Most states, California included, exempt services almost "
+      "entirely — professional, personal and medical services, rent, "
+      "insurance, and repair labour (the parts are taxed, the labour is "
+      "not), along with software and digital goods in many states. The "
+      "Goods/Services split this app already draws is close to the "
+      "taxable/exempt line, so the correction is applied to the Goods "
+      "section and not to Services.\n\n"
+      "**7.5%** is the population-weighted average combined state and local "
+      "rate. The spread is wide and this single number cannot follow it: "
+      "five states levy no sales tax at all, while Louisiana and Tennessee "
+      "exceed 9.5%. A household in Oregon is over-corrected and one in "
+      "Louisiana under-corrected, by roughly 7% of its goods figure in "
+      "either direction.\n\n"
+      "Two residual errors, in opposite directions. Goods that are exempt in "
+      "most states — prescription drugs in `goods_medical` above all — are "
+      "corrected when they should not be, which understates. And the "
+      "handful of states that do tax services get no correction there, which "
+      "overstates. Both are small against the 7.5% itself.\n\n"
+      "The same divisor applies to the US-average benchmark, whose basket "
+      "comes from the BLS Consumer Expenditure Survey and likewise records "
+      "what households actually paid, tax included. Correcting one side and "
+      "not the other would put your bar and the benchmark tick on different "
+      "bases — a comparison that looks fine and is quietly wrong.",
+      value=0.075, display="7.5% removed from Goods spend",
+      bias="varies",
+      sources=(("Tax Foundation, State and Local Sales Tax Rates "
+                "(population-weighted average combined rate)",
+                "https://taxfoundation.org/data/all/state/2025-sales-taxes/"),
+               ("USEEIO model format spec — purchaser's value = producers' value "
+                "+ transportation + wholesale + retail",
+                "https://github.com/USEPA/useeior/blob/master/format_specs/Model.md")),
+      code=("site/v2-template.html", "src/cf/assumptions.py")),
+
     A("gs.epa_factors", "gs", "EPA supply-chain factors (USEEIO)",
       "Every dollar of classified spending is multiplied by the Supply Chain "
       "GHG Emission Factor for its NAICS commodity — **v1.4.0, kg CO₂e per "
@@ -178,7 +221,11 @@ ASSUMPTIONS = [
       "transport, wholesale and retail. These are economy-wide averages from "
       "the USEEIO input-output model — they can't see brands, so a dollar of "
       "artisanal furniture and a dollar of IKEA carry the same factor. All "
-      "972 usable codes are browsable on the [industry table](naics.html).\n\n"
+      "972 usable codes are browsable on the [industry table](naics.html). "
+      "One wrinkle follows from \"purchaser price\": it excludes sales tax, "
+      "while the dollars on your statement include it, so goods aggregates "
+      "are divided by it first — see **Sales tax taken off goods spending**."
+      "\n\n"
       "**This is no longer an EPA dataset.** EPA published through v1.3.0 and "
       "then stopped; v1.4.0 (October 2025) is published by the Cornerstone "
       "Sustainability Data Initiative and authored by Wesley Ingwersen, who "
