@@ -19,7 +19,7 @@ declared once in `src/cf/assumptions.py`; the app computes with those values
 (injected as `ASSUME`) and `scripts/build_methodology.py` renders the same
 registry into the human-readable methodology page
 (`web/methodology.html`, live at
-[carbon.outis.cc/methodology.html](https://carbon.outis.cc/methodology.html))
+[carbon.outis.cc/methodology](https://carbon.outis.cc/methodology))
 plus the browsable 972-code factor table (`web/naics.html`) — so a number
 can't drift between code and writeup.
 
