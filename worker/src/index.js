@@ -332,8 +332,16 @@ export default {
     try {
       return await handle(request, env, ctx);
     } catch (e) {
-      console.error("unhandled", { path: new URL(request.url).pathname, error: String(e.message || e).slice(0, 300) });
-      return new Response(JSON.stringify({ error: String(e.message || e).slice(0, 300) }),
+      // Unexpected failures only — every deliberate error (rate limit, missing
+      // secret, Turnstile, budget) returns its own message above and is meant
+      // to be read. What lands here can carry upstream text: an Anthropic
+      // error body, for one, which is no use to a browser and should not be
+      // echoed into one. Log the detail, hand back a reference that matches it.
+      const ref = crypto.randomUUID().slice(0, 8);
+      console.error("unhandled", { ref, path: new URL(request.url).pathname,
+                                   error: String(e.message || e).slice(0, 300) });
+      return new Response(JSON.stringify({
+        error: `Something went wrong on our side (ref ${ref}). Please try again in a minute.` }),
         { status: 500, headers: { ...JSON_HEADERS, ...cors(env) } });
     }
   },
